@@ -230,9 +230,14 @@ sub store {
 		my $program_id =  $params->{additionalInfo}->{programDbId}  || undef;
 		my $type =  $params->{locationType} || undef;
 		my $geo_coordinates = $params->{coordinates} || undef;
-		my $latitude = $geo_coordinates->[0] || undef;
-		my $longitude = $geo_coordinates->[1] || undef;
-		my $altitude  = $geo_coordinates->[2]|| undef;
+		my $latitude;
+		my $longitude;
+		my $altitude;
+		if ($geo_coordinates && $geo_coordinates->{geometry} && $geo_coordinates->{geometry}->{coordinates}) {
+			$latitude = $geo_coordinates->{geometry}->{coordinates}[0] || undef;
+			$longitude = $geo_coordinates->{geometry}->{coordinates}[1] || undef;
+			$altitude  = $geo_coordinates->{geometry}->{coordinates}[2]|| undef;
+		}
 		my $noaa_station_id    = $params->{additionalInfo}->{noaaStationId} || undef;
 		my $external_references = $params->{externalReferences};
 		my $program_name;
