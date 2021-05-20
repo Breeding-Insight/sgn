@@ -291,10 +291,10 @@ sub store {
 			push @location_ids, $store->{'nd_geolocation_id'};
 		}
 	}
-	my %result;
-	my $count = scalar @location_ids;
-    my $pagination = CXGN::BrAPI::Pagination->pagination_response($count,$page_size,$page);
-    return CXGN::BrAPI::JSONResponse->return_success( \%result, $pagination, undef, $self->status(), $count . " Locations were saved.");
+
+	# Retrieve our new locations
+	my $locations = CXGN::Trial::get_all_locations($schema, \@location_ids);
+	return $self->get_response($locations, 1);
 }
 
 1;
