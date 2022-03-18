@@ -368,7 +368,7 @@ sub verify {
                 if (exists($check_trait_category{$trait_cvterm_id})) {
                     my @trait_categories = split /\//, $check_trait_category{$trait_cvterm_id};
                     my %trait_categories_hash;
-                    if ($check_trait_format{$trait_cvterm_id} eq 'Ordinal') {
+                    if ($check_trait_format{$trait_cvterm_id} eq 'Ordinal' || $check_trait_format{$trait_cvterm_id} eq 'Nominal') {
                         # Ordinal looks like <value>=<category>
                         foreach my $ordinal_category (@trait_categories) {
                             my @split_value = split('=', $ordinal_category);
@@ -377,7 +377,7 @@ sub verify {
                             }
                         }
                     } else {
-                        # Nominal, the category is just a value
+                        # Catch everything else
                         %trait_categories_hash = map { $_ => 1 } @trait_categories;
                     }
 
@@ -470,6 +470,7 @@ sub store {
     my $subplot_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'subplot', 'stock_type')->cvterm_id();
     my $tissue_sample_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'tissue_sample', 'stock_type')->cvterm_id();
     my $analysis_instance_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'analysis_instance', 'stock_type')->cvterm_id();
+    my $phenotype_addtional_info_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'phenotype_additional_info', 'phenotype_property')->cvterm_id();
     my %experiment_ids;
     my @stored_details;
     my %nd_experiment_md_images;
@@ -563,6 +564,7 @@ sub store {
                     $operator = $value->[2] ? $value->[2] : $operator;
                     my $observation = $value->[3];
                     my $image_id = $value->[4];
+                    my $additional_info = $value_array->[5] || undef;
                     my $unique_time = $timestamp && defined($timestamp) ? $timestamp : 'NA' . $upload_date;
 
                     if (defined($trait_value) && length($trait_value)) {
@@ -659,6 +661,15 @@ sub store {
                                 $nd_experiment_md_images{$experiment->nd_experiment_id()} = $image_id;
                             }
                         }
+
+                        if($additional_info){
+                            my $pheno_additional_info = $schema->resultset("Phenotype::Phenotypeprop")->create({
+                                phenotype_id => $phenotype->phenotype_id,
+                                type_id       => $phenotype_addtional_info_type_id,
+                                value => encode_json $additional_info,
+                            });
+                        }
+
                         my $observationVariableDbId = $trait_cvterm->cvterm_id;
                         my %details = (
                             "germplasmDbId"           => $linked_data{$plot_name}->{germplasmDbId},
@@ -670,7 +681,7 @@ sub store {
                             "observationVariableDbId" => qq|$observationVariableDbId|,
                             "observationVariableName" => $trait_cvterm->name,
                             "studyDbId"               => $project_id,
-                            "uploadedBy"              => $user_id,
+                            "uploadedBy"              => $operator ? $operator : "",
                             "value"                   => $trait_value
                         );
 
