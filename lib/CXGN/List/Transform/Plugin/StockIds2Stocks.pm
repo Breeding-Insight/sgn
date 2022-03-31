@@ -3,6 +3,8 @@ package CXGN::List::Transform::Plugin::StockIds2Stocks;
 use Moose;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "stock_ids_2_stocks";
 }
@@ -39,7 +41,7 @@ sub transform {
             if ($rs->count() == 0) {
                 push @missing, $l;
             } else {
-                #print STDERR $rs->first()->uniquename() . "\n";
+                #$logger->error($rs->first()->uniquename() . "");
                 push @transform, $rs->first()->uniquename();
             }
         }

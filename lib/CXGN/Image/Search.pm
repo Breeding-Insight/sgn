@@ -56,6 +56,8 @@ use Data::Dumper;
 use SGN::Model::Cvterm;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -448,7 +450,7 @@ sub search {
         $limit_clause
         $offset_clause;";
 
-    # print STDERR Dumper $q;
+    # $logger->error(Dumper($q));
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute();
 
@@ -479,7 +481,7 @@ sub search {
         };
         $total_count = $full_count;
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
     return (\@result, $total_count);
 }
 

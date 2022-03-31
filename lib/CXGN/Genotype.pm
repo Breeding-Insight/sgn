@@ -6,6 +6,8 @@ use Moose;
 use JSON::Any;
 use Math::Round qw | :all |;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'genotypeprop_id' => ( isa => 'Int',
 			   is => 'rw',
     );
@@ -56,7 +58,7 @@ sub BUILD {
     my $bcs_schema = $self->bcs_schema();
 
     if ( defined($genotypeprop_id) && defined($bcs_schema)) { 
-	print STDERR "Creating CXGN::Genotype object from genotypeprop_id ".$self->genotypeprop_id()." and the schema object\n";
+	$logger->debug("Creating CXGN::Genotype object from genotypeprop_id ".$self->genotypeprop_id()." and the schema object");
 
 	my $row = $self->bcs_schema()->resultset("Genetic::Genotypeprop")->find( { genotypeprop_id=> $self->genotypeprop_id() });
 
@@ -66,7 +68,7 @@ sub BUILD {
 	else { 
 	    die "The CXGN::Genotype object could not be created with the genotypeprop_id ".$self->genotypeprop_id()." and the provided schema.";
 	}
-	print STDERR "Done!\n";
+	$logger->debug("Done!");
     }
 }
 
@@ -86,7 +88,7 @@ sub from_json {
     my $self = shift;
     my $json = shift;
     
-    #print STDERR "JSON = $json\n";
+    #$logger->error("JSON = $json");
     
     my $data = JSON::Any->decode($json);
 
@@ -173,15 +175,15 @@ sub calculate_distance {
 	if ($self->good_score($other_genotype_score->{$m}->{$self->marker_encoding()}) && $self->good_score($this_genotype_score->{$m}->{$self->marker_encoding() })) { 
 	    if ($self->scores_are_equal($other_genotype_score->{$m}->{$self->marker_encoding()}, $this_genotype_score->{$m}->{$self->marker_encoding()})) { 
 		$total_matches++;
-		#print STDERR "$m: $other_genotype_score->{$m} matches $this_genotype_score->{$m}\n";
+		#$logger->error("$m: $other_genotype_score->{$m} matches $this_genotype_score->{$m}");
 	    }
 	    else { 
 		$total_mismatches++;
-		#print STDERR "$m: $other_genotype_score->{$m} no match with $this_genotype_score->{$m}\n";
+		#$logger->error("$m: $other_genotype_score->{$m} no match with $this_genotype_score->{$m}");
 	    }
 	    
 	}
-	else {    #print STDERR "$m has no valid scores\n"; 
+	else {    #$logger->error("$m has no valid scores");
 	}
     }
     return $total_matches / ($total_matches + $total_mismatches);
@@ -192,7 +194,7 @@ sub read_counts {
     my $marker = shift;
 
     my $raw = $self->rawscores->{$marker};
-    #print STDERR "RAW: $raw\n";
+    #$logger->error("RAW: $raw");
     my $counts = (split /\:/, $raw)[1];
     
     my ($c1, $c2) = split /\,/, $counts;
@@ -360,35 +362,35 @@ sub calculate_encoding_type {
 }
 
 sub delete_genotypes_with_protocol_id {
-    my $class = shift;
+    my $self = shift;
     my $schema = shift;
     my $nd_protocol_id = shift;
 
     my $dbh = $schema->storage()->dbh();
 
-    print STDERR "Deleteing genotype entries... ";
+    $logger->error("Deleteing genotype entries... ");
     my $q1 = "DELETE FROM genotype WHERE genotype_id in (SELECT genotype_id FROM nd_experiment_protocol join nd_experiment_genotype using(nd_experiment_id) JOIN genotype USING(genotype_id) WHERE nd_protocol_id=?)";
     my $h1 = $dbh->prepare($q1);
     $h1->execute($nd_protocol_id);
-    print STDERR "Done.\n";
+    $logger->debug("Done.");
     
-    print STDERR "Delete nd_experiment_md_files entries... ";
+    $logger->error("Delete nd_experiment_md_files entries... ");
     my $q8 = "DELETE FROM phenome.nd_experiment_md_files WHERE nd_experiment_id in (SELECT nd_experiment_id FROM nd_experiment_protocol join nd_experiment using(nd_experiment_id) WHERE nd_protocol_id=?)";
     my $h8 = $dbh->prepare($q8);
     $h8->execute($nd_protocol_id);
     
-    print STDERR "Deleting nd_experiment entries... ";
+    $logger->error("Deleting nd_experiment entries... ");
     my $q2 = "DELETE FROM nd_experiment WHERE nd_experiment_id in (SELECT nd_experiment_id FROM nd_experiment_protocol join nd_experiment using(nd_experiment_id) WHERE nd_protocol_id=?)";
     
     my $h2 = $dbh->prepare($q2);
     $h2 ->execute($nd_protocol_id);
-    print STDERR "Done.\n";
+    $logger->debug("Done.");
     
-    print STDERR "Deleting protocol entry... ";
+    $logger->error("Deleting protocol entry... ");
     my $q3 = "DELETE FROM nd_protocol WHERE nd_protocol_id=?";
     my $h3 = $dbh->prepare($q3);
     $h3->execute($nd_protocol_id);
-    print STDERR "Done.\n";
+    $logger->debug("Done.");
 }
 
 __PACKAGE__->meta->make_immutable;

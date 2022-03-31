@@ -5,6 +5,8 @@ use Moose;
 use Data::Dumper;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "accessions_or_family_names";
 }
@@ -31,7 +33,7 @@ sub validate {
         }
     }
 
-    #print STDERR Dumper \%all_names;
+    #$logger->error(Dumper(\%all_names));
     my @missing;
     foreach my $item (@$list) {
         if (!exists($all_names{$item})) {

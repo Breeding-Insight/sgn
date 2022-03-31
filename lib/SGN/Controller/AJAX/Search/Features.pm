@@ -8,6 +8,8 @@ BEGIN { extends 'Catalyst::Controller::REST' }
 use Data::Dumper;
 use JSON::Any;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 __PACKAGE__->config(
     default   => 'application/json',
@@ -22,7 +24,7 @@ sub feature_search :Path('/ajax/search/features') Args(0) {
     
     my $params = $c->req->params() || {};
 
-#    print STDERR "PARAMS: ".Dumper($params);
+#    $logger->error("PARAMS: ".Dumper($params));
     
 # params 
 # organism
@@ -144,7 +146,7 @@ sub feature_search :Path('/ajax/search/features') Args(0) {
 	} 
 	);
     
-    print STDERR "RECORDS TOTAL: $records_total\n";
+    $logger->debug("RECORDS TOTAL: $records_total");
     ## then get the data
     #
     #organism type name description location(s) 

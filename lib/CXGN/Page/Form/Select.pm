@@ -23,6 +23,7 @@ use CXGN::Page::Form::ElementI;
 package CXGN::Page::Form::Select;
 
 use base qw / CXGN::Page::Form::ElementI /;
+my $logger = Log::Log4perl->get_logger();
 
 =head2 new
 
@@ -50,10 +51,10 @@ sub new {
     my %args = @_;
     my $self = $class->SUPER::new(%args);
 
-    #print STDERR "Parameters after SUPER: ".(join ", ", @_)."\n";
+    #$logger->error("Parameters after SUPER: ".(join ", ", @_)."");
     for (my $i=0; $i<@{$args{select_list_ref}}; $i++) { 
 	$self->add_selection($args{select_list_ref}->[$i], $args{select_id_list_ref}->[$i]);
-	#print STDERR "Adding selection $args{select_list_ref}->[$i], $args{select_id_list_ref}->[$i]\n";
+	#$logger->error("Adding selection $args{select_list_ref}->[$i], $args{select_id_list_ref}->[$i]");
     }
     return $self;
 }

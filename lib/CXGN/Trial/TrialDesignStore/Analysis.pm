@@ -7,10 +7,12 @@ use SGN::Model::Cvterm;
 
 extends 'CXGN::Trial::TrialDesignStore::AbstractTrial';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub BUILD {   # adjust the cvterm ids for phenotyping trials
     my $self = shift;
 
-    print STDERR "PhenotypingTrial BUILD setting stock type id etc....\n";
+    $logger->debug("PhenotypingTrial BUILD setting stock type id etc....");
     my @source_stock_types;
     $self->set_nd_experiment_type_id(SGN::Model::Cvterm->get_cvterm_row($self->get_bcs_schema(), 'analysis_experiment', 'experiment_type')->cvterm_id());
 

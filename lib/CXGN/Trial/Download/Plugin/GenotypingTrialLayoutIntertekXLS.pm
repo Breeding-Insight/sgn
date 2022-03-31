@@ -40,6 +40,8 @@ use Spreadsheet::WriteExcel;
 use CXGN::Trial;
 use CXGN::Trial::TrialLayout;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub verify { 
     return 1;
 } 
@@ -55,7 +57,7 @@ sub download {
         push @trial_ids, @{$self->trial_list};
     }
 
-    print STDERR "DATALEVEL ".$self->data_level."\n";
+    $logger->debug("DATALEVEL ".$self->data_level."");
     my $ss = Spreadsheet::WriteExcel->new($self->filename());
     my $ws = $ss->add_worksheet();
 
@@ -71,7 +73,7 @@ sub download {
         my $trial_name = $trial->get_name();
         my $trial_layout = CXGN::Trial::TrialLayout->new({schema => $self->bcs_schema, trial_id => $_, experiment_type => 'genotyping_layout'});
         my $design = $trial_layout->get_design();
-        print STDERR "DESIGN FOR INTERTEK XLS DOWNLOAD: ".Dumper $design;
+        $logger->error("DESIGN FOR INTERTEK XLS DOWNLOAD: ".Dumper($design));
         no warnings 'uninitialized';
         foreach my $key (sort keys %$design){
             my $val = $design->{$key};

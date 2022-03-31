@@ -31,6 +31,8 @@ use CXGN::Genotype::Protocol;
 use CXGN::Genotype;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -50,7 +52,7 @@ sub upload_genotype_qc_verify_POST : Args(0) {
     my @error_status;
     my @success_status;
 
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
     my $session_id = $c->req->param("sgn_session_id");
     my $user_id;
     my $user_role;
@@ -134,7 +136,7 @@ sub upload_genotype_qc_verify_POST : Args(0) {
             $c->stash->{rest} = {error_string => $return_error,};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error=$return_error.$error_string."<br>";
             }
@@ -142,7 +144,7 @@ sub upload_genotype_qc_verify_POST : Args(0) {
         $c->stash->{rest} = {error_string => $return_error, missing_stocks => $parse_errors->{'missing_stocks'}};
         $c->detach();
     }
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
     my $observation_unit_uniquenames = $parsed_data->{observation_unit_uniquenames};
     my $genotype_info = $parsed_data->{genotypes_info};
     my $protocol_info = $parsed_data->{protocol_info};
@@ -182,10 +184,10 @@ sub upload_genotype_qc_verify_POST : Args(0) {
     }
     my @protocol_stock_names = keys %seen_stored_genotype_names;
 
-    #print STDERR Dumper \%distance_matrix;
-    #print STDERR Dumper $genotype_info;
-    #print STDERR Dumper $protocol_info;
-    #print STDERR Dumper $observation_unit_uniquenames;
+    #$logger->error(Dumper(\%distance_matrix));
+    #$logger->error(Dumper($genotype_info));
+    #$logger->error(Dumper($protocol_info));
+    #$logger->error(Dumper($observation_unit_uniquenames));
 
     $c->stash->{rest} = {success => 1, distance_matrix => \%distance_matrix, users_stock_names => $observation_unit_uniquenames, protocol_stock_names => \@protocol_stock_names };
 }

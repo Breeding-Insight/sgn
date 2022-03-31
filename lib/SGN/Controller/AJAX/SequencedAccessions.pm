@@ -8,6 +8,8 @@ use DateTime;
 use List::MoreUtils qw(uniq);
 use CXGN::Stock::SequencingInfo;
 
+my $logger = Log::Log4perl->get_logger();
+
 __PACKAGE__->config(
     default   => 'application/json',
     stash_key => 'rest',
@@ -25,7 +27,7 @@ sub get_all_sequenced_stocks :Path('/ajax/genomes/sequenced_stocks') {
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $sequenced_stocks = CXGN::Stock::SequencingInfo->get_props($schema);
 
-    print STDERR "SEQeunced STOCKS: ".Dumper($sequenced_stocks);
+    $logger->error("SEQeunced STOCKS: ".Dumper($sequenced_stocks));
     
     my @info = $self->format_sequencing_infos($schema, $user_id, $sequenced_stocks);
 
@@ -38,14 +40,14 @@ sub get_all_sequenced_stocks :Path('/ajax/genomes/sequenced_stocks') {
      my $stock_id = shift;
 
      my $user_id = $c->user() ? $c->user->get_object()->get_sp_person_id() : undef;
-     print STDERR "Retrieving sequencing info for stock $stock_id...\n";
+     $logger->debug("Retrieving sequencing info for stock $stock_id...");
      
      my $schema = $c->dbic_schema("Bio::Chado::Schema");
      my $sequenced_stocks = CXGN::Stock::SequencingInfo->get_props($schema, $stock_id);
 
      my @info = $self->format_sequencing_infos($schema, $user_id, $sequenced_stocks);
 
-     print STDERR "SEQ INFOS: ".Dumper(\@info);
+     $logger->error("SEQ INFOS: ".Dumper(\@info));
 
      $c->stash->{rest} = { data => \@info };
 }
@@ -67,7 +69,7 @@ sub format_sequencing_infos {
 	    $info->{uniquename} = $row->uniquename();
 	}
 	
-	print STDERR "INFO = ".Dumper($info);
+	$logger->error("INFO = ".Dumper($info));
 
 	my $website = "";
 	if ($info->{website}) {
@@ -113,7 +115,7 @@ sub format_sequencing_infos {
 	    ];
     }
     
-    #print STDERR "Sequencing Data for this stock: ".Dumper(\@data);
+    #$logger->error("Sequencing Data for this stock: ".Dumper(\@data));
     return @data;
 }
 
@@ -140,7 +142,7 @@ sub store_sequencing_info :Path('/ajax/genomes/store_sequencing_info') Args(0) {
 
     my $params = $c->req->params();
 
-    print STDERR "Params for store: ".Dumper($params);
+    $logger->error("Params for store: ".Dumper($params));
 
     if (!$c->user()) {
 	$c->stash->{rest} = { error => "You need to be logged in to add sequencing information" };
@@ -153,15 +155,15 @@ sub store_sequencing_info :Path('/ajax/genomes/store_sequencing_info') Args(0) {
 
     if (!$params->{stockprop_id}) { $params->{stockprop_id} = undef; } # force it to undef if it is a ""
 
-    print STDERR "Create sequencing info object...\n";
+    $logger->debug("Create sequencing info object...");
     my $si = CXGN::Stock::SequencingInfo->new( { bcs_schema => $c->dbic_schema("Bio::Chado::Schema") });
-    print STDERR "Done\n";
+    $logger->debug("Done");
     my $timestamp = DateTime->now();
     $params->{sp_person_id} = $c->user()->get_object()->get_sp_person_id();
     $params->{timestamp} = $timestamp->ymd()." ".$timestamp->hms();
     $params->{stock_id} = $params->{sequencing_status_stock_id};
 
-    print STDERR "Adjusted params = ".Dumper($params);
+    $logger->error("Adjusted params = ".Dumper($params));
 
     $si->from_hash($params);
     
@@ -186,7 +188,7 @@ sub delete_sequencing_info :Path('/ajax/genomes/sequencing_info/delete') Args(1)
 
     my $stockprop_id = shift;
 
-    print STDERR "delete_sequencing_info...\n";
+    $logger->debug("delete_sequencing_info...");
 
     if (!$c->user() && !$c->user()->check_roles("curator")) {
 	$c->stash->{rest} = { error => "Log in required for sequencing info dele
@@ -205,7 +207,7 @@ tion." };
 	return;
     }
 
-    print STDERR "Starting delete of stockprop_id $stockprop_id...(in object: ".$si->prop_id()."), type_id =". $si->_prop_type_id()."\n";
+    $logger->debug("Starting delete of stockprop_id $stockprop_id...(in object: ".$si->prop_id()."), type_id =". $si->_prop_type_id()."");
 
     my $success;
     if ($si->_prop_type_id()) {
@@ -213,7 +215,7 @@ tion." };
 	    $success = $si->delete();
 	};
 	if ($@) {
-	    print STDERR "An error occurred during deletion. Sorry.\n";
+	    $logger->error("An error occurred during deletion. Sorry.");
 	    $c->stash->{rest} = { error => "An error occurred while deleting sequencing info. ($@)" };
 	    return;
 	}

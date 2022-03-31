@@ -10,6 +10,8 @@ use CXGN::BrAPI::v2::ExternalReferences;
 
 extends 'CXGN::BrAPI::v2::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
 	my $self = shift;
     my $params = shift;
@@ -259,7 +261,7 @@ sub store {
 			$program_name = $program->name();
 		}
 
-		print STDERR "Creating location object\n";
+		$logger->debug("Creating location object");
 
 		my $location = CXGN::Location->new( {
 			bcs_schema => $schema,

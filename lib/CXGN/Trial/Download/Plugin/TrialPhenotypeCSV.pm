@@ -129,7 +129,7 @@ sub download {
         );
         @data = $phenotypes_search->get_phenotype_matrix();
     }
-    #print STDERR Dumper \@data;
+    #$logger->error(Dumper(\@data));
 
     my $time = DateTime->now();
     my $timestamp = $time->ymd()."_".$time->hms();

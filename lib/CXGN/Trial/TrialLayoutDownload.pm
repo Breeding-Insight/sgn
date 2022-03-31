@@ -70,6 +70,8 @@ use CXGN::Trial::TrialLayoutDownload::TissueSampleLayout;
 use CXGN::Trial::TrialLayoutDownload::GenotypingPlateLayout;
 use CXGN::Trial::TrialLayoutDownload::SamplingTrialLayout;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
     is       => 'rw',
     isa      => 'DBIx::Class::Schema',
@@ -189,7 +191,7 @@ sub get_layout_output {
     my %errors;
     my @error_messages;
     my $trial_stock_type = $self->trial_stock_type();
-    print STDERR "TrialLayoutDownload for Trial id: ($trial_id) ".localtime()."\n";
+    $logger->debug("TrialLayoutDownload for Trial id: ($trial_id) ".localtime()."");
 
     my $trial_layout;
     try {
@@ -202,12 +204,12 @@ sub get_layout_output {
         $trial_layout = CXGN::Trial::TrialLayout->new(\%param);
     };
     if (!$trial_layout) {
-        #print STDERR "Trial does not have valid field design.\n";
+        #$logger->error("Trial does not have valid field design.");
         push @error_messages, "Trial does not have valid field design.";
         $errors{'error_messages'} = \@error_messages;
         return \%errors;
     }
-    print STDERR "TrialLayoutDownload retrieving deisgn ".localtime."\n";
+    $logger->debug("TrialLayoutDownload retrieving deisgn ".localtime."");
     my $design = $trial_layout->get_design();
     if (!$design){
         push @error_messages, "Trial does not have valid field design. Please contact us.";
@@ -228,25 +230,25 @@ sub get_layout_output {
             push @rows, $row_num;
             push @cols, $col_num;
         }
-        print STDERR "TrialLayoutDownload End for Trial id: ($trial_id) ".localtime()."\n";
+        $logger->debug("TrialLayoutDownload End for Trial id: ($trial_id) ".localtime()."");
         return {output => \%hash, rows => \@rows, cols => \@cols};
     }
 
-    print STDERR "TrialLayoutDownload running stock type checks ".localtime."\n";
+    $logger->debug("TrialLayoutDownload running stock type checks ".localtime."");
 
     my $selected_trial = CXGN::Trial->new({bcs_schema => $schema, trial_id => $trial_id});
     my $has_plants = $selected_trial->has_plant_entries();
     my $has_subplots = $selected_trial->has_subplot_entries();
     my $has_tissue_samples = $selected_trial->has_tissue_sample_entries();
 
-    print STDERR "TrialLayoutDownload retrieving accessions ".localtime."\n";
+    $logger->debug("TrialLayoutDownload retrieving accessions ".localtime."");
 
     my $accessions = $selected_trial->get_accessions();
     my @accession_ids;
     foreach (@$accessions){
         push @accession_ids, $_->{stock_id};
     }
-    print STDERR "TrialLayoutDownload retrieving trait performance if requested ".localtime."\n";
+    $logger->debug("TrialLayoutDownload retrieving trait performance if requested ".localtime."");
     my $summary_values = [];
     if (scalar(@selected_traits)>0){
         my $summary = CXGN::Phenotypes::Summary->new({
@@ -275,14 +277,14 @@ sub get_layout_output {
     my $exact_performance_hash;
     if ($data_level eq 'plots') {
         if ($include_measured eq 'true') {
-            print STDERR "Getting exact trait values\n";
+            $logger->debug("Getting exact trait values");
             my $exact = CXGN::Phenotypes::Exact->new({
                 bcs_schema=>$schema,
                 trial_id=>$trial_id,
                 data_level=>'plot'
             });
             $exact_performance_hash = $exact->search();
-            #print STDERR "Exact Performance hash is ".Dumper($exact_performance_hash)."\n";
+            #$logger->error("Exact Performance hash is ".Dumper($exact_performance_hash)."");
         }
         foreach (@treatment_trials){
             my $treatment_units = $_ ? $_->get_observation_units_direct('plot', ['treatment_experiment']) : [];
@@ -355,7 +357,7 @@ sub get_layout_output {
         $selected_cols{'exported_tissue_sample_name'} = 1;
     }
 
-    print STDERR "Treatment stock hashes\n";
+    $logger->debug("Treatment stock hashes");
     my @treatment_stock_hashes;
     foreach my $u (@treatment_units_array){
         my %treatment_stock_hash;
@@ -377,7 +379,7 @@ sub get_layout_output {
     my @traits = (@exact_trait_names, @overall_trait_names);
 
     if ($use_synonyms eq 'true') {
-        print STDERR "Getting synonyms\n";
+        $logger->debug("Getting synonyms");
         my $t = CXGN::List::Transform->new();
         my $trait_id_list = $t->transform($schema, 'traits_2_trait_ids', \@traits);
         my @trait_ids = @{$trait_id_list->{'transform'}};
@@ -385,7 +387,7 @@ sub get_layout_output {
         my @missing = @{$synonym_list->{'missing'}};
 
         if (scalar @missing) {
-            #print STDERR "Traits @missing don't have synonyms. Sticking with full trait names instead\n";
+            #$logger->error("Traits @missing don't have synonyms. Sticking with full trait names instead");
 
             #push @error_messages, "Traits @missing don't have synonyms. Please turn off synonym option before proceeding\n";
             #$errors{'error_messages'} = \@error_messages;
@@ -413,7 +415,7 @@ sub get_layout_output {
     };
     my $layout_output;
 
-    print STDERR "TrialLayoutDownload getting output object".localtime."\n";
+    $logger->debug("TrialLayoutDownload getting output object".localtime."");
 
     if ($data_level eq 'plots' ) {
         $layout_output = CXGN::Trial::TrialLayoutDownload::PlotLayout->new($layout_build);
@@ -434,11 +436,11 @@ sub get_layout_output {
         $layout_output = CXGN::Trial::TrialLayoutDownload::SamplingTrialLayout->new($layout_build);
     }
 
-    print STDERR "TrialLayoutDownload retrieving output ".localtime."\n";
+    $logger->debug("TrialLayoutDownload retrieving output ".localtime."");
 
     my $output = $layout_output->retrieve();
 
-    print STDERR "TrialLayoutDownload End for Trial id: ($trial_id) ".localtime()."\n";
+    $logger->debug("TrialLayoutDownload End for Trial id: ($trial_id) ".localtime()."");
     return {output => $output};
 }
 
@@ -483,7 +485,7 @@ sub _get_all_pedigrees {
     my $schema = $self->schema();
     my %design = %{$design};
 
-    print STDERR "TrialLayoutDownload running get_all_pedigrees ".localtime()."\n";
+    $logger->debug("TrialLayoutDownload running get_all_pedigrees ".localtime()."");
 
     # collect all unique accession ids for pedigree retrieval
     my %accession_id_hash;
@@ -504,7 +506,7 @@ sub _get_all_pedigrees {
         }
     }
 
-    print STDERR "TrialLayoutDownload get_all_pedigrees finished at ".localtime()."\n";
+    $logger->debug("TrialLayoutDownload get_all_pedigrees finished at ".localtime()."");
 
     return \%pedigree_strings;
 }

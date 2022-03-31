@@ -41,6 +41,8 @@ use Try::Tiny;
 use Data::Dumper;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -64,7 +66,7 @@ has 'accession_list' => (
 sub search {
     my $self = shift;
     my $schema = $self->bcs_schema;
-    print STDERR "Phenotype Summary Search ".localtime()."\n";
+    $logger->debug("Phenotype Summary Search ".localtime()."");
 
     my $accession_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'accession', 'stock_type')->cvterm_id();
     my $plot_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'plot', 'stock_type')->cvterm_id();
@@ -142,7 +144,7 @@ sub search {
     while (my ($trait, $trait_id, $count, $average, $max, $min, $stddev, $stock_name, $stock_id) = $h->fetchrow_array()) {
         push @phenotype_data, [$trait, $trait_id, $count, $average, $max, $min, $stddev, $stock_name, $stock_id];
     }
-    print STDERR "Phenotype Summary Search End ".localtime()."\n";
+    $logger->debug("Phenotype Summary Search End ".localtime()."");
     return \@phenotype_data;
 }
 

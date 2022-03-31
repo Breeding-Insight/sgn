@@ -9,6 +9,8 @@ use CXGN::Genotype::Search;
 
 extends 'CXGN::Dataset';
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'file_name' => ( isa => 'Str',
 		     is => 'rw',
 		     default => '/tmp/dataset_file',
@@ -107,7 +109,7 @@ override('retrieve_genotypes',
 # 			 $genotype_string .= $s."\t".$genotype_data_string."\n";
 # 		     }
 # #			 write_file($file, $genotype_string);
-# 			#print STDERR Dumper($genotype_string . "NEXT LINE\n");
+# 			#$logger->error(Dumper($genotype_string . "NEXT LINE"));
 # 			 write_file($file, {append => 1}, $genotype_string);
 
 

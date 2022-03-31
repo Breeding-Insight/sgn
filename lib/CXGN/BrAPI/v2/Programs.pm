@@ -10,6 +10,8 @@ use CXGN::BrAPI::v2::ExternalReferences;
 
 extends 'CXGN::BrAPI::v2::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
 	my $self = shift;
 	my $inputs = shift;
@@ -244,7 +246,7 @@ sub store {
 			return CXGN::BrAPI::JSONResponse->return_error($self->status, $new_program->{'error'}, 500);
 		}
 
-		print STDERR "New program is " . Dumper($new_program) . "\n";
+		$logger->debug("New program is " . Dumper($new_program) . "");
 		push @program_ids, $new_program;
 
 	}
@@ -304,7 +306,7 @@ sub get_projectprop_hash {
 	while (my $r = $prop_rs->next()){
 		push @{ $prop_hash->{$r->get_column('name')} }, $r->get_column('value');
 	}
-	#print STDERR Dumper $prop_hash;
+	#$logger->error(Dumper($prop_hash));
 	return $prop_hash;
 }
 

@@ -3,6 +3,8 @@ package CXGN::DbStats;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'dbh' => (isa => 'Ref', is => 'rw');
 
 # retrieve all trials grouped by trial type
@@ -61,7 +63,7 @@ sub activity {
 	$h->execute();
 	my ($count) = $h->fetchrow_array();
 
-	print STDERR "Activity in week $week = $count\n";
+	$logger->debug("Activity in week $week = $count");
 	
 	push @counts, { letter => $week, frequency => $count };
 	#push @weeks, $week;

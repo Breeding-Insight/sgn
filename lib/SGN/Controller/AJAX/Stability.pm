@@ -18,6 +18,8 @@ use CXGN::Blast::Parse;
 use CXGN::Blast::SeqQuery;
 use Cwd qw(cwd);
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -50,7 +52,7 @@ sub shared_phenotypes: Path('/ajax/stability/shared_phenotypes') : {
     my $ds2 = CXGN::Dataset::File->new(people_schema => $people_schema, schema => $schema, sp_dataset_id => $dataset_id, file_name => $temppath, quotes => 0);
     my $phenotype_data_ref = $ds2->retrieve_phenotypes();
 
-    print STDERR Dumper(@trait_info);
+    $logger->error(Dumper(@trait_info));
     $c->stash->{rest} = {
         options => \@trait_info,
         tempfile => $tempfile."_phenotype.txt",
@@ -63,7 +65,7 @@ sub get_method: Path('/ajax/Stability/get_method') : {
     my $self = shift;
     my $c = shift;
     my $method_1 = $c->req->param('method_id');
-    print STDERR Dumper($method_1);
+    $logger->error(Dumper($method_1));
     $method_id = $method_1;
     print "The vairable method_id is $method_id \n";
 }
@@ -79,7 +81,7 @@ sub extract_trait_data :Path('/ajax/stability/getdata') Args(0) {
     $file = basename($file);
 
     my $temppath = File::Spec->catfile($c->config->{basepath}, "static/documents/tempfiles/stability_files/".$file);
-    print STDERR Dumper($temppath);
+    $logger->error(Dumper($temppath));
 
     my $F;
     if (! open($F, "<", $temppath)) {
@@ -89,9 +91,9 @@ sub extract_trait_data :Path('/ajax/stability/getdata') Args(0) {
 
     my $header = <$F>;
     chomp($header);
-    print STDERR Dumper($header);
+    $logger->error(Dumper($header));
     my @keys = split("\t", $header);
-    print STDERR Dumper($keys[1]);
+    $logger->error(Dumper($keys[1]));
     for(my $n=0; $n <@keys; $n++) {
         if ($keys[$n] =~ /\|CO\_/) {
         $keys[$n] =~ s/\|CO\_.*//;
@@ -109,7 +111,7 @@ sub extract_trait_data :Path('/ajax/stability/getdata') Args(0) {
     $line{$keys[$n]}=$fields[$n];
       }
   }
-    print STDERR Dumper(\%line);
+    $logger->error(Dumper(\%line));
   push @data, \%line;
     }
 
@@ -123,9 +125,9 @@ sub generate_results: Path('/ajax/stability/generate_results') : {
     my $method = $c->req->param('method_id');
     my $trait_id = $c->req->param('trait_id');
     
-    print STDERR $dataset_id;
-    print STDERR $trait_id;
-    print STDERR Dumper $method;
+    $logger->error($dataset_id);
+    $logger->error($trait_id);
+    $logger->error(Dumper($method));
 
     $c->tempfiles_subdir("stability_files");
     my $stability_tmp_output = $c->config->{cluster_shared_tempdir}."/stability_files";
@@ -171,7 +173,7 @@ sub generate_results: Path('/ajax/stability/generate_results') : {
             max_cluster_jobs => 1_000_000_000,
         });
 
-        print STDERR Dumper $pheno_filepath;
+        $logger->error(Dumper($pheno_filepath));
 
     # my $job;
     $cmd->run_cluster(

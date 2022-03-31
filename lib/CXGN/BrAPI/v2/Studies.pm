@@ -17,6 +17,8 @@ use JSON;
 
 extends 'CXGN::BrAPI::v2::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub seasons {
     my $self = shift;
     my $year_filter = shift;
@@ -274,7 +276,7 @@ sub store {
 				additional_info => \%additional_info
 	        );
 
-	        print STDERR "Trial type is ".$trial_info_hash{'trial_type'}."\n";
+	        $logger->debug("Trial type is ".$trial_info_hash{'trial_type'}."");
 
 	        if ($field_size){
 	            $trial_info_hash{field_size} = $field_size;
@@ -371,7 +373,7 @@ sub update {
 	my %has_roles = ();
 	map { $has_roles{$_} = 1; } @user_roles;
 
-	print STDERR "my user roles = @user_roles and trial breeding program = $breeding_program_name \n";
+	$logger->debug("my user roles = @user_roles and trial breeding program = $breeding_program_name ");
 
     # set each new detail that is defined
 	my $study_name = $params->{studyName} ? $params->{studyName} : undef;
@@ -566,7 +568,7 @@ sub _search {
         field_trials_only => 1
     });
     my ($data, $total_count) = $trial_search->search();
-    #print STDERR Dumper $data;
+    #$logger->error(Dumper($data));
 
     my @data_out;
     foreach (@$data){
@@ -690,17 +692,17 @@ sub _save_trial {
     $trial_name =~ s/^\s+|\s+$//g; #trim whitespace from both ends
 
 	if (!$trial_name) {
-		print STDERR "Trial not saved: Can't create trial without a trial name\n";
+		$logger->error("Trial not saved: Can't create trial without a trial name");
 		return { error => "Trial not saved: Can't create trial without a trial name" };
 	}
 
     if ($self->trial_name_already_exists()) {
-		print STDERR "Can't create trial: Trial name already exists\n";
+		$logger->error("Can't create trial: Trial name already exists");
 		return { error => sprintf("Trial not saved: Trial name %s already exists.", $trial_name) };
 	}
 
 	if (!$self->get_breeding_program_id()) {
-		print STDERR "Can't create trial: Breeding program does not exist\n";
+		$logger->error("Can't create trial: Breeding program does not exist");
 		return { error => "Trial not saved: breeding program does not exist" };
 	}
 
@@ -729,7 +731,7 @@ sub _save_trial {
 		trial_id => $project->project_id()
 	});
 
-	print STDERR "TRIAL TYPE = ".ref($t)."!!!!\n";
+	$logger->debug("TRIAL TYPE = ".ref($t)."!!!!");
 
 	my $geolocation_lookup = CXGN::Location::LocationLookup->new(schema => $chado_schema);
 	$geolocation_lookup->set_location_name($self->get_trial_location());

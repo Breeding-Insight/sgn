@@ -8,6 +8,8 @@ use JSON::XS;
 use Statistics::Descriptive::Full;
 use Time::Piece;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller' };
 
 sub view_analytics_protocols :Path('/analytics_protocols') Args(0) {
@@ -42,7 +44,7 @@ sub analytics_protocol_detail :Path('/analytics_protocols') Args(1) {
         $c->detach();
     }
 
-    print STDERR "Viewing analytics protocol with id $analytics_protocol_id\n";
+    $logger->debug("Viewing analytics protocol with id $analytics_protocol_id");
 
     my $protocolprop_type_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'analytics_protocol_properties', 'protocol_property')->cvterm_id();
     my $protocolprop_results_type_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'analytics_protocol_result_summary', 'protocol_property')->cvterm_id();
@@ -73,7 +75,7 @@ sub analytics_protocol_detail :Path('/analytics_protocols') Args(1) {
     );
 
     my $result_props_json_array = $result_props_json ? decode_json $result_props_json : [];
-    # print STDERR Dumper $result_props_json_array;
+    # $logger->error(Dumper($result_props_json_array));
 
     $c->stash->{analytics_protocol_id} = $nd_protocol_id;
     $c->stash->{analytics_protocol_name} = $name;

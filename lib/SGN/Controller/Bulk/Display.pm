@@ -20,6 +20,8 @@ use Cache::File;
 use File::Spec::Functions;
 use File::Slurp qw | read_file |;
 use CXGN::Page::FormattingHelpers qw | html_break_string |;
+
+my $logger = Log::Log4perl->get_logger();
 BEGIN { extends 'Catalyst::Controller' };
 
 =head2 display_page
@@ -113,9 +115,9 @@ sub display_summary_page : Path('/tools/bulk/summary') Args(1){
     my $c = shift;
     my $dumpfile = shift;
 
-    print STDERR "DUMPFILE = $dumpfile\n";
+    $logger->debug("DUMPFILE = $dumpfile");
     my $cache_root = catfile($c->config->{basepath}, $c->tempfiles_subdir("bulk"), $dumpfile.".summary");;
-    print STDERR "CACHE_ROOT: $cache_root\n";
+    $logger->debug("CACHE_ROOT: $cache_root");
     my $cache = Cache::File->new( cache_root =>$cache_root);
 
     my $summary_data = {};
@@ -446,7 +448,7 @@ sub getFileLines {
 sub render_text_page {
     my $self = shift;
     my $c = shift;
-    print STDERR "TEMPDIR = $self->{tempdir}\n\n";
+    $logger->debug("TEMPDIR = $self->{tempdir}\n");
     $self->dumptextfile($c, $self->{tempdir} . "/" . $self->{dumpfile} );
 }
 

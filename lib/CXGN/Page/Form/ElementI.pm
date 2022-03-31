@@ -67,6 +67,8 @@ our $ALLELE_SYMBOL_REQUIRED_ERROR=8;
 
 =cut
 
+my $logger = Log::Log4perl->get_logger();
+
 sub new {
     my $class = shift;
     my $self = bless {}, $class;
@@ -609,7 +611,7 @@ sub validate {
     }
 
     
-#    print STDERR "VALIDATION OF FIELD ".$self->get_field_name()." CONTENTS: ".$self->get_contents()." - NO ERROR DETECTED\n";
+#    $logger->error("VALIDATION OF FIELD ".$self->get_field_name()." CONTENTS: ".$self->get_contents()." - NO ERROR DETECTED");
     # the field has validated
     return 0;
 
@@ -627,7 +629,7 @@ sub validate {
 =cut
 
 sub render {
-    print STDERR "ElementI does not render anything...please subclass.\n";
+    $logger->debug("ElementI does not render anything...please subclass.");
     exit();
 }
 

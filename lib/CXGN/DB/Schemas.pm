@@ -9,6 +9,8 @@ use CXGN::Phenome::Schema;
 use SGN::Schema;
 use CXGN::Metadata::Schema;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'dbh' => (
 		is => 'rw',
@@ -66,10 +68,10 @@ sub BUILD {
 	$self->dbh(DBI->connect($dsn, $self->dbuser(), $self->dbpass()));
     }
 
-    print STDERR "Setting the search path...\n";
+    $logger->debug("Setting the search path...");
     $self->dbh()->do("SET search_path TO phenome, metadata, sgn_people, public, sgn");
 
-    print STDERR "Connecting to the schemas...\n";
+    $logger->debug("Connecting to the schemas...");
     $self->bcs_schema(Bio::Chado::Schema->connect( sub { $self->dbh(); }));
     
     $self->phenome_schema(CXGN::Phenome::Schema->connect( sub { $self->dbh() }));

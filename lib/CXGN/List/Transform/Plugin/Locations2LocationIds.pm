@@ -2,6 +2,8 @@ package CXGN::List::Transform::Plugin::Locations2LocationIds;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "locations_2_location_ids";
 }
@@ -32,7 +34,7 @@ sub transform {
     my @missing = ();
 
     foreach my $l (@$list) { 
-	#print STDERR "Converting location $l to location_id...\n";
+	#$logger->error("Converting location $l to location_id...");
         my $rs = $schema->resultset("NaturalDiversity::NdGeolocation")->search(
             { 
 		description => $l,

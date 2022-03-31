@@ -42,6 +42,8 @@ use CXGN::Phenotypes::HighDimensionalPhenotypeProtocol;
 use CXGN::Phenotypes::HighDimensionalPhenotypesSearch;
 use Text::CSV;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -181,7 +183,7 @@ sub search {
     my %rel_matrix_data;
     my $csv = Text::CSV->new({ sep_char => "\t" });
     open(my $rel_res, '<', $relationship_matrix_file) or die "Could not open file '$relationship_matrix_file' $!";
-        print STDERR "Opened $relationship_matrix_file\n";
+        $logger->debug("Opened $relationship_matrix_file");
         my $header_row = <$rel_res>;
         my @header;
         if ($csv->parse($header_row)) {
@@ -203,10 +205,10 @@ sub search {
         }
     close($rel_res);
 
-    # print STDERR Dumper \%rel_matrix_data;
-    # print STDERR Dumper \@data_matrix;
-    # print STDERR Dumper $identifier_metadata_hash;
-    # print STDERR Dumper $identifier_names_array;
+    # $logger->error(Dumper(\%rel_matrix_data));
+    # $logger->error(Dumper(\@data_matrix));
+    # $logger->error(Dumper($identifier_metadata_hash));
+    # $logger->error(Dumper($identifier_names_array));
     return (\%rel_matrix_data, \@data_matrix, $identifier_metadata_hash, $identifier_names_array);
 }
 

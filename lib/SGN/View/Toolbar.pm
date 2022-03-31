@@ -1,6 +1,8 @@
 package SGN::View::Toolbar;
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 extends 'Catalyst::View';
 
 has 'toolbar_data' => (
@@ -625,7 +627,7 @@ sub option_link {
     my $self = shift;
     my ( $heading, $option ) = @_;
 
-    #print STDERR "option_link received: heading '$heading' option '$option'\n";
+    #$logger->error("option_link received: heading '$heading' option '$option'");
     for my $heading_hash ( @{ $self->toolbar_data } ) {
         if ( $heading_hash->{name} eq $heading ) {
             for my $menu_option_hash ( @{ $heading_hash->{menu} } ) {
@@ -644,7 +646,7 @@ sub option_target {
     my $self = shift;
     my ( $heading, $option ) = @_;
 
-    #print STDERR "option_link received: heading '$heading' option '$option'\n";
+    #$logger->error("option_link received: heading '$heading' option '$option'");
     for my $heading_hash ( @{ $self->toolbar_data } ) {
         if ( $heading_hash->{name} eq $heading ) {
             for my $menu_option_hash ( @{ $heading_hash->{menu} } ) {
@@ -680,7 +682,7 @@ sub option_style {
     my $self = shift;
     my ( $heading, $option ) = @_;
 
-    #print STDERR "option_link received: heading '$heading' option '$option'\n";
+    #$logger->error("option_link received: heading '$heading' option '$option'");
     for my $heading_hash ( @{ $self->toolbar_data } ) {
         if ( $heading_hash->{name} eq $heading ) {
             for my $menu_option_hash ( @{ $heading_hash->{menu} } ) {

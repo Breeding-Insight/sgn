@@ -4,6 +4,8 @@ package PDF::LabelPage;
 use Moose;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'pdf'            => ( isa => 'PDF::Create',
 			  is  => 'rw',
     );
@@ -50,7 +52,7 @@ sub add_label {
     push @$labels, $label;
     $self->labels($labels);
 
-    print STDERR "Now we have ".(scalar(@{$self->labels()}))." labels in the page object.\n";
+    $logger->debug("Now we have ".(scalar(@{$self->labels()}))." labels in the page object.");
 }
 
 sub render { 
@@ -67,14 +69,14 @@ sub render {
 
     my @images =@{ $self->labels() };
       
-    print STDERR "Rendering page with @images labels on it\n";
+    $logger->debug("Rendering page with @images labels on it");
     foreach my $row (1..$self->rows()) { 
 	foreach my $col (1..$self->cols()) { 
 	    my $label_boundary = $page_height - (($row-1) * $label_height) - $self->top_margin;	
 	    $page->line($page_width -100, $label_boundary, $page_width, $label_boundary);
 	    my $index = ($row -1) * $self->cols() + $col -1;
 	    my $image = $images[$index];	   
-	    #print STDERR "RENDER: IMAGE: ".Data::Dumper::Dumper($image)."\n\n";
+	    #$logger->error("RENDER: IMAGE: ".Data::Dumper::Dumper($image)."\n");
 
 	    
 	    if (!defined($image)) { next; }
@@ -85,7 +87,7 @@ sub render {
 	    my $ypos = $label_boundary - int( ($label_height - $image->{height} * $scaley) /2);
 	    my $xpos = $label_width * ($col -1);
 
-	    print STDERR "Printing label: row $row; col $col = index $index X: $xpos. Y: $ypos\n";
+	    $logger->debug("Printing label: row $row; col $col = index $index X: $xpos. Y: $ypos");
 
 	    if ($scalex < $scaley) { $scaley = $scalex; }
 	    else { $scalex = $scaley; }

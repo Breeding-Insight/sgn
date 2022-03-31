@@ -23,6 +23,8 @@ use CXGN::NOAANCDC;
 use File::Temp 'tempfile';
 use Time::Piece;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -38,7 +40,7 @@ sub get_all_locations :Path("/ajax/location/all") Args(0) {
     my $location = CXGN::BreedersToolbox::Projects->new( { schema => $c->dbic_schema("Bio::Chado::Schema") });
 
     my $all_locations = $location->get_location_geojson();
-    #print STDERR "Returning with all locations: ".$all_locations."\n";
+    #$logger->error("Returning with all locations: ".$all_locations."");
     $c->stash->{rest} = { data => $all_locations };
 }
 
@@ -68,7 +70,7 @@ sub store_location :Path("/ajax/location/store") Args(0) {
         return;
     }
 
-    print STDERR "Creating location object\n";
+    $logger->debug("Creating location object");
 
     my $location = CXGN::Location->new( {
         bcs_schema => $c->dbic_schema("Bio::Chado::Schema"),
@@ -142,7 +144,7 @@ sub upload_locations_POST : Args(0) {
 
 
     if (!$c->user()) {
-        print STDERR "User not logged in... not uploading locations.\n";
+        $logger->debug("User not logged in... not uploading locations.");
         push @errors, "You need to be logged in to upload locations.";
         $c->stash->{rest} = {filename => $upload_original_name, error => \@errors };
         return;
@@ -176,7 +178,7 @@ sub upload_locations_POST : Args(0) {
     my $parser = CXGN::Location::ParseUpload->new();
     my $parse_result = $parser->parse($type, $archived_filename_with_path, $schema);
 
-    print STDERR "Dump of parsed result:\t" . Dumper($parse_result) . "\n";
+    $logger->debug("Dump of parsed result:\t" . Dumper($parse_result) . "");
 
     if (!$parse_result) {
         push @errors, "Error parsing file.";
@@ -243,7 +245,7 @@ sub get_noaa_station_id :Path("/ajax/location/get_noaa_station_id") Args(1) {
 sub noaa_ncdc_analysis :Path("/ajax/location/noaa_ncdc_analysis") Args(0) {
     my $self = shift;
     my $c = shift;
-    # print STDERR Dumper $c->req->params;
+    # $logger->error(Dumper($c->req->params));
     my $location_id = $c->req->param('location_id');
     my $station_id = $c->req->param('station_id');
     my $start_date = $c->req->param('start_date');
@@ -290,8 +292,8 @@ sub noaa_ncdc_analysis :Path("/ajax/location/noaa_ncdc_analysis") Args(0) {
             noaa_ncdc_access_token => $noaa_ncdc_access_token
         });
         my ($weather_hash, $sorted_dates) = $noaa->get_daily_values();
-        # print STDERR Dumper $weather_hash;
-        # print STDERR Dumper $sorted_dates;
+        # $logger->error(Dumper($weather_hash));
+        # $logger->error(Dumper($sorted_dates));
 
         my %years_groups;
         foreach my $date (@$sorted_dates) {
@@ -379,7 +381,7 @@ sub noaa_ncdc_analysis :Path("/ajax/location/noaa_ncdc_analysis") Args(0) {
 
         ggsave(\''.$stats_tempfile_plot.'\', sp, device=\'png\', width=10, height=6, limitsize = FALSE, units=\'in\');
         "';
-        print STDERR $cmd;
+        $logger->error($cmd);
         my $status = system($cmd);
 
         open(my $F, ">", $stats_tempfile_prcp) || die "Can't open file ".$stats_tempfile_prcp;
@@ -431,7 +433,7 @@ sub noaa_ncdc_analysis :Path("/ajax/location/noaa_ncdc_analysis") Args(0) {
 
         ggsave(\''.$stats_tempfile_plot2.'\', sp, device=\'png\', width=10, height=6, limitsize = FALSE, units=\'in\');
         "';
-        print STDERR $cmd;
+        $logger->error($cmd);
         my $status = system($cmd);
     }
 

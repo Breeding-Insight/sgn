@@ -20,6 +20,8 @@ use CXGN::Dataset::File;
 use CXGN::Tools::Run;
 use Cwd qw(cwd);
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -70,7 +72,7 @@ sub shared_phenotypes: Path('/ajax/solgwas/shared_phenotypes') : {
 
 #    my $phenotypes = $ds->retrieve_phenotypes();
 #    my $trials_ref = $ds->retrieve_trials();
-    print STDERR Dumper(@trait_info);
+    $logger->error(Dumper(@trait_info));
 #    my @trials = @$trials_ref;
 
 #    my $values_path = $c->{basepath} . "./documents/tempfiles/solgwas_files/";
@@ -78,7 +80,7 @@ sub shared_phenotypes: Path('/ajax/solgwas/shared_phenotypes') : {
 
 #    my $file_basename = basename($pheno_filepath);
 #    my $file_response = "./documents/tempfiles/solgwas_files/" . $file_basename;
-#    print STDERR $file_response . "\n";
+#    $logger->error($file_response . "");
 #    my @co_pheno;
     $c->stash->{rest} = {
         options => \@trait_info,
@@ -100,7 +102,7 @@ sub extract_trait_data :Path('/ajax/solgwas/getdata') Args(0) {
     my $temppath = File::Spec->catfile($c->config->{basepath}, "static/documents/tempfiles/solgwas_files/".$file);
 #    my $temppath = File::Spec->catfile($c->config->{cluster_shared_tempdir}, "static/documents/tempfiles/solgwas_files/".$file);
 #    my $temppath = File::Spec->catfile($c->config->{basepath}, "static/documents/tempfiles/solgwas_files/solgwas_download_0bDQ5_phenotype.txt");
-    print STDERR Dumper($temppath);
+    $logger->error(Dumper($temppath));
 
     my $F;
     if (! open($F, "<", $temppath)) {
@@ -110,9 +112,9 @@ sub extract_trait_data :Path('/ajax/solgwas/getdata') Args(0) {
 
     my $header = <$F>;
     chomp($header);
-    print STDERR Dumper($header);
+    $logger->error(Dumper($header));
     my @keys = split("\t", $header);
-    print STDERR Dumper($keys[1]);
+    $logger->error(Dumper($keys[1]));
 # add this for loop to remove the crop ontology codes from the keys (and the preceding pipes)
     for(my $n=0; $n <@keys; $n++) {
         if ($keys[$n] =~ /\|CO\_/) {
@@ -131,7 +133,7 @@ sub extract_trait_data :Path('/ajax/solgwas/getdata') Args(0) {
 		$line{$keys[$n]}=$fields[$n];
 	    }
 	}
-    print STDERR Dumper(\%line);
+    $logger->error(Dumper(\%line));
 	push @data, \%line;
     }
 
@@ -147,8 +149,8 @@ sub generate_pca: Path('/ajax/solgwas/generate_pca') : {
     my $kinship_check = $c->req->param('kinship_check');
 	my $forbid_cache = defined($c->req->param('forbid_cache')) ? $c->req->param('forbid_cache') : 0;
 
-    print STDERR $dataset_id;
-    print STDERR $trait_id;
+    $logger->error($dataset_id);
+    $logger->error($trait_id);
     $c->tempfiles_subdir("solgwas_files");
 #    my ($fh, $tempfiletest) = $c->tempfile(TEMPLATE=>"solgwas_files/solgwas_download_XXXXX");
     my $solgwas_tmp_output = $c->config->{cluster_shared_tempdir}."/solgwas_files";
@@ -187,13 +189,13 @@ sub generate_pca: Path('/ajax/solgwas/generate_pca') : {
 
     my $filehandle = $ds->retrieve_genotypes($protocol_id,$geno_filepath, $c->config->{cache_file_path}, $c->config->{cluster_shared_tempdir}, $c->config->{backend}, $c->config->{cluster_host}, $c->config->{'web_cluster_queue'}, $c->config->{basepath}, $forbid_cache);
 #    my $base_filename = $$filehandle;
-    print STDERR $filehandle . "\n";
-#    print STDERR $base_filename . "\n";
+    $logger->debug($filehandle . "");
+#    $logger->error($base_filename . "");
 #    $ds-> @$trials_ref = retrieve_genotypes();
     my $newtrait = $trait_id;
     $newtrait =~ s/\s/\_/g;
     $newtrait =~ s/\//\_/g;
-    print STDERR $newtrait . "\n";
+    $logger->debug($newtrait . "");
 #    my $figure1file = "." . $tempfile . "_" . $newtrait . "_figure1.png";
 #    my $figure2file = "." . $tempfile . "_" . $newtrait . "_figure2.png";
 #    my $figure3file = "." . $tempfile . "_" . $newtrait . "_figure3.png";
@@ -242,7 +244,7 @@ sub generate_pca: Path('/ajax/solgwas/generate_pca') : {
 #         my $random_current = int(rand($marker_total));
 #         redo if $columns_seen{$random_current}++;
 #         push @column_selection, $random_current;
-#         print STDERR $random_current . "\n";
+#         $logger->error($random_current . "");
 #     }
 #
 #     open my $filehandle_in, "<", "$geno_filepath2"  or die "Could not open $geno_filepath2: $!\n";
@@ -256,7 +258,7 @@ sub generate_pca: Path('/ajax/solgwas/generate_pca') : {
 #             $curr_line .= $first_item[$item] . "\t";
 #         }
 # #           $curr_line .= "\n";
-#         print STDERR $curr_line . "\n";
+#         $logger->error($curr_line . "");
 #         print $filehandle_out2 "$curr_line\n";
 #     }
 #
@@ -312,8 +314,8 @@ sub generate_results: Path('/ajax/solgwas/generate_results') : {
     my $kinship_check = $c->req->param('kinship_check');
 	my $forbid_cache = defined($c->req->param('forbid_cache')) ? $c->req->param('forbid_cache') : 0;
 
-    print STDERR $dataset_id;
-    print STDERR $trait_id;
+    $logger->error($dataset_id);
+    $logger->error($trait_id);
     $c->tempfiles_subdir("solgwas_files");
 #    my ($fh, $tempfiletest) = $c->tempfile(TEMPLATE=>"solgwas_files/solgwas_download_XXXXX");
     my $solgwas_tmp_output = $c->config->{cluster_shared_tempdir}."/solgwas_files";
@@ -352,13 +354,13 @@ sub generate_results: Path('/ajax/solgwas/generate_results') : {
 
     my $filehandle = $ds->retrieve_genotypes($protocol_id,$geno_filepath, $c->config->{cache_file_path}, $c->config->{cluster_shared_tempdir}, $c->config->{backend}, $c->config->{cluster_host}, $c->config->{'web_cluster_queue'}, $c->config->{basepath}, $forbid_cache);
 #    my $base_filename = $$filehandle;
-    print STDERR $filehandle . "\n";
-#    print STDERR $base_filename . "\n";
+    $logger->debug($filehandle . "");
+#    $logger->error($base_filename . "");
 #    $ds-> @$trials_ref = retrieve_genotypes();
     my $newtrait = $trait_id;
     $newtrait =~ s/\s/\_/g;
     $newtrait =~ s/\//\_/g;
-    print STDERR $newtrait . "\n";
+    $logger->debug($newtrait . "");
 #    my $figure1file = "." . $tempfile . "_" . $newtrait . "_figure1.png";
 #    my $figure2file = "." . $tempfile . "_" . $newtrait . "_figure2.png";
 #    my $figure3file = "." . $tempfile . "_" . $newtrait . "_figure3.png";
@@ -407,7 +409,7 @@ sub generate_results: Path('/ajax/solgwas/generate_results') : {
 #         my $random_current = int(rand($marker_total));
 #         redo if $columns_seen{$random_current}++;
 #         push @column_selection, $random_current;
-#         print STDERR $random_current . "\n";
+#         $logger->error($random_current . "");
 #     }
 #
 #     open my $filehandle_in, "<", "$geno_filepath2"  or die "Could not open $geno_filepath2: $!\n";
@@ -421,7 +423,7 @@ sub generate_results: Path('/ajax/solgwas/generate_results') : {
 #             $curr_line .= $first_item[$item] . "\t";
 #         }
 # #           $curr_line .= "\n";
-#         print STDERR $curr_line . "\n";
+#         $logger->error($curr_line . "");
 #         print $filehandle_out2 "$curr_line\n";
 #     }
 #

@@ -52,6 +52,7 @@ use CXGN::Trial;
 use CXGN::Trial::TrialLayoutDownload;
 use CXGN::Trial::TrialLayout;
 use List::MoreUtils ':all';
+my $logger = Log::Log4perl->get_logger();
 
 sub verify { 
     return 1;
@@ -60,7 +61,7 @@ sub verify {
 sub download { 
     my $self = shift;
 
-    print STDERR "DATALEVEL ".$self->data_level."\n";
+    $logger->debug("DATALEVEL ".$self->data_level."");
     my $ss = Spreadsheet::WriteExcel->new($self->filename());
     my $ws = $ss->add_worksheet();
 

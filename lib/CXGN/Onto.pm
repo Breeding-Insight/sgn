@@ -8,6 +8,8 @@ use Try::Tiny;
 use Bio::Chado::Schema;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -79,7 +81,7 @@ sub get_root_nodes {
 sub store_composed_term {
     my $self = shift;
     my $new_trait_names = shift;
-    #print STDERR Dumper $new_trait_names;
+    #$logger->error(Dumper($new_trait_names));
 
     my $schema = $self->schema();
     my $dbh = $schema->storage->dbh;
@@ -98,7 +100,7 @@ sub store_composed_term {
 
         my $existing_trait_id = SGN::Model::Cvterm->get_trait_from_exact_components($schema, \@component_ids);
         if ($existing_trait_id) {
-            print STDERR "Skipping: This trait already exists $name with the following component_ids".Dumper(\@component_ids)."\n";
+            $logger->debug("Skipping: This trait already exists $name with the following component_ids".Dumper(\@component_ids)."");
             next;
         }
 
@@ -120,11 +122,11 @@ sub store_composed_term {
           name   => 'Composed traits',
       });
 
-    #print STDERR "Parent cvterm_id = " . $parent_term->cvterm_id();
+    #$logger->error("Parent cvterm_id = " . $parent_term->cvterm_id());
 
     my $new_term = $schema->resultset('Cv::Cvterm')->find({ name=>$name });
     if ($new_term){
-        print STDERR "Cvterm with name $name already exists... so components must be new\n";
+        $logger->debug("Cvterm with name $name already exists... so components must be new");
     } else {
         $new_term= $schema->resultset("Cv::Cvterm")->create({
             cv_id  =>$cv->cv_id(),
@@ -134,7 +136,7 @@ sub store_composed_term {
     }
 
 
-    #print STDERR "New term cvterm_id = " . $new_term->cvterm_id();
+    #$logger->error("New term cvterm_id = " . $new_term->cvterm_id());
 
         my $variable_rel = $schema->resultset('Cv::CvtermRelationship')->find_or_create({
             subject_id => $new_term->cvterm_id(),

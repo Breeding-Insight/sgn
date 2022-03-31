@@ -18,6 +18,8 @@ use CXGN::Blast::Parse;
 use CXGN::Blast::SeqQuery;
 use Cwd qw(cwd);
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -50,7 +52,7 @@ sub shared_phenotypes: Path('/ajax/heritability/shared_phenotypes') : {
     my $ds2 = CXGN::Dataset::File->new(people_schema => $people_schema, schema => $schema, sp_dataset_id => $dataset_id, file_name => $temppath, quotes => 0);
     my $phenotype_data_ref = $ds2->retrieve_phenotypes();
 
-    print STDERR Dumper(@trait_info);
+    $logger->error(Dumper(@trait_info));
     $c->stash->{rest} = {
         options => \@trait_info,
         tempfile => $tempfile."_phenotype.txt",
@@ -69,7 +71,7 @@ sub extract_trait_data :Path('/ajax/heritability/getdata') Args(0) {
     $file = basename($file);
 
     my $temppath = File::Spec->catfile($c->config->{basepath}, "static/documents/tempfiles/heritability_files/".$file);
-    print STDERR Dumper($temppath);
+    $logger->error(Dumper($temppath));
 
     my $F;
     if (! open($F, "<", $temppath)) {
@@ -79,9 +81,9 @@ sub extract_trait_data :Path('/ajax/heritability/getdata') Args(0) {
 
     my $header = <$F>;
     chomp($header);
-    print STDERR Dumper($header);
+    $logger->error(Dumper($header));
     my @keys = split("\t", $header);
-    print STDERR Dumper($keys[1]);
+    $logger->error(Dumper($keys[1]));
     for(my $n=0; $n <@keys; $n++) {
         if ($keys[$n] =~ /\|CO\_/) {
         $keys[$n] =~ s/\|CO\_.*//;
@@ -99,7 +101,7 @@ sub extract_trait_data :Path('/ajax/heritability/getdata') Args(0) {
 		$line{$keys[$n]}=$fields[$n];
 	    }
 	}
-    print STDERR Dumper(\%line);
+    $logger->error(Dumper(\%line));
 	push @data, \%line;
     }
 
@@ -113,8 +115,8 @@ sub generate_results: Path('/ajax/heritability/generate_results') : {
     my $trait_id = $c->req->param('trait_id');
     print"****************************************************************************\n";
     print"The dataset is $dataset_id\n";
-    print STDERR $dataset_id;
-    print STDERR $trait_id;
+    $logger->error($dataset_id);
+    $logger->error($trait_id);
     $c->tempfiles_subdir("heritability_files");
     my $heritability_tmp_output = $c->config->{cluster_shared_tempdir}."/heritability_files";
     mkdir $heritability_tmp_output if ! -d $heritability_tmp_output;
@@ -153,7 +155,7 @@ sub generate_results: Path('/ajax/heritability/generate_results') : {
             max_cluster_jobs => 1_000_000_000,
         });
 
-        print STDERR Dumper $pheno_filepath;
+        $logger->error(Dumper($pheno_filepath));
 
     # my $job;
     $cmd->run_cluster(

@@ -60,6 +60,8 @@ use CXGN::Phenotypes::PhenotypeMatrix;
 use CXGN::Genotype::Search;
 use CXGN::Phenotypes::HighDimensionalPhenotypesSearch;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 people_schema()
 
 accessor for CXGN::People::Schema database object
@@ -288,7 +290,7 @@ sub BUILD {
     $self->breeder_search($bs);
 
     if ($self->has_sp_dataset_id()) {
-        print STDERR "Processing dataset_id ".$self->sp_dataset_id()."\n";
+        $logger->debug("Processing dataset_id ".$self->sp_dataset_id()."");
         my $row = $self->people_schema()->resultset("SpDataset")->find({ sp_dataset_id => $self->sp_dataset_id() });
         if (!$row) { die "The dataset with id ".$self->sp_dataset_id()." does not exist"; }
         my $dataset = JSON::Any->decode($row->dataset());
@@ -311,7 +313,7 @@ sub BUILD {
         $self->is_live($dataset->{is_live});
         $self->is_public($dataset->{is_public});
     }
-    else { print STDERR "Creating empty dataset object\n"; }
+    else { $logger->debug("Creating empty dataset object"); }
 
 }
 
@@ -483,15 +485,15 @@ sub to_hashref {
 sub store {
     my $self = shift;
 
-    print STDERR "dataset_id = ".$self->sp_dataset_id()."\n";
+    $logger->debug("dataset_id = ".$self->sp_dataset_id()."");
     if (!$self->has_sp_dataset_id()) {
-	print STDERR "Creating new dataset row... ".$self->sp_dataset_id()."\n";
+	$logger->debug("Creating new dataset row... ".$self->sp_dataset_id()."");
 	my $row = $self->people_schema()->resultset("SpDataset")->create($self->to_hashref());
 	$self->sp_dataset_id($row->sp_dataset_id());
 	return $row->sp_dataset_id();
     }
     else {
-	print STDERR "Updating dataset row ".$self->sp_dataset_id()."\n";
+	$logger->debug("Updating dataset row ".$self->sp_dataset_id()."");
 	my $row = $self->people_schema()->resultset("SpDataset")->find( { sp_dataset_id => $self->sp_dataset_id() });
 	if ($row) {
 	    $row->name($self->name());
@@ -502,7 +504,7 @@ sub store {
 	    return $row->sp_dataset_id();
 	}
 	else {
-	    print STDERR "Weird... has ".$self->sp_dataset_id()." but no data in db\n";
+	    $logger->warn("Weird... has ".$self->sp_dataset_id()." but no data in db");
 	}
     }
 }
@@ -790,10 +792,10 @@ sub retrieve_high_dimensional_phenotypes_relationship_matrix {
         plant_list=>\@plant_ids
     });
     my ($relationship_matrix_data, $data_matrix, $identifier_metadata, $identifier_names) = $phenotypes_search->search();
-    # print STDERR Dumper $relationship_matrix_data;
-    # print STDERR Dumper $data_matrix;
-    # print STDERR Dumper $identifier_metadata;
-    # print STDERR Dumper $identifier_names;
+    # $logger->error(Dumper($relationship_matrix_data));
+    # $logger->error(Dumper($data_matrix));
+    # $logger->error(Dumper($identifier_metadata));
+    # $logger->error(Dumper($identifier_names));
 
     return ($relationship_matrix_data, $data_matrix, $identifier_metadata, $identifier_names);
 }
@@ -896,7 +898,7 @@ sub retrieve_trials {
         push @$criteria, "trials";
         $trials = $self->breeder_search()->metadata_query($criteria, $self->_get_source_dataref("trials"));
     }
-    print STDERR "TRIALS: ".Dumper($trials);
+    $logger->error("TRIALS: ".Dumper($trials));
     return $trials->{results};
 }
 

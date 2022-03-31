@@ -10,6 +10,8 @@ use JSON;
 use CXGN::Image::Search;
 use SGN::Image;
 
+my $logger = Log::Log4perl->get_logger();
+
 __PACKAGE__->config(
     default   => 'application/json',
     stash_key => 'rest',
@@ -20,12 +22,12 @@ __PACKAGE__->config(
 sub image_search :Path('/ajax/search/images') Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR "Image search AJAX\n";
+    $logger->debug("Image search AJAX");
     my $schema = $c->dbic_schema("Bio::Chado::Schema", 'sgn_chado');
     my $people_schema = $c->dbic_schema("CXGN::People::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
     my $params = $c->req->params() || {};
-    #print STDERR Dumper $params;
+    #$logger->error(Dumper($params));
 
     my @descriptors;
     if (exists($params->{image_description_filename_composite}) && $params->{image_description_filename_composite}) {
@@ -88,7 +90,7 @@ sub image_search :Path('/ajax/search/images') Args(0) {
         $draw =~ s/\D//g; # cast to int
     }
 
-    #print STDERR Dumper $result;
+    #$logger->error(Dumper($result));
     my @return;
     foreach (@$result){
         my $image = SGN::Image->new($schema->storage->dbh, $_->{image_id}, $c);
@@ -127,7 +129,7 @@ sub image_search :Path('/ajax/search/images') Args(0) {
         push @return, \@line;
     }
 
-    #print STDERR Dumper \@return;
+    #$logger->error(Dumper(\@return));
     $c->stash->{rest} = { data => [ @return ], draw => $draw, recordsTotal => $records_total,  recordsFiltered => $records_total };
 }
 

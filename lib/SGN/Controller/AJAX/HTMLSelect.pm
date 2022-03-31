@@ -40,6 +40,8 @@ use Math::Round;
 use URI::Encode qw(uri_encode uri_decode);
 use Array::Utils qw(:all);
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' };
 
 __PACKAGE__->config(
@@ -402,7 +404,7 @@ sub get_genotyping_trials_select : Path('/ajax/html/select/genotyping_trials') A
 sub get_label_data_source_select : Path('/ajax/html/select/label_data_sources') Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR "Retrieving list items . . .\n";
+    $logger->debug("Retrieving list items . . .");
 
     my $id = $c->req->param("id") || "label_data_sources_select";
     my $name = $c->req->param("name") || "label_data_sources_select";
@@ -459,7 +461,7 @@ sub get_label_data_source_select : Path('/ajax/html/select/label_data_sources') 
         push @choices, [@$item[0], @$item[1]];
     }
 
-    print STDERR "Choices are:\n".Dumper(@choices);
+    $logger->debug("Choices are:").Dumper(@choices);
 
     if ($default) { unshift @choices, [ '', $default ]; }
 
@@ -510,7 +512,7 @@ sub get_label_data_source_select : Path('/ajax/html/select/label_data_sources') 
     #     push @choices, $trial;
     # }
     #
-    # print STDERR "Choices are:\n".Dumper(@choices);
+    # $logger->error("Choices are:").Dumper(@choices);
     #
     # if ($default) { unshift @trials, [ '', $default ]; }
     #
@@ -571,7 +573,7 @@ sub get_stocks_select : Path('/ajax/html/select/stocks') Args(0) {
         display_pedigree=>0
 	});
 	my ($result, $records_total) = $stock_search->search();
-	#print STDERR Dumper $result;
+	#$logger->error(Dumper($result));
 	my $id = $c->req->param("id") || "html_trial_select";
 	my $name = $c->req->param("name") || "html_trial_select";
 	my $multiple = defined($c->req->param("multiple")) ? $c->req->param("multiple") : 1;
@@ -640,7 +642,7 @@ sub get_seedlots_select : Path('/ajax/html/select/seedlots') Args(0) {
             count => $sl->{current_count}
         };
     }
-    #print STDERR Dumper \@seedlots;
+    #$logger->error(Dumper(\@seedlots));
     my $id = $c->req->param("id") || "html_trial_select";
     my $name = $c->req->param("name") || "html_trial_select";
     my $multiple = defined($c->req->param("multiple")) ? $c->req->param("multiple") : 1;
@@ -683,7 +685,7 @@ sub get_ontologies : Path('/ajax/html/select/trait_variable_ontologies') Args(0)
     });
 
     my $result = $observation_variables->observation_variable_ontologies({cvprop_type_names => $cvprop_type_names});
-    #print STDERR Dumper $result;
+    #$logger->error(Dumper($result));
 
     my @ontos;
     foreach my $o (@{$result->{result}->{data}}) {
@@ -1074,7 +1076,7 @@ sub get_traits_select : Path('/ajax/html/select/traits') Args(0) {
       }
       my $query = $bs->metadata_query([ 'traits' ], {}, {});
       @traits = @{$query->{results}};
-      #print STDERR "Traits: ".Dumper(@traits)."\n";
+      #$logger->error("Traits: ".Dumper(@traits)."");
     } elsif (looks_like_number($stock_id)) {
         my $stock = CXGN::Chado::Stock->new($schema, $stock_id);
         my @trait_list = $stock->get_trait_list();
@@ -1231,13 +1233,13 @@ sub get_phenotyped_trait_components_select : Path('/ajax/html/select/phenotyped_
         my $trial = CXGN::Trial->new({bcs_schema=>$schema, trial_id=>$_});
         push @trait_components, @{$trial->get_trait_components_assayed($data_level, $composable_cvterm_format)};
     }
-    #print STDERR Dumper \@trait_components;
+    #$logger->error(Dumper(\@trait_components));
     my %unique_trait_components = map {$_->[0] => $_->[1]} @trait_components;
     my @unique_components;
     foreach my $id (keys %unique_trait_components){
         push @unique_components, [$id, $unique_trait_components{$id}];
     }
-    #print STDERR Dumper \@unique_components;
+    #$logger->error(Dumper(\@unique_components));
 
     my $id = $c->req->param("id") || "html_trait_component_select";
     my $name = $c->req->param("name") || "html_trait_component_select";
@@ -1347,7 +1349,7 @@ sub get_trait_components_select : Path('/ajax/html/select/trait_components') Arg
   my $c = shift;
 
   my $cv_id = $c->req->param('cv_id');
-  #print STDERR "cv_id = $cv_id\n";
+  #$logger->error("cv_id = $cv_id");
   my $id = $c->req->param("id") || "component_select";
   my $name = $c->req->param("name") || "component_select";
   my $default = $c->req->param("default") || 0;
@@ -1357,7 +1359,7 @@ sub get_trait_components_select : Path('/ajax/html/select/trait_components') Arg
   my $dbh = $c->dbc->dbh();
   my $onto = CXGN::Onto->new( { schema => $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado') } );
   my @components = $onto->get_terms($cv_id);
-  #print STDERR Dumper \@components;
+  #$logger->error(Dumper(\@components));
   if ($default) { unshift @components, [ '', $default ]; }
 
   my $html = simple_selectbox_html(
@@ -1380,7 +1382,7 @@ sub ontology_children_select : Path('/ajax/html/select/ontology_children') Args(
     my $rel_cv = $c->request->param("rel_cv");
     my $size = $c->req->param('size') || '5';
     my $value_format = $c->req->param('value_format') || 'ids';
-    print STDERR "Parent Node $parent_node_cvterm\n";
+    $logger->debug("Parent Node $parent_node_cvterm");
 
     my $select_name = $c->request->param("selectbox_name");
     my $select_id = $c->request->param("selectbox_id");
@@ -1416,7 +1418,7 @@ sub ontology_children_select : Path('/ajax/html/select/ontology_children') Args(
     if ($empty) {
         unshift @ontology_children, [ 0, "None" ];
     }
-    #print STDERR Dumper \@ontology_children;
+    #$logger->error(Dumper(\@ontology_children));
     my $html = simple_selectbox_html(
         name => $select_name,
         id => $select_id,
@@ -1458,7 +1460,7 @@ sub all_ontology_terms_select : Path('/ajax/html/select/all_ontology_terms') Arg
     if ($empty) {
         unshift @ontology_terms, [ 0, "None" ];
     }
-    #print STDERR Dumper \@ontology_children;
+    #$logger->error(Dumper(\@ontology_children));
     my $html = simple_selectbox_html(
         name => $select_name,
         id => $select_id,
@@ -1485,7 +1487,7 @@ sub get_datasets_select :Path('/ajax/html/select/datasets') Args(0) {
                 $c->dbic_schema("CXGN::People::Schema"),
                 $user_id
             );
-            #print STDERR "Retrieved datasets: ".Dumper($user_datasets);
+            #$logger->error("Retrieved datasets: ".Dumper($user_datasets));
 
             foreach (@$user_datasets) {
                 my $dataset_id = $_->[0];
@@ -1510,7 +1512,7 @@ sub get_datasets_select :Path('/ajax/html/select/datasets') Args(0) {
             }
         }
     }
-    #print STDERR Dumper \@datasets;
+    #$logger->error(Dumper(\@datasets));
 
     my $lt = CXGN::List::Transform->new();
     my %transform_dict = (
@@ -1593,7 +1595,7 @@ sub get_datasets_intersect_select : Path('/ajax/html/select/datasets_intersect')
             @intersect = intersect (@intersect, @$j);
         }
     }
-    # print STDERR Dumper @intersect;
+    # $logger->error(Dumper(@intersect));
 
     my $lt = CXGN::List::Transform->new();
     my %transform_dict = (
@@ -1931,8 +1933,8 @@ sub get_micasense_aligned_raw_images_grid : Path('/ajax/html/select/micasense_al
             polygons => \@polygons
         };
     }
-    # print STDERR Dumper \%longitudes;
-    # print STDERR Dumper \%latitudes;
+    # $logger->error(Dumper(\%longitudes));
+    # $logger->error(Dumper(\%latitudes));
 
     my $html = "<table class='table table-bordered table-hover'><thead><tr><th>Latitudes</th>";
     foreach my $lon (sort {$a <=> $b} keys %longitudes) {

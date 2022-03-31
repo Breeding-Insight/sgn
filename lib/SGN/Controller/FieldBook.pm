@@ -14,6 +14,8 @@ use File::Spec::Functions;
 use CXGN::BreedersToolbox::Projects;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub field_book :Path("/fieldbook") Args(0) {
@@ -122,7 +124,7 @@ sub trial_field_book_download : Path('/fieldbook/trial_download/') Args(1) {
     my $metadata_schema = $c->dbic_schema('CXGN::Metadata::Schema');
     my $file_row = $metadata_schema->resultset("MdFiles")->find({file_id => $file_id});
     my $file_destination =  catfile($file_row->dirname, $file_row->basename);
-    print STDERR "\n\n\nfile name:".$file_row->basename."\n";
+    $logger->debug("\n\n\nfile name:".$file_row->basename."");
     my $contents = read_file($file_destination);
     my $file_name = $file_row->basename;
     $c->res->content_type('Application/xls');
@@ -137,7 +139,7 @@ sub tablet_trait_file_download : Path('/fieldbook/trait_file_download/') Args(1)
     my $metadata_schema = $c->dbic_schema('CXGN::Metadata::Schema');
     my $file_row = $metadata_schema->resultset("MdFiles")->find({file_id => $file_id});
     my $file_destination =  catfile($file_row->dirname, $file_row->basename);
-    print STDERR "\n\n\nfile name:".$file_row->basename."\n";
+    $logger->debug("\n\n\nfile name:".$file_row->basename."");
     my $contents = read_file($file_destination);
     my $file_name = $file_row->basename;
 
@@ -197,7 +199,7 @@ sub delete_file : Path('/fieldbook/delete_file/') Args(1) {
      if ($file_id){
 		 $decoded = $json->allow_nonref->utf8->decode($file_id);
      }
-	#print STDERR Dumper($file_id);
+	#$logger->error(Dumper($file_id));
 	print "File ID: $file_id\n";
      my $dbh = $c->dbc->dbh();
      my $h_nd_exp_md_files = $dbh->prepare("delete from phenome.nd_experiment_md_files where file_id=?;");
@@ -205,7 +207,7 @@ sub delete_file : Path('/fieldbook/delete_file/') Args(1) {
 
      my $h_md_files = $dbh->prepare("delete from metadata.md_files where file_id=?;");
      $h_md_files->execute($decoded);
-     print STDERR "File successfully deleted.\n";
+     $logger->debug("File successfully deleted.");
 	$c->response->redirect('/fieldbook');
 }
 

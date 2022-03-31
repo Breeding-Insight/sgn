@@ -43,6 +43,8 @@ use SGN::Context;
 
 =cut
 
+my $logger = Log::Log4perl->get_logger();
+
 sub send_email {
     my ( $subject, $body, $mailto, $replyto ) = @_;
     my $request_info = "";
@@ -74,10 +76,10 @@ sub send_email {
     $mailto  ||= 'sgn-bugs@sgn.cornell.edu';
 
     $body .= $request_info;
-    print STDERR "$subject\n\n$body";
+    $logger->debug("$subject\n\n$body");
     #if ( $vhost_conf->get_conf('production_server') ) {
         if ( $vhost_conf->get_conf('disable_emails') ) {
-            print STDERR "CXGN::Contact: Configured as production server, but not configured to send emails; no email sent from $mailfrom to $mailto.\n";
+            $logger->debug("CXGN::Contact: Configured as production server, but not configured to send emails; no email sent from $mailfrom to $mailto.");
         }
         else {
             my $smtp_server = $vhost_conf->get_conf('smtp_server');
@@ -90,7 +92,6 @@ sub send_email {
 
             # If SMTP config values are found use external SMTP server
             if ( $smtp_server and $smtp_login and $smtp_pass ) {
-
               my ($mail,$error) = Email::Send::SMTP::Gmail->new(
                   -smtp  => $smtp_server,
                   -layer => $smtp_layer,
@@ -101,15 +102,16 @@ sub send_email {
               );
 
               if ($mail == -1) {
-                print STDERR "CXGN::Contact: SMTP error: $error\n";
-              };
+                $logger->error("CXGN::Contact: SMTP error: $error");
+              } else {
+                  $mail->send(
+                      -from       => $smtp_from,
+                      -to         => $mailto,
+                      -subject    => $subject,
+                      -body       => $body
+                  );
+              }
 
-              $mail->send(
-                  -from       => $smtp_from,
-                  -to         => $mailto,
-                  -subject    => $subject,
-                  -body       => $body
-              );
 
             } else {
 
@@ -122,17 +124,17 @@ sub send_email {
               $mail{'Reply-To'} = $replyto;
 
               if ( sendmail(%mail) ) {
-                  print STDERR "CXGN::Contact: Email notification sent from $mailfrom to $mailto.\n";
+                  $logger->debug("CXGN::Contact: Email notification sent from $mailfrom to $mailto.");
               }
               else {
-                  print STDERR "CXGN::Contact: UNABLE TO SEND EMAIL NOTIFICATION\n";
+                  $logger->error("CXGN::Contact: UNABLE TO SEND EMAIL NOTIFICATION");
               }
 
             }
         }
    # }
     #else {
-     #   print STDERR "CXGN::Contact: Not configured as production server; no email sent from $mailfrom to $mailto.\n";
+     #   $logger->error("CXGN::Contact: Not configured as production server; no email sent from $mailfrom to $mailto.");
     #}
 }
 

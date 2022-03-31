@@ -7,6 +7,7 @@ use Bio::GeneticRelationships::Pedigree;
 use Bio::GeneticRelationships::Individual;
 
 with 'MooseX::Object::Pluggable';
+my $logger = Log::Log4perl->get_logger();
 
 
 has 'chado_schema' => (
@@ -53,23 +54,23 @@ sub parse {
     my $self = shift;
 
     if (!$self->_validate_with_plugin()) {
-        print STDERR "\nCould not validate cross file: ".$self->get_filename()."\n";
+        $logger->error("\nCould not validate cross file: ".$self->get_filename()."");
         return;
     }
 
     if (!$self->_parse_with_plugin()) {
-        print STDERR "\nCould not parse cross file: ".$self->get_filename()."\n";
+        $logger->error("\nCould not parse cross file: ".$self->get_filename()."");
         return;
     }
 
     if (!$self->_has_parsed_data()) {
-        print STDERR "\nNo parsed data for cross file: ".$self->get_filename()."\n";
+        $logger->error("\nNo parsed data for cross file: ".$self->get_filename()."");
         return;
     } else {
         return $self->_parsed_data();
     }
 
-    print STDERR "\nError parsing cross file: ".$self->get_filename()."\n";
+    $logger->error("\nError parsing cross file: ".$self->get_filename()."");
     return;
 }
 

@@ -21,6 +21,8 @@ use Data::Dumper;
 use JSON;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller::REST' }
 
@@ -55,9 +57,9 @@ sub sync_cass_transgenics_POST {
     });
 
     foreach (@transgenics_array) {
-    	#print STDERR $_->{construct};
-    	#print STDERR $_->{construct_id};
-    	#print STDERR $_->{level};
+    	#$logger->error($_->{construct});
+    	#$logger->error($_->{construct_id});
+    	#$logger->error($_->{level});
 
     	my $create_stock = $schema->resultset("Stock::Stock")->find_or_create({
             uniquename => $_->{transgenic},
@@ -84,8 +86,8 @@ sub sync_cass_transgenics_POST {
         });
     }
 
-    #print STDERR Dumper $transgenics;
-    #print STDERR $status;
+    #$logger->error(Dumper($transgenics));
+    #$logger->error($status);
 
     $c->stash->{rest} = {response=>$status};
 }

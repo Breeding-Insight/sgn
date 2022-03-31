@@ -4,6 +4,8 @@ use Moose;
 use Data::Dumper;
 use CXGN::Dataset;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -25,7 +27,7 @@ sub get_constraints :Path('/ajax/tools/boxplotter/get_constraints') {
   if (!$c->user || $c->user->get_sp_person_id()!=$ds->sp_person_id()){
     $c->stash->{rest} = [];
     $c->response->status(403);
-    print STDERR Dumper ["NOKAY"];
+    $logger->error(Dumper(["NOKAY"]));
     return;
   }
   else {

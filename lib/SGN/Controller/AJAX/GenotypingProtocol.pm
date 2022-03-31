@@ -21,6 +21,8 @@ use CXGN::Genotype::MarkersSearch;
 use JSON;
 use CXGN::Tools::Run;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -37,7 +39,7 @@ sub genotyping_protocol_delete_GET : Args(1) {
     my $protocol_id = shift;
     my $bcs_schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
 
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
     my $session_id = $c->req->param("sgn_session_id");
     my $user_id;
     my $user_role;

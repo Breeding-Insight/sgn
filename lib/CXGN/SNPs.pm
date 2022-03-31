@@ -25,6 +25,8 @@ use Moose;
 use Data::Dumper;
 use Math::BigInt;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 accessors id()
 
 The id of the SNP.
@@ -214,7 +216,7 @@ sub snp_stats {
     my $good_snps = 0;
     my $invalid_snps = 0;
     
-    #print STDERR Dumper($self->snps());
+    #$logger->error(Dumper($self->snps()));
     foreach my $a (@{$self->valid_accessions}) { 
 	my $snp = $self->snps()->{$a};
 	if (!$snp) { print  "Warning! No snp found for accession $a!!!!\n"; }
@@ -238,7 +240,7 @@ sub calculate_allele_frequency_using_counts {
     foreach my $k (@{$self->valid_accessions()}) {
 	my $s = $self->snps->{$k};
 	if (!$s) { 
-	    print STDERR "Accession $k has no valid SNPs associated with it. Skipping.\n";
+	    $logger->debug("Accession $k has no valid SNPs associated with it. Skipping.");
 	    $missing++;
 	    next();
 	}
@@ -260,7 +262,7 @@ sub calculate_allele_frequency_using_counts {
     $self->pAA($pAA);
     $self->pAB($pAB);
     $self->pBB($pBB);
-    #print STDERR "$missing accessions had no valid snps associated with them for snp ".$self->id()."\n";
+    #$logger->error("$missing accessions had no valid snps associated with them for snp ".$self->id()."");
     return $allele_freq;
 }
 
@@ -271,9 +273,9 @@ sub calculate_allele_frequency_using_counts {
  	my $s = $self->snps()->{$k};
  	$self->calculate_snp_dosage($s);
 	my $dosage = $s->dosage() || "no dosage";
-	#print STDERR "Dosage for SNP ".$s->id()."=$dosage for accession ".$s->accession()."\n";
+	#$logger->error("Dosage for SNP ".$s->id()."=$dosage for accession ".$s->accession()."");
      }
-     #print STDERR Dumper($self->snps());
+     #$logger->error(Dumper($self->snps()));
  }
 
 =head2 function calculate_snp_dosage()
@@ -291,29 +293,29 @@ sub calculate_snp_dosage {
 
     my $error_probability = $self->error_probability();
 
-    #print STDERR "Working with strict dosage filter ($strict_dosage_filter) and error probability $error_probability\n";
+    #$logger->error("Working with strict dosage filter ($strict_dosage_filter) and error probability $error_probability");
     my $c1 = $snp->ref_count();
     my $c2 = $snp->alt_count();
 
-    #print STDERR "counts: $c1, $c2\n";
+    #$logger->error("counts: $c1, $c2");
     
     my $n = $c1 + $c2;
 
     my $N1 = Math::BigInt->new($n);
     my $N2 = Math::BigInt->new($n);
 
- #   print STDERR "$N1 bnok $c1 is: ". $N1->bnok($c1)."\n";
+ #   $logger->error("$N1 bnok $c1 is: ". $N1->bnok($c1)."");
 
     my $Nbnokc1 = $N1->bnok($c1)->numify();
     my $Nbnokc2 = $N2->bnok($c2)->numify();
     
-#    print STDERR "NBnokc1: $Nbnokc1, NBnokc2 $Nbnokc2\n";
+#    $logger->error("NBnokc1: $Nbnokc1, NBnokc2 $Nbnokc2");
 
     my $pDAA = $Nbnokc1 * ((1-$error_probability) ** $c1) * ($error_probability ** $c2);
     my $pDAB = $Nbnokc1 * (0.5 ** $c1) * (0.5 ** $c2);
     my $pDBB = $Nbnokc2 * ((1-$error_probability) ** $c2) * ($error_probability ** $c1);
 
-#   print STDERR "pDAA: $pDAA pDAB $pDAB, pDBB $pDBB\n";
+#   $logger->error("pDAA: $pDAA pDAB $pDAB, pDBB $pDBB");
 
     my $pSAA = $pDAA * ($self->pAA || 0);
     my $pSAB = $pDAB * ($self->pAB || 0);
@@ -375,12 +377,12 @@ sub hardy_weinberg_filter {
 	    $classes{BB}++;
 	}
 	else { 
-	    #print STDERR "Dosage outlier: $d\n";
+	    #$logger->error("Dosage outlier: $d");
 	}
 
     }
 
-    print STDERR "Class counts: AA: $classes{AA}, BB: $classes{BB}, AB: $classes{AB}, NA: $classes{NA}\n";
+    $logger->debug("Class counts: AA: $classes{AA}, BB: $classes{BB}, AB: $classes{AB}, NA: $classes{NA}");
  
     if ( ( ($classes{AA} ==0) && ($classes{AB} ==0)) ||
 	( ($classes{BB} == 0) && ($classes{AB} ==0)) ) { 
@@ -395,7 +397,7 @@ sub hardy_weinberg_filter {
 
     $score{scored_marker_fraction} = $total / (@$dosages);
     
-    #print STDERR "AA  $classes{AA}, AB $classes{AB}, BB $classes{BB} Total: $total\n";
+    #$logger->error("AA  $classes{AA}, AB $classes{AB}, BB $classes{BB} Total: $total");
     my $allele_freq = (2 * $classes{AA} + $classes{AB}) / (2 * $total);
 
     $score{heterozygote_count} = $classes{AB};
@@ -404,7 +406,7 @@ sub hardy_weinberg_filter {
     
     my $expected = $allele_freq * (1-$allele_freq) * 2 * $total;
 
-    #print STDERR "TOTAL: $total\n";
+    #$logger->error("TOTAL: $total");
     my $x = ($classes{AB} - $expected)**2 / $expected;
 
     # only do the chi square test if the number of heterozygotes is larger than expected

@@ -13,7 +13,7 @@ sub validate {
     my $schema = shift;
     my $list = shift;
 
-#    print STDERR "LIST: ".Data::Dumper::Dumper($list);
+#    $logger->error("LIST: ".Data::Dumper::Dumper($list));
     my $breeding_program_cvterm_id  = SGN::Model::Cvterm->get_cvterm_row($schema, 'breeding_program','project_property')->cvterm_id();
     my @missing = ();
     foreach my $term (@$list) {

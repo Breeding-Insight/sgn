@@ -292,7 +292,7 @@ sub store {
 
 #       eval
 #       {
-         #print STDERR "**** about to call the get_form->store() ****";
+         #$logger->error("**** about to call the get_form->store() ****");
                 $self->get_form()->store($self->get_args());
 
                 #give the user the opportunity to do anything related to the form after storing

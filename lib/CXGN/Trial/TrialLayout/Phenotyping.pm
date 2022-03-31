@@ -6,19 +6,21 @@ use namespace::autoclean;
 
 extends 'CXGN::Trial::TrialLayout::AbstractLayout';
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'block_numbers' => (isa => 'ArrayRef', is => 'ro', predicate => 'has_block_numbers', reader => 'get_block_numbers', writer => '_set_block_numbers');
 
 
 sub BUILD {
     my $self = shift;
 
-    print STDERR "BUILD CXGN::Trial::TrialLayout::Phenotyping...\n";
+    $logger->debug("BUILD CXGN::Trial::TrialLayout::Phenotyping...");
     $self->set_source_primary_stock_types( [ "accession", "cross", "family_name" ] );
     $self->set_source_stock_types([ 'accession', 'cross', 'family_name', 'subplot', 'plant', 'grafted_accession' ] );
     $self->set_relationship_types([ 'plot_of', 'member_of', 'plant_of_subplot', 'tissue_sample_of']);
     $self->set_target_stock_types( [ 'plot'] );
 
-    #print STDERR "Set source stock types to ".join(", ", @{$self->get_source_stock_types()});
+    #$logger->error("Set source stock types to ".join(", ", @{$self->get_source_stock_types()}));
         # probably better to lazy load the action design...
     #
     $self->convert_source_stock_types_to_ids();

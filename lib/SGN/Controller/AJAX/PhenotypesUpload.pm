@@ -31,6 +31,8 @@ use CXGN::Phenotypes::StorePhenotypes;
 use List::MoreUtils qw /any /;
 use CXGN::BreederSearch;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -195,7 +197,7 @@ sub _prep_upload {
     my $image_zip;
     if ($file_type eq "spreadsheet") {
         my $spreadsheet_format = $c->req->param('upload_spreadsheet_phenotype_file_format'); #simple or detailed or nirs or scio or associated_images
-        # print STDERR "File type is Spreadsheet and format is $spreadsheet_format\n";
+        # $logger->error("File type is Spreadsheet and format is $spreadsheet_format");
         $metadata_file_type = "spreadsheet phenotype file";
 
         if ($spreadsheet_format eq 'detailed'){
@@ -214,7 +216,7 @@ sub _prep_upload {
         $image_zip = $c->req->upload('upload_spreadsheet_phenotype_associated_images_file_input');
     }
     elsif ($file_type eq "fieldbook") {
-        # print STDERR "Fieldbook \n";
+        # $logger->error("Fieldbook ");
         $subdirectory = "tablet_phenotype_upload";
         $validate_type = "field book";
         $metadata_file_type = "tablet phenotype file";
@@ -224,7 +226,7 @@ sub _prep_upload {
         $data_level = $c->req->param('upload_fieldbook_phenotype_data_level') || 'plots';
     }
     elsif ($file_type eq "datacollector") {
-        # print STDERR "Datacollector \n";
+        # $logger->error("Datacollector ");
         $subdirectory = "data_collector_phenotype_upload";
         $validate_type = "datacollector spreadsheet";
         $metadata_file_type = "data collector phenotype file";
@@ -240,7 +242,7 @@ sub _prep_upload {
 
     my $overwrite_values = $c->req->param('phenotype_upload_overwrite_values');
     if ($overwrite_values) {
-        #print STDERR $user_type."\n";
+        #$logger->error($user_type."");
         if ($user_type ne 'curator') {
             push @error_status, 'Must be a curator to overwrite values! Please contact us!';
             return (\@success_status, \@error_status);
@@ -271,7 +273,7 @@ sub _prep_upload {
         push @success_status, "File $upload_original_name saved in archive.";
     }
     unlink $upload_tempfile;
-    #print STDERR "Archived Phenotype File: $archived_filename_with_path\n";
+    #$logger->error("Archived Phenotype File: $archived_filename_with_path");
 
     my $archived_image_zipfile_with_path;
     if ($image_zip) {
@@ -295,7 +297,7 @@ sub _prep_upload {
             push @success_status, "Images Zip File $upload_original_name saved in archive.";
         }
         unlink $upload_tempfile;
-        #print STDERR "Archived Zipfile: $archived_image_zipfile_with_path\n";
+        #$logger->error("Archived Zipfile: $archived_image_zipfile_with_path");
     }
 
     ## Validate and parse uploaded file
@@ -347,7 +349,7 @@ sub update_plot_phenotype :  Path('/ajax/phenotype/plot_phenotype_upload') : Act
 sub update_plot_phenotype_POST : Args(0) {
   my $self = shift;
   my $c = shift;
-  print STDERR Dumper $c->req->params();
+  $logger->error(Dumper($c->req->params()));
   my $plot_name = $c->req->param("plot_name");
   my $trait_id = $c->req->param("trait");
   my $trait_value = $c->req->param("trait_value");
@@ -365,7 +367,7 @@ sub update_plot_phenotype_POST : Args(0) {
   my $plot_type_id = $plot->type_id();
 
   if (!$c->user()) {
-    print STDERR "User not logged in... not uploading phenotype.\n";
+    $logger->debug("User not logged in... not uploading phenotype.");
     $c->stash->{rest} = {error => "You need to be logged in to upload phenotype." };
     return;
   }

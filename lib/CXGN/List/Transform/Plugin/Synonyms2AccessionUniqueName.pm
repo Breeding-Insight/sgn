@@ -4,6 +4,7 @@ package CXGN::List::Transform::Plugin::Synonyms2AccessionUniqueName;
 use strict;
 
 use Data::Dumper;
+my $logger = Log::Log4perl->get_logger();
 
 sub name {
     return "synonyms2accession_uniquename";
@@ -49,7 +50,7 @@ sub transform {
 	}
     }
 
-    print STDERR "synonym type id = $synonym_type_id\n";
+    $logger->debug("synonym type id = $synonym_type_id");
 
     my @missing;
     my %mapping;
@@ -78,7 +79,7 @@ sub transform {
 	duplicate => \@duplicates,
     };
 
-    #print STDERR Dumper($data);
+    #$logger->error(Dumper($data));
     return $data;
 }
 

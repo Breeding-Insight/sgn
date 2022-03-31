@@ -9,6 +9,8 @@ use File::Copy;
 use File::Basename;
 use CXGN::Tools::Run;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN {extends 'Catalyst::Controller'}
 
 

@@ -25,6 +25,8 @@ my $json = JSON::Any->new;
 
 use Time::HiRes qw(gettimeofday tv_interval);
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST'; };
 
 __PACKAGE__->config(
@@ -51,7 +53,7 @@ sub run : Path('/tools/blast/run') Args(0) {
 	if ($params->{input_options} eq 'autodetect') {
 		my $detected_type = $input_query->autodetect_seq_type($c, $params->{input_options}, $params->{sequence});
 
-		# print STDERR "SGN BLAST detected your sequence is: $detected_type\n";
+		# $logger->error("SGN BLAST detected your sequence is: $detected_type");
 
 		# create a hash with the valid options =1 and check and if result 0 return error
 		my %blast_seq_db_program = (
@@ -87,7 +89,7 @@ sub run : Path('/tools/blast/run') Args(0) {
     	$seq_count= $params->{sequence} =~ tr/\>/\>/;
     }
 
-    print STDERR "SEQ COUNT = $seq_count\n";
+    $logger->debug("SEQ COUNT = $seq_count");
     my ($seq_fh, $seqfile) = tempfile(
       "blast_XXXXXX",
       DIR=> $blast_tmp_output,
@@ -95,7 +97,7 @@ sub run : Path('/tools/blast/run') Args(0) {
 
 #    my $jobid = basename($seqfile);
 
-#    print STDERR "JOB ID CREATED: $jobid\n";
+#    $logger->error("JOB ID CREATED: $jobid");
 
     my $schema = $c->dbic_schema("SGN::Schema");
 
@@ -112,12 +114,12 @@ sub run : Path('/tools/blast/run') Args(0) {
 	      #	 }
 	      #	 $sequence .= "\n"; #< add a final newline
 
-	         print STDERR "Opening file for sequence ($seqfile)... ";
+	         $logger->error("Opening file for sequence ($seqfile)... ");
 		 open(my $FH, ">", $seqfile) || die "Can't open file for query ($seqfile)\n";
 		 print $FH $sequence if $sequence;
 		 close($FH);
 
-     # print STDERR "Done.\n";
+     # $logger->error("Done.");
 
 #	     if(my $file_upload = $page->get_upload) {
 #		 if ( my $fh = $file_upload->fh ) {
@@ -125,7 +127,7 @@ sub run : Path('/tools/blast/run') Args(0) {
 #		 }
 #	     }
 
-		 print STDERR "Parsing with bioperl... ";
+		 $logger->error("Parsing with bioperl... ");
 		 my $i = Bio::SeqIO->new(
 		     -format   => 'fasta',
 		     -file       => $seqfile,
@@ -139,7 +141,7 @@ sub run : Path('/tools/blast/run') Args(0) {
 			     );
 		     }
 		 } catch {
-		     print STDERR $@;
+		     $logger->error($@);
 		     die $_ if ref; #< throw it onward if it's an exception
 		     my $full_error = $_;
 		     if( /MSG:([^\n]+)/ ) {
@@ -174,7 +176,7 @@ sub run : Path('/tools/blast/run') Args(0) {
 
 	 word_size =>
 	 sub {
-	     print STDERR "WORD SIZE = $params->{word_size}\n";
+	     $logger->debug("WORD SIZE = $params->{word_size}");
 	     $params->{word_size} =~ s/[^\d]//gi; # filter numbers only
 	     return -word_size => $params->{word_size} ? $params->{word_size} : 11;
 	 },
@@ -240,7 +242,7 @@ sub run : Path('/tools/blast/run') Args(0) {
 	};
     }
     
-    print STDERR "BUILDING COMMAND...\n";
+    $logger->debug("BUILDING COMMAND...");
 
 
     # build our command with our arg handlers
@@ -248,7 +250,7 @@ sub run : Path('/tools/blast/run') Args(0) {
     my @command = ($params->{program});
     foreach my $k (keys %arg_handlers) {
 
-      print STDERR "evaluating $k...";
+      $logger->error("evaluating $k...");
       my @x = $arg_handlers{$k}->();
       print STDERR "component:
       ", (join ",", @x)."\n";
@@ -259,8 +261,8 @@ sub run : Path('/tools/blast/run') Args(0) {
     push(@command, '-show_gis');
 #    push(@command, 'T');  # show_gis is a flag, no parameter needed
 
-    print STDERR "COMMAND: ".join(" ", @command);
-    print STDERR "\n";
+    $logger->error("COMMAND: ".join(" ", @command));
+    $logger->debug("");
 
     # save our prefs
     # $prefs->save;
@@ -293,7 +295,7 @@ sub run : Path('/tools/blast/run') Args(0) {
     };
 
     if ($@) {
-	print STDERR "An error occurred! $@\n";
+	$logger->debug("An error occurred! $@");
 	$c->stash->{rest} = { error => $@ };
     }
     else {
@@ -301,15 +303,15 @@ sub run : Path('/tools/blast/run') Args(0) {
 	my $blast_log_path = $c->config->{blast_log};
 	my $blast_log_fh;
 	if (-e $blast_log_path) {
-	    open($blast_log_fh, ">>", $blast_log_path) || print STDERR "cannot create $blast_log_path\n";
+	    open($blast_log_fh, ">>", $blast_log_path) || $logger->debug("cannot create $blast_log_path");
 	} else {
-	    open($blast_log_fh, ">", $blast_log_path) || print STDERR "cannot open $blast_log_path\n";
+	    open($blast_log_fh, ">", $blast_log_path) || $logger->debug("cannot open $blast_log_path");
 	    print $blast_log_fh "Seq_num\tDB_id\tProgram\teval\tMaxHits\tMatrix\tDate\n";
 	}
 	print $blast_log_fh "$seq_count\t".$params->{database}."\t".$params->{program}."\t".$params->{evalue}."\t".$params->{maxhits}."\t".$params->{matrix}."\t".localtime()."\n";
 	
 	
-	print STDERR "Passing jobid code ".$job->jobid()."\n";
+	$logger->debug("Passing jobid code ".$job->jobid()."");
 	$c->stash->{rest} = { jobid => $job->jobid(),
   	                      seq_count => $seq_count,
 	};
@@ -345,7 +347,7 @@ sub check : Path('/tools/blast/check') Args(1) {
       #       my $t2 = [gettimeofday]; #-------------------------- TIME CHECK
       #
       # my $t1_t2 = tv_interval $t1, $t2;
-      #       print STDERR "Job alive: $t1_t2\n";
+      #       $logger->error("Job alive: $t1_t2");
 
       return;
     }
@@ -360,14 +362,14 @@ sub check : Path('/tools/blast/check') Args(1) {
 
       my $job_out_file = $job->out_file();
 
-      print STDERR "Job out file = $job_out_file...\n";
+      $logger->debug("Job out file = $job_out_file...");
       for( 1..10 ) {
   	    uncache($job_out_file);
   	    last if -f $job_out_file;
   	    sleep 1;
         #         my $t4 = [gettimeofday]; #-------------------------- TIME CHECK
         # my $t3_t4 = tv_interval $t3, $t4;
-        #         print STDERR "Job not alive loop: $t3_t4\n";
+        #         $logger->error("Job not alive loop: $t3_t4");
 
       }
       # my $t5 = [gettimeofday]; #-------------------------- TIME CHECK
@@ -386,7 +388,7 @@ sub check : Path('/tools/blast/check') Args(1) {
       # my $t7 = [gettimeofday]; #-------------------------- TIME CHECK
 
       # system("ls $c->{config}->{cluster_shared_tempdir} 2>&1 >/dev/null");
-      print STDERR "Copying result file to website tempdir...\n";
+      $logger->debug("Copying result file to website tempdir...");
       copy($job_out_file, $result_file) or die "Can't copy result file '$job_out_file' to $result_file ($!)";
 
       # my $t8 = [gettimeofday]; #-------------------------- TIME CHECK
@@ -409,14 +411,14 @@ sub check : Path('/tools/blast/check') Args(1) {
       # my $t3_t10 = tv_interval $t3, $t10;
       # my $t0_t10 = tv_interval $t0, $t10;
       #
-      #       print STDERR "check 5-6 interval: $t5_t6\n";
-      #       print STDERR "check 6-7 interval: $t6_t7\n";
-      #       print STDERR "check 7-8 interval: $t7_t8\n";
-      #       print STDERR "check 8-9 interval: $t8_t9\n";
-      #       print STDERR "check 9-10 interval: $t9_t10\n";
+      #       $logger->error("check 5-6 interval: $t5_t6");
+      #       $logger->error("check 6-7 interval: $t6_t7");
+      #       $logger->error("check 7-8 interval: $t7_t8");
+      #       $logger->error("check 8-9 interval: $t8_t9");
+      #       $logger->error("check 9-10 interval: $t9_t10");
       #
-      #       print STDERR "Job not alive (else): $t3_t10\n";
-      #       print STDERR "CHECK SUB TIME: $t0_t10\n";
+      #       $logger->error("Job not alive (else): $t3_t10");
+      #       $logger->error("CHECK SUB TIME: $t0_t10");
 
 
     	$c->stash->{rest} = { status => "complete" };
@@ -459,7 +461,7 @@ sub get_result : Path('/tools/blast/result') Args(1) {
 
     # my $t1 = [gettimeofday]; #-------------------------- TIME CHECK
     # my $t0_t1 = tv_interval $t0, $t1;
-    # print STDERR "GET RESULT SUB TIME: $t0_t1\n";
+    # $logger->error("GET RESULT SUB TIME: $t0_t1");
 
     $c->stash->{rest} = $parsed_data; # { blast_report => '<pre>'.(join("\n", read_file($parsed_file))).'</pre>', };
 }
@@ -528,7 +530,7 @@ sub render_canvas_graph : Path('/tools/blast/render_graph') Args(1) {
 
       if ($query_line_on && $line =~ /Length=(\d+)/) {
 	  $query_length = $1;
-	  print STDERR "Query length = $query_length\n";
+	  $logger->debug("Query length = $query_length");
 
       }
 
@@ -566,7 +568,7 @@ sub render_canvas_graph : Path('/tools/blast/render_graph') Args(1) {
           $description_hash{"description"} = $desc;
           $description_hash{"qstart"} = $qstart;
           $description_hash{"qend"} = $qend;
-	  print STDERR "HSPS: ".Dumper(\%description_hash);
+	  $logger->error("HSPS: ".Dumper(\%description_hash));
           push(@json_array, \%description_hash);
 
         }
@@ -585,7 +587,7 @@ sub render_canvas_graph : Path('/tools/blast/render_graph') Args(1) {
         if ($line =~ /^>(\S+)\s*(.*)/) {
           $subject = $1;
           $desc = $2;
-          # print STDERR "subject: $subject\n";
+          # $logger->error("subject: $subject");
         }
       }
 
@@ -609,7 +611,7 @@ sub render_canvas_graph : Path('/tools/blast/render_graph') Args(1) {
         $description_hash{"qstart"} = $qstart;
         $description_hash{"qend"} = $qend;
 
-	print STDERR "FOUND HSP: ".Dumper(\%description_hash);
+	$logger->error("FOUND HSP: ".Dumper(\%description_hash));
 	
         push(@json_array, \%description_hash);
 

@@ -3,6 +3,8 @@ package CXGN::Trial::TrialDesign::Plugin::MADII;
 
 use Moose::Role;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub create_design {
 #    sub _get_madii_design {
     my $self = shift;
@@ -94,9 +96,9 @@ sub create_design {
     
     #=comment
     
-    #print STDERR join "\n", "@stock_list\n";
+    #$logger->error(join "\n", "@stock_list");
     
-    #print STDERR join "\n", "$number_of_rows\n";
+    #$logger->error(join "\n", "$number_of_rows");
     
     $stock_data_matrix =  R::YapRI::Data::Matrix->new(
 	{
@@ -177,8 +179,8 @@ sub create_design {
     #  $r_block<-add_command('colnames(augmented)[7]<-"block"');
     
     my @commands = $r_block->read_commands();
-    print STDERR join "\n", @commands;
-    print STDERR "\n";
+    $logger->debug(join("\n", @commands));
+    $logger->debug("");
     
     $r_block->run_block();
     

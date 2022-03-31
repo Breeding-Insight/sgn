@@ -7,6 +7,8 @@ use CXGN::QRcode;
 use URI::Encode qw(uri_encode uri_decode);
 use URI::FromHash 'uri';
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub interactive_barcoder_main :Path('/tools/label_designer') Args(0) {
@@ -29,11 +31,11 @@ sub barcode_preview :Path('/tools/label_designer/preview') {
     my $type = $uri->decode($c->req->param("type"));
     my $size = $uri->decode($c->req->param("size"));
 
-    #print STDERR "Content is $content and type is $type and size is $size\n";
+    #$logger->error("Content is $content and type is $type and size is $size");
 
     if ($type eq 'Code128') {
 
-        print STDERR "Creating barcode 128\n";
+        $logger->debug("Creating barcode 128");
 
         my $barcode_object = Barcode::Code128->new();
         $barcode_object->option("scale", $size);
@@ -48,7 +50,7 @@ sub barcode_preview :Path('/tools/label_designer/preview') {
 
     } elsif ($type eq 'QRCode') {
 
-        print STDERR "Creating QR Code\n";
+        $logger->debug("Creating QR Code");
 
         $c->tempfiles_subdir('barcode');
         my ($file_location, $uri) = $c->tempfile( TEMPLATE => [ 'barcode', 'bc-XXXXX'], SUFFIX=>'.jpg');

@@ -21,6 +21,8 @@ use Data::Dumper;
 use JSON;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller::REST' }
 
@@ -53,9 +55,9 @@ sub sync_cass_constructs_POST {
     });
 
     foreach (@construct_array) {
-    	#print STDERR $_->{construct};
-    	#print STDERR $_->{construct_id};
-    	#print STDERR $_->{level};
+    	#$logger->error($_->{construct});
+    	#$logger->error($_->{construct_id});
+    	#$logger->error($_->{level});
 
     	my $create_stock = $schema->resultset("Stock::Stock")->find_or_create({
             uniquename => $_->{construct},
@@ -76,8 +78,8 @@ sub sync_cass_constructs_POST {
         });
     }
 
-    #print STDERR Dumper $constructs;
-    #print STDERR $status;
+    #$logger->error(Dumper($constructs));
+    #$logger->error($status);
 
     $c->stash->{rest} = {response=>$status};
 }

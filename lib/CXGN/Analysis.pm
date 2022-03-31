@@ -59,6 +59,8 @@ use Moose;
 
 extends 'CXGN::Project';
 
+my $logger = Log::Log4perl->get_logger();
+
 use Try::Tiny;
 use DateTime;
 use Data::Dumper;
@@ -204,12 +206,12 @@ sub BUILD {
     my $self = shift;
     my $args = shift;
 
-    print STDERR "BUILD CXGN::Analysis...\n";
+    $logger->debug("BUILD CXGN::Analysis...");
     my $metadata;
 
     if ($self->get_trial_id()) {
         my $schema = $args->{bcs_schema};
-        print STDERR "Location id retrieved : = ".$self->get_location()->[0]."\n";
+        $logger->debug("Location id retrieved : = ".$self->get_location()->[0]."");
         $self->nd_geolocation_id($self->get_location()->[0]);
 
         my $metadata_json_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'analysis_metadata_json', 'project_property')->cvterm_id();
@@ -220,16 +222,16 @@ sub BUILD {
             $stockprop_id = $rs->first()->projectprop_id();
         }
 
-        print STDERR "Create AnalysisMetadata object...\n";
+        $logger->debug("Create AnalysisMetadata object...");
         $metadata = CXGN::Analysis::AnalysisMetadata->new( { bcs_schema => $schema, prop_id => $stockprop_id });
         $self->metadata($metadata);
 
         $stockprop_id = $metadata->prop_id();
 
         my $time = DateTime->now();
-        print STDERR "prop_id is $stockprop_id...\n";
+        $logger->debug("prop_id is $stockprop_id...");
         if (! defined($stockprop_id)) {
-            print STDERR "project_id = ".$self->get_trial_id()." with stockprop_id = undefined...storing metadata...\n";
+            $logger->debug("project_id = ".$self->get_trial_id()." with stockprop_id = undefined...storing metadata...");
             $metadata->parent_id($self->get_trial_id());
             $metadata->create_timestamp($time->ymd()." ".$time->hms());
             $metadata->store();
@@ -295,7 +297,7 @@ sub retrieve_analyses_by_user {
 
     my @analyses = ();
     while (my ($project_id, $analysis_info) = $h->fetchrow_array()) {
-        print STDERR "Instantiating analysis project for project ID $project_id...\n";
+        $logger->debug("Instantiating analysis project for project ID $project_id...");
         my $info = decode_json $analysis_info;
         if ($analyses_type) {
             if ($info->{analysis_model_type} eq $analyses_type) {
@@ -317,7 +319,7 @@ sub create_and_store_analysis_design {
     my $schema = $self->bcs_schema();
     my $dbh = $schema->storage->dbh();
 
-    print STDERR "CREATE AND STORE ANALYSIS DESIGN...\n";
+    $logger->debug("CREATE AND STORE ANALYSIS DESIGN...");
 
     if (!$self->user_id()) {
         die "Need an sp_person_id to store an analysis.";
@@ -338,8 +340,8 @@ sub create_and_store_analysis_design {
     if (!$self->year()) {
         my $dt = DateTime->now();
         my $year = $dt->year();
-        print STDERR "Year: $year\n";
-        print STDERR "No year provided. Using current year ($year).\n";
+        $logger->debug("Year: $year");
+        $logger->debug("No year provided. Using current year ($year).");
         $self->year($year);
     }
 
@@ -353,7 +355,7 @@ sub create_and_store_analysis_design {
 
     # store user info
     #
-    print STDERR "Storing user info...\n";
+    $logger->debug("Storing user info...");
     my $project_sp_person_term_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'project_sp_person_id', 'project_property')->cvterm_id();
     my $row = $schema->resultset("Project::Projectprop")->create({
         project_id => $self->get_trial_id(),
@@ -365,9 +367,9 @@ sub create_and_store_analysis_design {
     #
     my $time = DateTime->now();
     if (!$self->metadata()) {
-        print STDERR "Storing metadata...\n";
+        $logger->debug("Storing metadata...");
         my $metadata = CXGN::Analysis::AnalysisMetadata->new({ bcs_schema => $schema });
-        print STDERR "Analysis ID = ".$self->get_trial_id()."\n";
+        $logger->debug("Analysis ID = ".$self->get_trial_id()."");
         $metadata->parent_id($self->get_trial_id());
         $self->metadata( $metadata );
         $self->metadata()->create_timestamp($time->ymd()." ".$time->hms());
@@ -378,14 +380,14 @@ sub create_and_store_analysis_design {
     # changes.
     #
     if ($self->metadata()->dataset_id()) {
-        print STDERR "Retrieving data for dataset_id ".$self->metadata->dataset_id()."\n";
+        $logger->debug("Retrieving data for dataset_id ".$self->metadata->dataset_id()."");
         my $ds = CXGN::Dataset->new( { schema => $schema, people_schema => $self->people_schema(), sp_dataset_id => $self->metadata()->dataset_id() });
         my $data = $ds->to_hashref();
-        #print STDERR "DATA: $data\n";
+        #$logger->error("DATA: $data");
         $self->metadata()->dataset_data(JSON::Any->encode($data));
     }
     else {
-        print STDERR "No dataset_id provided...\n";
+        $logger->debug("No dataset_id provided...");
     }
 
     $self->metadata()->parent_id($self->get_trial_id());
@@ -394,7 +396,7 @@ sub create_and_store_analysis_design {
 
     my $design;
     if (!$precomputed_design_to_save) {
-        print STDERR "Create a new analysis design...\n";
+        $logger->debug("Create a new analysis design...");
         my $td = CXGN::Trial::TrialDesign->new();
 
         $td->set_trial_name($self->name());
@@ -402,7 +404,7 @@ sub create_and_store_analysis_design {
         $td->set_design_type("Analysis");
 
         if ($td->calculate_design()) {
-            print STDERR "Design calculated :-) ...\n";
+            $logger->debug("Design calculated :-) ...");
             $design = $td->get_design();
             $self->design($design);
         }
@@ -412,9 +414,9 @@ sub create_and_store_analysis_design {
     } else {
         $design = $precomputed_design_to_save;
     }
-    # print STDERR Dumper $design;
+    # $logger->error(Dumper($design));
 
-    print STDERR "Store design...\n";
+    $logger->debug("Store design...");
 
     my $saved_model_protocol_id;
     if ($self->analysis_model_protocol_id) {
@@ -445,10 +447,10 @@ sub create_and_store_analysis_design {
 #    my $validate_error = $trial_create->validate_design();
 #    my $store_error;
 #    if ($validate_error) {
-#	print STDERR "VALIDATE ERROR! "; #.Dumper($validate_error)."\n";
+#	$logger->error("VALIDATE ERROR! "; #.Dumper($validate_error)."");
 #    }
 #    else {
-##	print STDERR "Valiation successful. Storing...\n";
+##	$logger->error("Valiation successful. Storing...");
 #	try { $store_error = $design_store->store() }
 #	catch { $store_error = $_ };
 #    }
@@ -465,7 +467,7 @@ sub create_and_store_analysis_design {
 
     $self->_get_layout()->get_design();
 
-    print STDERR "Done with design create & store.\n";
+    $logger->debug("Done with design create & store.");
     return $self->get_trial_id();
 }
 
@@ -488,7 +490,7 @@ sub store_analysis_values {
     my $dbpass = shift;
     my $tempfile_path = shift;
 
-    print STDERR "Storing analysis values...\n";
+    $logger->debug("Storing analysis values...");
 
     my $time = DateTime->now();
     my $timestamp = $time->ymd()."_".$time->hms();
@@ -539,7 +541,7 @@ sub _get_layout {
 
     my $design = CXGN::Trial::TrialLayout->new({ schema => $self->bcs_schema(), trial_id => $self->get_trial_id(), experiment_type=> 'analysis_experiment'});
 
-    # print STDERR "_get_layout: design = ".Dumper($design->get_design);
+    # $logger->error("_get_layout: design = ".Dumper($design->get_design));
     return $design;
 }
 
@@ -560,10 +562,10 @@ sub _load_accession_names {
     my $self = shift;
 
     my $design = $self->design();
-    #print STDERR "Design = ".Dumper($design);
+    #$logger->error("Design = ".Dumper($design));
 
     my @accessions = $design->get_accession_names();
-    print STDERR "ACCESSIONS: ". Dumper(\@accessions);
+    $logger->error("ACCESSIONS: ". Dumper(\@accessions));
     # get the accessions from the design (not the dataset!)
     #
     return $self->design()->get_accession_names();
@@ -578,7 +580,7 @@ sub _load_traits {
 
     my $traits = [ @$header[39..scalar(@$header)-1] ];
 
-    print STDERR "_load_traits: TRAITS: ".Dumper($traits);
+    $logger->error("_load_traits: TRAITS: ".Dumper($traits));
     #$self->traits($traits);
     return $traits;
 }

@@ -10,6 +10,8 @@ use IO::File;
 use IO::Uncompress::Unzip qw($UnzipError);
 use File::Path qw(mkpath);
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'archived_zipfile_path' => (
     isa => 'Str',
     is => 'rw',
@@ -38,7 +40,7 @@ sub BUILD {
 sub file_names {
     my $self = shift;
     unless ( $archived_zip->read( $self->archived_zipfile_path() ) == AZ_OK ) {
-        print STDERR "cannot read given zipfile\n";
+        $logger->error("cannot read given zipfile");
         return;
     }
     $self->archived_zip(Archive::Zip->new($self->archived_zipfile_path()));
@@ -64,7 +66,7 @@ sub file_names {
 sub file_members {
     my $self = shift;
     unless ( $archived_zip->read( $self->archived_zipfile_path() ) == AZ_OK ) {
-        print STDERR "cannot read given zipfile\n";
+        $logger->error("cannot read given zipfile");
         return;
     }
     $self->archived_zip(Archive::Zip->new($self->archived_zipfile_path()));
@@ -73,7 +75,7 @@ sub file_members {
         return;
     }
     my @file_members = $self->archived_zip()->members();
-    #print STDERR Dumper \@file_members;
+    #$logger->error(Dumper(\@file_members));
     my %seen_files;
     foreach (@file_members) {
         if (exists($seen_files{$_->{'fileName'}}) || $_->{'compressedSize'} == 0 || index($_->{'fileName'}, '.DS_Store') != -1 || index($_->{'fileName'}, '.fieldbook') != -1 || index($_->{'fileName'}, '.thumbnails') != -1 || index($_->{'fileName'}, '__MACOSX') != -1) {

@@ -68,6 +68,8 @@ use File::Temp qw | tempfile |;
 use File::Copy;
 use POSIX;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -498,7 +500,7 @@ sub get_genotype_info {
         $limit_clause
         $offset_clause;";
 
-    #print STDERR Dumper $q;
+    #$logger->error(Dumper($q));
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute();
 
@@ -550,7 +552,7 @@ sub get_genotype_info {
         $protocolprop_hash{$protocol_id}++;
         $total_count = $full_count;
     }
-    print STDERR "CXGN::Genotype::Search has genotype_ids $total_count\n";
+    $logger->debug("CXGN::Genotype::Search has genotype_ids $total_count");
 
     my @found_protocolprop_ids = keys %protocolprop_hash;
     my @protocolprop_marker_hash_select_arr;
@@ -684,7 +686,7 @@ sub get_genotype_info {
         push @data, $info;
     }
 
-    #print STDERR Dumper \@data;
+    #$logger->error(Dumper(\@data));
     return ($total_count, \@data);
 }
 
@@ -882,7 +884,7 @@ sub init_genotype_iterator {
     my $protocolprop_q = "SELECT nd_protocol_id, s.key $protocolprop_hash_select_sql
         FROM nd_protocolprop, jsonb_each(nd_protocolprop.value) as s
         WHERE nd_protocol_id = ? AND type_id = $vcf_map_details_markers_cvterm_id $chromosome_where $start_position_where $end_position_where $marker_name_list_where;";
-    #print STDERR Dumper $protocolprop_q;
+    #$logger->error(Dumper($protocolprop_q));
     my $protocolprop_h = $schema->storage->dbh()->prepare($protocolprop_q);
     $self->_protocolprop_markers_h($protocolprop_h);
 
@@ -919,7 +921,7 @@ sub init_genotype_iterator {
         $limit_clause
         $offset_clause;";
 
-    #print STDERR Dumper $q;
+    #$logger->error(Dumper($q));
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute();
     my @genotypeprop_infos;
@@ -1166,7 +1168,7 @@ sub key {
     my $end = $self->end_position() || '';
     my $prevent_transpose = $self->prevent_transpose() || '';
     my $key = md5_hex($accessions.$tissues.$trials.$protocols.$markerprofiles.$genotypedataprojects.$markernames.$genotypeprophash.$protocolprophash.$protocolpropmarkerhash.$chromosomes.$start.$end.$self->return_only_first_genotypeprop_for_stock().$prevent_transpose.$self->limit().$self->offset()."_$datatype");
-    #print STDERR Dumper($genotypeprophash);
+    #$logger->error(Dumper($genotypeprophash));
     return $key;
 }
 
@@ -1197,7 +1199,7 @@ sub get_cached_file_search_json {
     } else {
         # Set the temp dir and temp output file
         my $tmp_output_dir = $shared_cluster_dir_config."/tmp_genotype_download_json";
-	print STDERR "creating cached json file in $tmp_output_dir\n";
+	$logger->debug("creating cached json file in $tmp_output_dir");
         mkdir $tmp_output_dir if ! -d $tmp_output_dir;
         my ($tmp_fh, $tempfile) = tempfile(
             "wizard_download_XXXXX",
@@ -1470,9 +1472,9 @@ sub get_cached_file_dosage_matrix_compute_from_parents {
             push @male_stock_ids_found, $male_parent_stock_id;
         }
 
-        # print STDERR Dumper \@accession_stock_ids_found;
-        # print STDERR Dumper \@female_stock_ids_found;
-        # print STDERR Dumper \@male_stock_ids_found;
+        # $logger->error(Dumper(\@accession_stock_ids_found));
+        # $logger->error(Dumper(\@female_stock_ids_found));
+        # $logger->error(Dumper(\@male_stock_ids_found));
 
         my %unique_germplasm;
         my $protocol = CXGN::Genotype::Protocol->new({
@@ -1603,7 +1605,7 @@ sub get_cached_file_VCF {
     } else {
         # Set the temp dir and temp output file
         my $tmp_output_dir = $shared_cluster_dir_config."/tmp_genotype_download_VCF";
-	print STDERR "creating cached VCF file in $tmp_output_dir\n";
+	$logger->debug("creating cached VCF file in $tmp_output_dir");
         mkdir $tmp_output_dir if ! -d $tmp_output_dir;
         my ($tmp_fh, $tempfile) = tempfile(
             "wizard_download_XXXXX",
@@ -1918,9 +1920,9 @@ sub get_cached_file_VCF_compute_from_parents {
             push @male_stock_ids_found, $male_parent_stock_id;
         }
 
-        # print STDERR Dumper \@accession_stock_ids_found;
-        # print STDERR Dumper \@female_stock_ids_found;
-        # print STDERR Dumper \@male_stock_ids_found;
+        # $logger->error(Dumper(\@accession_stock_ids_found));
+        # $logger->error(Dumper(\@female_stock_ids_found));
+        # $logger->error(Dumper(\@male_stock_ids_found));
 
         my $time = DateTime->now();
         my $timestamp = $time->ymd()."_".$time->hms();
@@ -2163,8 +2165,8 @@ sub get_pcr_genotype_info {
     my $genotype_id_list = $self->markerprofile_id_list;
     my $protocol_id = $protocol_id_list->[0];
     my @where_clause = ();
-#    print STDERR "GENOTYPE ID =".Dumper($genotype_id_list)."\n";
-#    print STDERR "PROTOCOL ID =".Dumper($protocol_id_list)."\n";
+#    $logger->error("GENOTYPE ID =".Dumper($genotype_id_list)."");
+#    $logger->error("PROTOCOL ID =".Dumper($protocol_id_list)."");
 
     if ($protocol_id_list && scalar(@$protocol_id_list)>0) {
         my $query = join ("," , @$protocol_id_list);
@@ -2175,7 +2177,7 @@ sub get_pcr_genotype_info {
         my $query = join ("," , @$genotype_id_list);
         push @where_clause, "genotype.genotype_id in ($query)";
     }
-#    print STDERR "WHERE CLAUSE =".Dumper(\@where_clause)."\n";
+#    $logger->error("WHERE CLAUSE =".Dumper(\@where_clause)."");
     my $where_clause = scalar(@where_clause)>0 ? " WHERE " . (join (" AND " , @where_clause)) : '';
 
     my $pcr_genotyping_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'pcr_marker_genotyping', 'genotype_property')->cvterm_id();
@@ -2213,7 +2215,7 @@ sub get_pcr_genotype_info {
         protocol_genotype_data => \@pcr_genotype_data
     );
 
-#    print STDERR "PCR GENOTYPE INFO =".Dumper(\%protocol_genotype_data)."\n";
+#    $logger->error("PCR GENOTYPE INFO =".Dumper(\%protocol_genotype_data)."");
 
     return \%protocol_genotype_data;
 

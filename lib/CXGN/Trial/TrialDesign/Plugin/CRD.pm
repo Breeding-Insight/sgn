@@ -3,6 +3,7 @@ package CXGN::Trial::TrialDesign::Plugin::CRD;
 
 use Moose::Role;
 
+my $logger = Log::Log4perl->get_logger();
 
 
 sub create_design {
@@ -54,7 +55,7 @@ sub create_design {
       $fieldmap_row_number = $self->get_fieldmap_row_number();
       my $colNumber = ((scalar(@stock_list) * $number_of_reps)/$fieldmap_row_number);
 
-      print STDERR "COLNUMBER: $colNumber, stocks: ".scalar(@stock_list).", number of reps: $number_of_reps, field_row_numbers: $fieldmap_row_number\n";
+      $logger->debug("COLNUMBER: $colNumber, stocks: ".scalar(@stock_list).", number of reps: $number_of_reps, field_row_numbers: $fieldmap_row_number");
       $fieldmap_col_number = CXGN::Trial::TrialDesign::validate_field_colNumber($colNumber);
       #$fieldmap_col_number = $self->validate_field_colNumber($colNumber);
 
@@ -77,7 +78,7 @@ sub create_design {
             coln => scalar(@stock_list),
             data => \@stock_list,
         });
-        #print STDERR Dumper $stock_data_matrix;
+        #$logger->error(Dumper($stock_data_matrix));
 
         $r_block = $rbase->create_block('r_block');
         $stock_data_matrix->send_rbase($rbase, 'r_block');
@@ -98,15 +99,15 @@ sub create_design {
         $r_block->add_command('crd<-as.matrix(crd)');
         $r_block->run_block();
         $result_matrix = R::YapRI::Data::Matrix->read_rbase( $rbase,'r_block','crd');
-        #print STDERR Dumper $result_matrix;
+        #$logger->error(Dumper($result_matrix));
 
         @plot_numbers = $result_matrix->get_column("plots");
-        #print STDERR Dumper \@plot_numbers;
+        #$logger->error(Dumper(\@plot_numbers));
 
         @rep_numbers = $result_matrix->get_column("r");
         @stock_names = $result_matrix->get_column("trt");
         @converted_plot_numbers=@{$self->_convert_plot_numbers(\@plot_numbers, \@rep_numbers, $number_of_reps)};
-        #print STDERR Dumper \@converted_plot_numbers;
+        #$logger->error(Dumper(\@converted_plot_numbers));
 
         #generate col_number
         if ($plot_layout_format eq "zigzag") {
@@ -115,7 +116,7 @@ sub create_design {
           } else {
             @col_number_fieldmaps = ((1..$fieldmap_col_number) x $fieldmap_row_number);
           }
-          #print STDERR Dumper(\@col_number_fieldmaps);
+          #$logger->error(Dumper(\@col_number_fieldmaps));
         }
         elsif ($plot_layout_format eq "serpentine") {
           if (!$fieldmap_row_number)  {
@@ -177,7 +178,7 @@ sub create_design {
         $crd_design{$converted_plot_numbers[$i]} = \%plot_info;
     }
 
-    #print STDERR Dumper \%crd_design;
+    #$logger->error(Dumper(\%crd_design));
 
     %crd_design = %{$self->_build_plot_names(\%crd_design)};
     return \%crd_design;

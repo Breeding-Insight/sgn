@@ -38,6 +38,7 @@ use CatalystX::GlobalContext '$c';
 ## STDERR Capture for the Logger, by Developer Preference ####
 our $STDERR_BUFFER  = '';
 our $STDERR_CAPTURE = 0;
+my $logger = Log::Log4perl->get_logger();
 
 =head1 OBJECT METHODS
 
@@ -341,7 +342,7 @@ EOHTML
 # # a way of coming up with temporary file names
 use IO::File;
 our $dev_urandom = new IO::File "</dev/urandom"
-  or print STDERR "Can't open /dev/urandom for an entropy source.";
+  or $logger->error("Can't open /dev/urandom for an entropy source.");
 
 sub tempname {
     my $rand_string = "";
@@ -425,7 +426,7 @@ sub log {
 
     push( @{ $self->{mk_log_messages} }, $message, $type );
 
-    #print STDERR "LOG " . uc($type) . ": $message\n";
+    #$logger->error("LOG " . uc($type) . ": $message");
 }
 
 sub log_error {

@@ -3,6 +3,8 @@ package CXGN::List::Validate::Plugin::FamilyNames;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "family_names";
 }
@@ -27,7 +29,7 @@ sub validate {
         }
     }
 
-    #print STDERR Dumper \%all_names;
+    #$logger->error(Dumper(\%all_names));
     my @missing;
     foreach my $item (@$list) {
         if (!exists($all_names{$item})) {

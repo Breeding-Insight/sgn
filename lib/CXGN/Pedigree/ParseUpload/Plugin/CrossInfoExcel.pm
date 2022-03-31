@@ -7,6 +7,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use CXGN::List::Validate;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub _validate_with_plugin {
     my $self = shift;
     my $filename = $self->get_filename();
@@ -161,7 +163,7 @@ sub _parse_with_plugin {
             }
         }
     }
-    print STDERR "PARSED RESULT =".Dumper(\%parsed_result)."\n";
+    $logger->debug("PARSED RESULT =".Dumper(\%parsed_result)."");
 
     $self->_set_parsed_data(\%parsed_result);
 

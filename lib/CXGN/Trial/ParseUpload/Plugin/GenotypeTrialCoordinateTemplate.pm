@@ -8,6 +8,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use Scalar::Util qw(looks_like_number);
 
+my $logger = Log::Log4perl->get_logger();
+
 sub _validate_with_plugin {
     my $self = shift;
     my $args = shift;
@@ -160,8 +162,8 @@ sub _validate_with_plugin {
 
 
 sub _parse_with_plugin {
-    print STDERR "Parsing genotype trial file upload\n";
     my $self = shift;
+    $logger->debug("Parsing genotype trial file upload");
     my $args = shift;
     my $filename = $self->get_filename();
     my $schema = $self->get_chado_schema();
@@ -256,7 +258,7 @@ sub _parse_with_plugin {
         $design{$key}->{volume} = 'NA';
     }
 
-    #print STDERR Dumper \%design;
+    #$logger->error(Dumper(\%design));
     $self->_set_parsed_data(\%design);
 
     return 1;

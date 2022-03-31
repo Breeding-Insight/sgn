@@ -34,6 +34,8 @@ use CXGN::People::Schema;
 use File::Basename qw | basename dirname|;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -148,7 +150,7 @@ sub store_analysis_model_files {
         if (!$archived_filename_with_path) {
             return { error => "Could not save file $model_original_name in archive." };
         }
-        print STDERR "Archived Model File: $archived_filename_with_path\n";
+        $logger->debug("Archived Model File: $archived_filename_with_path");
 
         my $md_row = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
         my $file_row = $metadata_schema->resultset("MdFiles")->create({
@@ -186,7 +188,7 @@ sub store_analysis_model_files {
     if (!$archived_aux_filename_with_path) {
         return { error => "Could not save file $model_aux_original_name in archive." };
     }
-    print STDERR "Archived Auxiliary Model File: $archived_aux_filename_with_path\n";
+    $logger->debug("Archived Auxiliary Model File: $archived_aux_filename_with_path");
 
     my $md_row_aux = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
     my $file_row_aux = $metadata_schema->resultset("MdFiles")->create({
@@ -225,7 +227,7 @@ sub store_analysis_model_files {
             if (!$archived_aux_filename_with_path) {
                 return { error => "Could not save file $model_aux_original_name in archive." };
             }
-            print STDERR "Archived Auxiliary Model File: $archived_aux_filename_with_path\n";
+            $logger->debug("Archived Auxiliary Model File: $archived_aux_filename_with_path");
 
             my $md_row_aux = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
             my $file_row_aux = $metadata_schema->resultset("MdFiles")->create({

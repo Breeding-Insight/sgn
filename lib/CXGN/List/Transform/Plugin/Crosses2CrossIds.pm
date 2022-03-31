@@ -2,6 +2,8 @@ package CXGN::List::Transform::Plugin::Crosses2CrossIds;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "crosses_2_cross_ids";
 }
@@ -36,7 +38,7 @@ sub transform {
     if (ref($list) eq "ARRAY" ) {
 	foreach my $l (@$list) {
       if (!$l) { next;}
-	    #print STDERR "Converting location $l to location_id...\n";
+	    #$logger->error("Converting location $l to location_id...");
 	    my $rs = $schema->resultset("Stock::Stock")->search( { uniquename => $l,
 								   type_id    => $type_id });
 	    if ($rs->count() == 0) {

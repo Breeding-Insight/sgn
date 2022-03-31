@@ -14,6 +14,8 @@ use CXGN::List::Transform;
 
 extends 'CXGN::BrAPI::v1::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
     my $self = shift;
     my $params = shift;
@@ -86,7 +88,7 @@ sub search {
         }
     }
 
-    #print STDERR Dumper \@data_window;
+    #$logger->error(Dumper(\@data_window));
 
     my %result = (
         headerRow => ['studyYear', 'programDbId', 'programName', 'programDescription', 'studyDbId', 'studyName', 'studyDescription', 'studyDesign', 'plotWidth', 'plotLength', 'fieldSize', 'fieldTrialIsPlannedToBeGenotyped', 'fieldTrialIsPlannedToCross', 'plantingDate', 'harvestDate', 'locationDbId', 'locationName', 'germplasmDbId', 'germplasmName', 'germplasmSynonyms', 'observationLevel', 'observationUnitDbId', 'observationUnitName', 'replicate', 'blockNumber', 'plotNumber', 'rowNumber', 'colNumber', 'entryType', 'plantNumber', 'plantedSeedlotStockDbId', 'plantedSeedlotStockUniquename', 'plantedSeedlotCurrentCount', 'plantedSeedlotCurrentWeightGram', 'plantedSeedlotBoxName', 'plantedSeedlotTransactionCount', 'plantedSeedlotTransactionWeight', 'plantedSeedlotTransactionDescription', 'availableGermplasmSeedlotUniquenames'],

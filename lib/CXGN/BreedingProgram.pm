@@ -20,6 +20,8 @@ use SGN::Model::Cvterm;
 use CXGN::BreedersToolbox::Projects;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -300,7 +302,7 @@ sub get_locations_with_details {
     my $schema = $self->schema;
     my $project_obj = $self->get_project_object;
     my $program_name = $project_obj->name;
-#    print STDERR "PROGRAM NAME =".Dumper($program_name)."\n";
+#    $logger->error("PROGRAM NAME =".Dumper($program_name)."");
     my $obj = CXGN::BreedersToolbox::Projects->new({schema => $schema});
     my $all_locations = decode_json $obj->get_location_geojson();
 

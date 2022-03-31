@@ -32,6 +32,8 @@ use Tie::UrlEncoder; our(%urlencode);
 use Data::Dumper;
 use JSON qw( decode_json );
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -50,8 +52,8 @@ sub create_phenotype_spreadsheet_GET : Args(0) {
 }
 
 sub create_phenotype_spreadsheet_POST : Args(0) {
-    print STDERR "phenotype download controller\n";
     my ($self, $c) = @_;
+    $logger->debug("phenotype download controller");
     if (!$c->user()) {
         $c->stash->{rest} = {error => "You need to be logged in to download a phenotype spreadsheet." };
         return;
@@ -59,7 +61,7 @@ sub create_phenotype_spreadsheet_POST : Args(0) {
 
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my @trial_ids = @{_parse_list_from_json($c->req->param('trial_ids'))};
-    #print STDERR Dumper \@trial_ids;
+    #$logger->error(Dumper(\@trial_ids));
     my $format = $c->req->param('format') || "ExcelBasic";
     my $include_notes = $c->req->param('include_notes');
     my $data_level = $c->req->param('data_level') || "plots";
@@ -68,8 +70,8 @@ sub create_phenotype_spreadsheet_POST : Args(0) {
     if ($sample_number eq '') {$sample_number = undef};
     my $predefined_columns = $c->req->param('predefined_columns') ? decode_json $c->req->param('predefined_columns') : [];
     my $trial_stock_type = $c->req->param('trial_stock_type');
-    #print STDERR Dumper $sample_number;
-    #print STDERR Dumper $predefined_columns;
+    #$logger->error(Dumper($sample_number));
+    #$logger->error(Dumper($predefined_columns));
 
     foreach (@trial_ids){
         my $trial = CXGN::Trial->new( { bcs_schema => $c->dbic_schema("Bio::Chado::Schema"), trial_id => $_ });
@@ -113,8 +115,8 @@ sub create_phenotype_spreadsheet_POST : Args(0) {
 
     $create_spreadsheet->download();
 
-    print STDERR "DOWNLOAD FILENAME = ".$create_spreadsheet->filename()."\n";
-    print STDERR "RELATIVE  = $rel_file\n";
+    $logger->debug("DOWNLOAD FILENAME = ".$create_spreadsheet->filename()."");
+    $logger->debug("RELATIVE  = $rel_file");
 
     #Add postcomposed terms from selected predefined_columns
     if (scalar(@$predefined_columns)>0){
@@ -135,13 +137,13 @@ sub create_phenotype_spreadsheet_POST : Args(0) {
             push @trait_cvterm_ids, SGN::Model::Cvterm->get_cvterm_row_from_trait_name($schema, $_)->cvterm_id();
         }
         $id_hash{'trait'} = \@trait_cvterm_ids;
-        #print STDERR Dumper \%id_hash;
+        #$logger->error(Dumper(\%id_hash));
         my $traits = SGN::Model::Cvterm->get_traits_from_component_categories($schema, \@allowed_composed_cvs, $composable_cvterm_delimiter, $composable_cvterm_format, \%id_hash);
         my %new_traits;
         foreach (@{$traits->{new_traits}}){
             $new_traits{$_->[1]} = join ',', @{$_->[0]};
         }
-        #print STDERR Dumper \%new_traits;
+        #$logger->error(Dumper(\%new_traits));
         my $new_terms;
         eval {
             my $onto = CXGN::Onto->new({ schema => $schema });
@@ -150,7 +152,7 @@ sub create_phenotype_spreadsheet_POST : Args(0) {
         if ($@) {
             die "An error occurred saving the new trait details: $@";
         }
-        #print STDERR Dumper $new_terms;
+        #$logger->error(Dumper($new_terms));
     }
 
     $c->stash->{rest} = { filename => $urlencode{$rel_file.".xls"} };

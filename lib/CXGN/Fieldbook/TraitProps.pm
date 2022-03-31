@@ -25,6 +25,8 @@ use MooseX::FollowPBP;
 use Moose::Util::TypeConstraints;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'chado_schema' => (
 		 is       => 'ro',
 		 isa      => 'DBIx::Class::Schema',
@@ -92,7 +94,7 @@ sub validate {
   my $db_rs = $chado_schema->resultset("General::Db")->search( { 'me.name' => $self->get_db_name() });
 
   if (!$db_rs->first()) {
-    print STDERR "Could not find trait ontology database: ".$self->get_db_name()."\n";
+    $logger->debug("Could not find trait ontology database: ".$self->get_db_name()."");
     return;
   }
 
@@ -101,14 +103,14 @@ sub validate {
   my @trait_props_data = @{$self->get_trait_names_and_props()};
 
   if (scalar @trait_props_data == 0) {
-    print STDERR "No trait props supplied\n";
+    $logger->debug("No trait props supplied");
     return;
   }
 
 
   foreach my $trait_props (@trait_props_data) {
     if (!$trait_props->{'trait_name'}) {
-      print STDERR "Bad data structure for trait properties:  no trait_name\n";
+      $logger->debug("Bad data structure for trait properties:  no trait_name");
       return;
     }
     my $trait_name = $trait_props->{'trait_name'};
@@ -125,7 +127,7 @@ sub validate {
 	      }
 	    );
     if (!$trait_cvterm) {
-      print STDERR "Could not find trait $trait_name\n";
+      $logger->debug("Could not find trait $trait_name");
       return;
     }
 
@@ -133,7 +135,7 @@ sub validate {
     foreach my $prop_name (keys %{$trait_props}) {
       if ($prop_name ne 'trait_name') {
 	if (!$cvterms->{$prop_name}) {
-	  print STDERR "Bad data structure for trait properties: $prop_name is not valid";
+	  $logger->error("Bad data structure for trait properties: $prop_name is not valid");
 	  return;
 	}
 
@@ -147,13 +149,13 @@ sub validate {
 			    );
 
 	  if ($cvtermprop_search->count() > 1) {
-	    print STDERR "More than one cvtermprop for trait $trait_name with property $prop_name\n";
+	    $logger->debug("More than one cvtermprop for trait $trait_name with property $prop_name");
 	    return;
 	  }
 
 	if ($cvtermprop_search->count() == 1) {
 	  if (!$self->get_overwrite()) {
-	    print STDERR "A cvtermprop for trait $trait_name with property $prop_name already exists\n";
+	    $logger->debug("A cvtermprop for trait $trait_name with property $prop_name already exists");
 	    return;
 	  }
 	}
@@ -174,7 +176,7 @@ sub store {
   my $db_rs = $chado_schema->resultset("General::Db")->search( { 'me.name' => $self->get_db_name() });
 
   if (!$db_rs) {
-    print STDERR "Could not find trait ontology database: ".$self->get_db_name()."\n";
+    $logger->debug("Could not find trait ontology database: ".$self->get_db_name()."");
     return;
   }
 
@@ -257,12 +259,12 @@ sub store {
   if ($transaction_error) {
     if ($self->get_is_test_run()) {
       if ($test_success) {
-	print STDERR "test success (rolling back)\n";
+	$logger->debug("test success (rolling back)");
       } else {
-	print STDERR "test error\n$transaction_error\n";
+	$logger->error("test error\n$transaction_error");
       }
     } else {
-      print STDERR "\nTransaction error storing trait props: $transaction_error\n";
+      $logger->error("\nTransaction error storing trait props: $transaction_error");
     }
     return;
   }

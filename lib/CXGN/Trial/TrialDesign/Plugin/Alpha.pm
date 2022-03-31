@@ -3,6 +3,8 @@ package CXGN::Trial::TrialDesign::Plugin::Alpha;
 
 use Moose::Role;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub create_design {
 #sub _get_alpha_lattice_design {
     my $self = shift;
@@ -27,6 +29,7 @@ sub create_design {
     my $fieldmap_col_number;
     my $plot_layout_format;
     my @col_number_fieldmaps;
+
     if ($self->has_stock_list()) {
 	@stock_list = @{$self->get_stock_list()};
     } else {
@@ -53,7 +56,7 @@ sub create_design {
     
     if ($self->has_block_size()) {
 	$block_size = $self->get_block_size();
-	#print STDERR "block size = $block_size\n";
+	#$logger->debug("block size = $block_size");
 	if ($block_size < 3) {
 	    die "Block size must be greater than 2 for alpha lattice design\n";
 	}
@@ -68,7 +71,7 @@ sub create_design {
 	# 		foreach my $stock_list_rep(1..$stocks_to_add) {
 	# 			push(@stock_list, $stock_list[0]);
 	# 		}
-	#         print STDERR Dumper(\@stock_list);
+	#         $logger->error(Dumper(\@stock_list));
 	# 		$self->set_stock_list(\@stock_list);
 	# 	}
 	
@@ -116,8 +119,8 @@ sub create_design {
     $r_block->add_command('alpha_book<-as.matrix(alpha_book)');
     
     my @commands = $r_block->read_commands();
-    print STDERR join "\n", @commands;
-    print STDERR "\n";
+    $logger->debug(join("\n", @commands));
+    $logger->debug();
     
     
     $r_block->run_block();
@@ -132,7 +135,7 @@ sub create_design {
     if ($plot_layout_format eq "zigzag") {
 	if (!$fieldmap_col_number){
 	    @col_number_fieldmaps = ((1..$block_size) x ($number_of_blocks * $number_of_reps));
-	    #print STDERR Dumper(\@col_number_fieldmaps);
+	    #$logger->error(Dumper(\@col_number_fieldmaps));
 	} else {
 	    @col_number_fieldmaps = ((1..$fieldmap_col_number) x $fieldmap_row_number);
 	}

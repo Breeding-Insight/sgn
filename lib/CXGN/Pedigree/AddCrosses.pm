@@ -36,6 +36,8 @@ use Data::Dumper;
 use File::Basename qw | basename dirname|;
 use CXGN::UploadFile;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 class_type 'Pedigree', { class => 'Bio::GeneticRelationships::Pedigree' };
 
@@ -115,7 +117,7 @@ sub add_crosses {
     my %nd_experiments;
 
     if (!$self->validate_crosses()) {
-        print STDERR "Invalid pedigrees in array.  No crosses will be added\n";
+        $logger->debug("Invalid pedigrees in array.  No crosses will be added");
         return;
     }
 
@@ -337,7 +339,7 @@ sub add_crosses {
     };
 
     if ($transaction_error) {
-        print STDERR "Transaction error creating a cross: $transaction_error\n";
+        $logger->debug("Transaction error creating a cross: $transaction_error");
         return;
     }
 
@@ -351,9 +353,9 @@ sub add_crosses {
 
     #link nd_experiments to uploaded file
 	my $archived_filename_with_path = $self->get_archived_filename;
-    print STDERR "FILE =".Dumper($archived_filename_with_path)."\n";
+    $logger->debug("FILE =".Dumper($archived_filename_with_path)."");
     if ($archived_filename_with_path) {
-        print STDERR "Generating md_file entry for cross file...\n";
+        $logger->debug("Generating md_file entry for cross file...");
         my $md_row = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $owner_id});
         $md_row->insert();
         my $upload_file = CXGN::UploadFile->new();
@@ -368,7 +370,7 @@ sub add_crosses {
         });
 
         my $file_id = $file_row->file_id();
-        print STDERR "FILE ID =".Dumper($file_id)."\n";
+        $logger->debug("FILE ID =".Dumper($file_id)."");
 
         foreach my $nd_experiment_id (keys %nd_experiments) {
             my $nd_experiment_files = $phenome_schema->resultset("NdExperimentMdFiles")->create({
@@ -394,7 +396,7 @@ sub validate_crosses {
     $crossing_trial_lookup = CXGN::BreedersToolbox::Projects->new({ schema => $chado_schema});
     $crossing_trial = $crossing_trial_lookup->get_crossing_trials($self->get_crossing_trial_id());
     if (!$crossing_trial) {
-        print STDERR "Crossing trial ". $self->get_crossing_trials() ." not found\n";
+        $logger->debug("Crossing trial ". $self->get_crossing_trials() ." not found");
         return;
     }
 
@@ -408,7 +410,7 @@ sub validate_crosses {
     }
 
     if ($invalid_cross_count > 0) {
-        print STDERR "There were $invalid_cross_count invalid crosses\n";
+        $logger->error("There were $invalid_cross_count invalid crosses");
         return;
     }
 
@@ -433,7 +435,7 @@ sub _validate_cross {
         $male_parent = $self->_get_accession($male_parent_name);
 
         if (!$female_parent || !$male_parent) {
-            print STDERR "Parent $female_parent_name or $male_parent_name in pedigree is not a stock\n";
+            $logger->debug("Parent $female_parent_name or $male_parent_name in pedigree is not a stock");
             return;
         }
 
@@ -442,7 +444,7 @@ sub _validate_cross {
         $female_parent = $self->_get_accession($female_parent_name);
 
         if (!$female_parent) {
-            print STDERR "Parent $female_parent_name in pedigree is not a stock\n";
+            $logger->debug("Parent $female_parent_name in pedigree is not a stock");
             return;
         }
 
@@ -451,7 +453,7 @@ sub _validate_cross {
         $female_parent = $self->_get_accession($female_parent_name);
 
         if (!$female_parent) {
-            print STDERR "Parent $female_parent_name in pedigree is not a stock\n";
+            $logger->debug("Parent $female_parent_name in pedigree is not a stock");
             return;
         }
     } elsif ($cross_type eq 'backcross') {
@@ -461,7 +463,7 @@ sub _validate_cross {
 	        $male_parent = $self->_get_accession_or_cross($male_parent_name);
 
         if (!$female_parent || !$male_parent) {
-            print STDERR "Parent $female_parent_name or $male_parent_name in pedigree is not a stock\n";
+            $logger->debug("Parent $female_parent_name or $male_parent_name in pedigree is not a stock");
             return;
 	    }
 
@@ -491,13 +493,13 @@ sub _get_accession {
     $stock = $stock_lookup->get_stock_exact();
 
     if (!$stock) {
-        print STDERR "Parent name is not a stock\n";
+        $logger->debug("Parent name is not a stock");
         return;
     }
 
 	#not sure why vector_construct is in this function
     if (($stock->type_id() != $accession_cvterm->cvterm_id()) && ($stock->type_id() != $population_cvterm->cvterm_id())  && ($stock->type_id() != $vector_cvterm->cvterm_id()) ) {
-        print STDERR "Parent name is not a stock of type accession or population or vector_construct\n";
+        $logger->debug("Parent name is not a stock of type accession or population or vector_construct");
         return;
     }
 
@@ -516,12 +518,12 @@ sub _get_plot {
     $stock = $stock_lookup->get_stock_exact();
 
     if (!$stock) {
-        print STDERR "Parent name is not a stock\n";
+        $logger->debug("Parent name is not a stock");
         return;
     }
 
 	if ($stock->type_id() != $plot_cvterm->cvterm_id()) {
-        print STDERR "Parent name is not a stock of type plot\n";
+        $logger->debug("Parent name is not a stock of type plot");
         return;
     }
 
@@ -540,12 +542,12 @@ sub _get_plant {
     $stock = $stock_lookup->get_stock_exact();
 
     if (!$stock) {
-        print STDERR "Parent name is not a stock\n";
+        $logger->debug("Parent name is not a stock");
         return;
     }
 
 	if ($stock->type_id() != $plant_cvterm->cvterm_id()) {
-        print STDERR "Parent name is not a stock of type plant\n";
+        $logger->debug("Parent name is not a stock of type plant");
         return;
     }
 
@@ -565,12 +567,12 @@ sub _get_accession_or_cross {
     $stock = $stock_lookup->get_stock_exact();
 
     if (!$stock) {
-        print STDERR "Parent name is not a stock\n";
+        $logger->debug("Parent name is not a stock");
         return;
     }
 
     if (($stock->type_id() != $accession_cvterm->cvterm_id()) && ($stock->type_id() != $cross_cvterm->cvterm_id())) {
-        print STDERR "Parent name is not a stock of type accession or cross \n";
+        $logger->debug("Parent name is not a stock of type accession or cross ");
         return;
     }
 

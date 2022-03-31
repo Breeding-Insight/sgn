@@ -18,6 +18,8 @@ use Bio::Chado::Schema;
 use CXGN::Marker::SearchMatView;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head1 NAME
 
 SGN::Controller::QuickSearch - implement the quick search
@@ -190,7 +192,7 @@ sub execute_predefined_searches: Private {
 
     # execute all the searches and stash the results
     for my $search_name ( sort keys %searches ) {
-	print STDERR "performing quick search for $search_name (". Dumper($searches{$search_name}).")...\n";
+	$logger->debug("performing quick search for $search_name (". Dumper($searches{$search_name}).")...");
          my $search = $searches{$search_name};
          my $b = time;
          my $searchresults = $self->do_quick_search(
@@ -204,7 +206,7 @@ sub execute_predefined_searches: Private {
              time   => time - $b,
              exact  => $search->{exact}
            };
-	print STDERR Dumper($searchresults);
+	$logger->error(Dumper($searchresults));
     }
 }
 
@@ -223,7 +225,7 @@ sub do_quick_search {
     my ( $self, $db, %args ) = @_;
 
     if ($args{function}) { #just run legacy functions and return their results
-	print STDERR "INVOKING $args{function} with $args{term}\n";
+	$logger->debug("INVOKING $args{function} with $args{term}");
         return $args{function}->( $self, $db,$args{term}, $args{schema});
     } else {
         my $classname = $args{sf_class}
@@ -498,7 +500,7 @@ sub sql_query_count {
 sub google_search {
   my( $self, $site_title, $term, $site_address ) = @_;
 
-  print STDERR "Googling...\n";
+  $logger->debug("Googling...");
   my $google_url = uri( scheme   => 'http',
                         host     => 'www.google.com',
                         path     => '/custom',
@@ -516,7 +518,7 @@ sub google_search {
   $lwp_ua->agent( 'SGN Quick Search ( Mozilla compatible )' );
   my $res = $lwp_ua->request( HTTP::Request->new( GET => $google_url ));
 
-  print STDERR "Hello world!\n";
+  $logger->debug("Hello world!");
   my $count = do {
     if( $res ->is_success ) {
       my $cont = $res->content;
@@ -526,7 +528,7 @@ sub google_search {
     }
   };
 
-  print STDERR "Returning search results...\n";
+  $logger->debug("Returning search results...");
   if( $count ) {
       return [ $google_url, "$count pages on $site_title" ];
   } else {
@@ -548,7 +550,7 @@ sub stock_search {
 	my $row = $rs->next();
 	$id = $row->stock_id();
 	$name = $row->uniquename();
-	print STDERR "FOUND: $id, $name\n";
+	$logger->debug("FOUND: $id, $name");
     }
     return ($id, $name);
 }
@@ -561,11 +563,11 @@ sub quick_accession_search {
 
     my ($id, $name) = $self->stock_search($schema, 'accession', $term);
     if ($id) {
-	print STDERR "Found accession $id, $name\n";
+	$logger->debug("Found accession $id, $name");
 	return [ '/stock/'.$id.'/view', "1 accession: ".$name ];
     }
     else {
-	print STDERR "Found no accession... ???\n";
+	$logger->debug("Found no accession... ???");
 	return [ '', "0 accession identifers" ];
     }
 }
@@ -613,7 +615,7 @@ sub quick_trials_search {
     my @trial_type_ids = ();
     while (my $row = $cv_rs->next()) {
 	my $cvterm_id = $row->get_column('cvterm_id');
-	print STDERR "retrieving cvterm id: $cvterm_id\n";
+	$logger->debug("retrieving cvterm id: $cvterm_id");
 	push @trial_type_ids, $cvterm_id;
     }
 
@@ -639,7 +641,7 @@ sub quick_locations_search {
     my $term = shift;
     my $schema = shift;
 
-    print STDERR "LOCATION SEARCH!\n";
+    $logger->debug("LOCATION SEARCH!");
     my $rs = $schema->resultset("NaturalDiversity::NdGeolocation")->search( { description => { ilike => $term } });
 
     my ($id, $name);
@@ -649,9 +651,9 @@ sub quick_locations_search {
 	$name = $row->description();
     }
     else {
-	print STDERR "LOCATION HAS ".$rs->count()." MATCHES!!!!\n";
+	$logger->debug("LOCATION HAS ".$rs->count()." MATCHES!!!!");
     }
-    print STDERR "RETURNED: $id, $name\n";
+    $logger->debug("RETURNED: $id, $name");
     if ($id) {
 	return [ '/breeders/locations/', '1 location: '.$name ]; # just link to generic locations page
     }
@@ -688,15 +690,15 @@ sub quick_bp_search {
     my $term = shift;
     my $schema = shift;
 
-    print STDERR "breeding program search... \n";
+    $logger->debug("breeding program search... ");
     my $rs = $schema->resultset("Project::Project")->search( { 'me.name' => { ilike => $term }  } , { cvterm_name => 'breeding_program', join => 'projectprops' => { 'cvterms', '+select' => [ 'cvterm.name'], '+as' => ['cvterm_name'] } } );
 
     my ($id, $name);
 
     if ($rs->count() > 1) {
-	print STDERR $rs->count()." results, which is unexpected...\n";
+	$logger->warn($rs->count()." results, which is unexpected...");
 	while (my $row = $rs->next()) {
-	    print STDERR join("\t", $row->name(), $row->project_id())."\n";
+	    $logger->debug(join("\t", $row->name(), $row->project_id())."");
 	}
 	return [ '', 'too many hits' ];
     }
@@ -707,10 +709,10 @@ sub quick_bp_search {
 	$name = $row->name();
     }
     else {
-	print STDERR "Sorry, no match!\n";
+	$logger->debug("Sorry, no match!");
     }
 
-    print STDERR "FOUND: $id\n";
+    $logger->debug("FOUND: $id");
     if ($id) {
 	return [ '/breeders/program/'.$id, "1 breeding program: ".$name ];
     }
@@ -724,7 +726,7 @@ sub quick_web_search {
   my ($self, undef,$term) = @_;
   # works the same way as quick_page_search, except that the domain contraint is removed from the
   # search.
-  print STDERR "Performing web search... ";
+  $logger->error("Performing web search... ");
   return $self->google_search('the entire web',$term);
 }
 

@@ -24,6 +24,8 @@ use Try::Tiny;
 use SGN::Model::Cvterm;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
     is       => 'rw',
     isa      => 'DBIx::Class::Schema',
@@ -79,7 +81,7 @@ sub add_population {
             if (exists($acc_synonyms_lookup{$m})) {
                 my @accession_names = keys %{$acc_synonyms_lookup{$m}};
                 if (scalar(@accession_names)>1){
-                    print STDERR "There is more than one uniquename for this synonym $m. this should not happen!\n";
+                    $logger->debug("There is more than one uniquename for this synonym $m. this should not happen!");
                 }
                 $m = $accession_names[0];
             }
@@ -99,10 +101,10 @@ sub add_population {
         $error =  $_;
     };
     if ($error) {
-        print STDERR "Error creating population $population_name: $error\n";
+        $logger->debug("Error creating population $population_name: $error");
         return { error => "Error creating population $population_name: $error" };
     } else {
-        print STDERR "population $population_name added successfully\n";
+        $logger->debug("population $population_name added successfully");
         return { success => "Success! Population $population_name created", population_id=>$population_id };
     }
 }
@@ -136,10 +138,10 @@ sub add_accessions {
         $error =  $_;
     };
     if ($error) {
-        print STDERR "Error adding accessions to population $population_name: $error\n";
+        $logger->error("Error adding accessions to population $population_name: $error");
         return { error => "Error adding accessions to population $population_name: $error" };
     } else {
-        print STDERR "Accession added to population $population_name successfully\n";
+        $logger->debug("Accession added to population $population_name successfully");
         return { success => "Accession added to population $population_name successfully!" };
     }
 }

@@ -26,6 +26,8 @@ use Text::CSV;
 use CXGN::List::Validate;
 use CXGN::Phenotypes::HighDimensionalPhenotypeProtocol;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "spreadsheet nirs";
 }
@@ -49,7 +51,7 @@ sub validate {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
@@ -59,14 +61,14 @@ sub validate {
         @columns = $csv->fields();
     } else {
         $parse_result{'error'} = "Could not parse header row.";
-        print STDERR "Could not parse header.\n";
+        $logger->error("Could not parse header.");
         return \%parse_result;
     }
 
     my $header_col_1 = shift @columns;
     if ($header_col_1 ne "sample_name") {
         $parse_result{'error'} = "First cell must be 'sample_name'. Please, check your file.";
-        print STDERR "First cell must be 'sample_name'\n";
+        $logger->error("First cell must be 'sample_name'");
         return \%parse_result;
     }
 
@@ -183,7 +185,7 @@ sub parse {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
@@ -220,7 +222,7 @@ sub parse {
     $parse_result{'data'} = \%data;
     $parse_result{'units'} = \@observation_units;
     $parse_result{'variables'} = \@traits;
-    # print STDERR Dumper \%parse_result;
+    # $logger->error(Dumper(\%parse_result));
     return \%parse_result;
 }
 

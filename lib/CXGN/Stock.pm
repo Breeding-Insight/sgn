@@ -42,6 +42,8 @@ use base qw / CXGN::DB::Object / ;
 use CXGN::Stock::StockLookup;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 accessor schema()
 
  Usage:
@@ -482,7 +484,7 @@ has 'subjects' => (
 sub BUILD {
     my $self = shift;
 
-    #print STDERR "RUNNING BUILD FOR STOCK.PM...\n";
+    #$logger->error("RUNNING BUILD FOR STOCK.PM...");
     my $stock;
     if ($self->stock_id){
         $stock = $self->schema()->resultset("Stock::Stock")->find({ stock_id => $self->stock_id() });
@@ -594,13 +596,13 @@ sub store {
     ###Check first if the name  exists in te database
     my $exists;
     if ($self->check_name_exists){
-	print STDERR "Checking stock uniquename \n";
+	$logger->debug("Checking stock uniquename ");
         $exists= $self->exists_in_database();
     }
-    print STDERR "Stock exists check: $exists\n";
+    $logger->debug("Stock exists check: $exists");
     ####
     if (!$stock) { #Trying to create a new stock
-        print STDERR "Storing Stock ".localtime."\n";
+        $logger->debug("Storing Stock ".localtime."");
         if (!$exists) {
 
             my $new_row = $self->schema()->resultset("Stock::Stock")->create({
@@ -621,7 +623,7 @@ sub store {
                 $self->_store_stockprop('organization', $self->organization_name());
             }
             if ($self->population_name){
-                print STDERR "**STOCK.PM This stock has population name " . $self->population_name . "\n\n";
+                $logger->debug("**STOCK.PM This stock has population name " . $self->population_name . "\n");
                 #DO NOT INSERT POPULATION RELATIONSHIP FROM THE STOCK STORE FUNCTION
                 $self->_store_population_relationship();
             }
@@ -632,7 +634,7 @@ sub store {
         }
     }
     else {
-        print STDERR "Updating Stock ".localtime."\n";
+        $logger->debug("Updating Stock ".localtime."");
         if (!$self->name && $self->uniquename){
             $self->name($self->uniquename);
         }
@@ -648,7 +650,7 @@ sub store {
             $self->_update_stockprop('organization', $self->organization_name());
         }
         if ($self->population_name){
-            print STDERR "**STOCK.PM This stock has population name " . $self->population_name . "\n\n";
+            $logger->debug("**STOCK.PM This stock has population name " . $self->population_name . "\n");
             #DO NOT INSERT POPULATION RELATIONSHIP FROM THE STOCK STORE FUNCTION
             $self->_update_population_relationship();
         }
@@ -679,7 +681,7 @@ sub exists_in_database {
     my $stock = $self->stock;
     my $stock_id = $self->stock_id;
     my $uniquename = $self->uniquename || '' ;
-    print STDERR "Stock lookup for name $uniquename\n\n";
+    $logger->debug("Stock lookup for name $uniquename\n");
     my $stock_lookup = CXGN::Stock::StockLookup->new({
         schema => $schema,
         stock_name => $uniquename,
@@ -1069,7 +1071,7 @@ sub get_ancestor_hash {
   push @$direct_descendant_ids, $stock_id; #excluded in parent retrieval to prevent loops
 
   my $stock = $self->schema->resultset("Stock::Stock")->find({stock_id => $stock_id});
-  #print STDERR "Stock ".$stock->uniquename()." decendants are: ".Dumper($direct_descendant_ids)."\n";
+  #$logger->error("Stock ".$stock->uniquename()." decendants are: ".Dumper($direct_descendant_ids)."");
   my %pedigree;
   $pedigree{'id'} = $stock_id;
   $pedigree{'name'} = $stock->uniquename();
@@ -1116,7 +1118,7 @@ sub get_descendant_hash {
   push @$direct_ancestor_ids, $stock_id; #excluded in child retrieval to prevent loops
 
   my $stock = $self->schema->resultset("Stock::Stock")->find({stock_id => $stock_id});
-  #print STDERR "Stock ".$stock->uniquename()." ancestors are: ".Dumper($direct_ancestor_ids)."\n";
+  #$logger->error("Stock ".$stock->uniquename()." ancestors are: ".Dumper($direct_ancestor_ids)."");
   my %descendants;
   my %progeny;
   $descendants{'id'} = $stock_id;
@@ -1154,7 +1156,7 @@ sub get_descendant_hash {
 
 sub get_pedigree_rows {
     my ($self, $accession_ids, $format) = @_;
-    #print STDERR "Accession ids are: ".Dumper(@$accession_ids)."\n";
+    #$logger->error("Accession ids are: ".Dumper(@$accession_ids)."");
 
     my $placeholders = join ( ',', ('?') x @$accession_ids );
     my ($query, $pedigree_rows);
@@ -1224,7 +1226,7 @@ sub get_pedigree_rows {
 
     no warnings 'uninitialized';
     while (my ($name, $mother, $father, $cross_type, $depth) = $sth->fetchrow_array()) {
-        #print STDERR "For child $name:\n\tMother:$mother\n\tFather:$father\n\tCross Type:$cross_type\n\tDepth:$depth\n\n";
+        #$logger->error("For child $name:\n\tMother:$mother\n\tFather:$father\n\tCross Type:$cross_type\n\tDepth:$depth\n");
 	    push @$pedigree_rows, "$name\t$mother\t$father\t$cross_type\n";
     }
     return $pedigree_rows;
@@ -1246,7 +1248,7 @@ sub get_pedigree_string {
 
     my $pedigree_hashref = $self->get_ancestor_hash();
 
-    #print STDERR "Getting string of level $level from pedigree hashref ".Dumper($pedigree_hashref)."\n";
+    #$logger->error("Getting string of level $level from pedigree hashref ".Dumper($pedigree_hashref)."");
     if ($level eq "Parents") {
         return $self->_get_parent_string($pedigree_hashref);
     }
@@ -1286,7 +1288,7 @@ sub _store_stockprop {
     my $self = shift;
     my $type = shift;
     my $value = shift;
-    # print STDERR Dumper $type;
+    # $logger->error(Dumper($type));
     my $stockprop = SGN::Model::Cvterm->get_cvterm_row($self->schema, $type, 'stock_property')->name();
     my @arr = split ',', $value;
     foreach (@arr){
@@ -1311,7 +1313,7 @@ sub _store_stockprop_raw {
     my $self = shift;
     my $type = shift;
     my $value = shift;
-    # print STDERR Dumper $type;
+    # $logger->error(Dumper($type));
     my $stockprop = SGN::Model::Cvterm->get_cvterm_row($self->schema, $type, 'stock_property')->name();
     my $stored_stockprop = $self->stock->create_stockprops({ $stockprop => $value});
 }
@@ -1352,7 +1354,7 @@ sub _retrieve_stockprop {
             push @results, $r->value;
         }
     } catch {
-        #print STDERR "Cvterm $type does not exist in this database\n";
+        #$logger->error("Cvterm $type does not exist in this database");
     };
 
     my $res = join ',', @results;
@@ -1383,7 +1385,7 @@ sub _retrieve_stockprops {
             push @results, [ $r->stockprop_id(), $r->value() ];
         }
     } catch {
-        #print STDERR "Cvterm $type does not exist in this database\n";
+        #$logger->error("Cvterm $type does not exist in this database");
     };
 
     return @results;
@@ -1404,7 +1406,7 @@ sub _remove_stockprop {
         return 0;
     }
     else {
-        print STDERR "Error removing stockprop from stock ".$self->stock_id().". Please check this manually.\n";
+        $logger->error("Error removing stockprop from stock ".$self->stock_id().". Please check this manually.");
         return 0;
     }
 
@@ -1423,7 +1425,7 @@ sub _retrieve_organismprop {
             push @results, $r->value;
         }
     } catch {
-        #print STDERR "Cvterm $type does not exist in this database\n";
+        #$logger->error("Cvterm $type does not exist in this database");
     };
 
     my $res = join ',', @results;
@@ -1437,7 +1439,7 @@ sub _store_population_relationship {
     my $population_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'population','stock_type')->cvterm_id();
     my $population_member_cvterm_id =  SGN::Model::Cvterm->get_cvterm_row($schema, 'member_of','stock_relationship')->cvterm_id();
 
-    print STDERR "***STOCK.PM : find_or_create population relationship $population_cvterm_id \n\n";
+    $logger->debug("***STOCK.PM : find_or_create population relationship $population_cvterm_id \n");
     my $population = $schema->resultset("Stock::Stock")->find_or_create({
         uniquename => $self->population_name(),
         name => $self->population_name(),
@@ -1454,7 +1456,7 @@ sub _store_population_relationship {
 ##Move to a population child object##
 sub _update_population_relationship {
     my $self = shift;
-    print STDERR "***STOCK.PM Updating population relationship\n\n";
+    $logger->debug("***STOCK.PM Updating population relationship\n");
     my $population_member_cvterm_id =  SGN::Model::Cvterm->get_cvterm_row($self->schema, 'member_of','stock_relationship')->cvterm_id();
     my $pop_rs = $self->stock->search_related('stock_relationship_subjects', {'type_id'=>$population_member_cvterm_id});
     while (my $r=$pop_rs->next){
@@ -1475,7 +1477,7 @@ sub _retrieve_populations {
         subject_id => $self->stock_id(),
     });
     if ($rs->count == 0) {
-        #print STDERR "No population saved for this stock!\n";
+        #$logger->error("No population saved for this stock!");
     }
     else {
         my @population_names;
@@ -1500,7 +1502,7 @@ sub _store_parent_relationship {
     my $parent_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, $relationship_type,'stock_relationship')->cvterm_id();
     my %return;
 
-    print STDERR "***STOCK.PM : Storing parent relationship $parent_cvterm_id \n\n";
+    $logger->debug("***STOCK.PM : Storing parent relationship $parent_cvterm_id \n");
     my $parent = $schema->resultset("Stock::Stock")->find({
         uniquename => $parent_accession
     });
@@ -1525,7 +1527,7 @@ sub _update_parent_relationship {
     my $relationship_type = shift;
     my $parent_accession = shift;
     my $cross_type = shift;
-    print STDERR "***STOCK.PM Updating parent relationship\n\n";
+    $logger->debug("***STOCK.PM Updating parent relationship\n");
     my $parent_cvterm_id =  SGN::Model::Cvterm->get_cvterm_row($self->schema, $relationship_type,'stock_relationship')->cvterm_id();
     my $pop_rs = $self->stock->search_related('stock_relationship_subjects', {'type_id'=>$parent_cvterm_id});
     while (my $r=$pop_rs->next){
@@ -1604,7 +1606,7 @@ sub merge {
     my $delete_other_stock = shift;
 
     if ($other_stock_id == $self->stock_id()) {
-	print STDERR "Trying to merge stock into itself ($other_stock_id) Skipping...\n";
+	$logger->debug("Trying to merge stock into itself ($other_stock_id) Skipping...");
 	return "Error: cannot merge stock into itself";
     }
 
@@ -1633,19 +1635,19 @@ sub merge {
     my $other_parents = $other_stock->get_parents();
     my $this_parents = $self->get_parents();
 
-    print STDERR "OTHER parents: ".Dumper($other_parents);
-    print STDERR "This parents: ".Dumper($this_parents);
+    $logger->error("OTHER parents: ".Dumper($other_parents));
+    $logger->error("This parents: ".Dumper($this_parents));
     
     my $skip_mother_comp = 0;
     my $skip_father_comp = 0;
     
     if (! defined($other_parents->{mother_id}) || ! defined($this_parents->{mother_id})) {
-	print STDERR "Can't compare mothers for these accessions.\n";
+	$logger->debug("Can't compare mothers for these accessions.");
 	$skip_mother_comp =1;
     }
 
     if (! defined($other_parents->{father_id}) || ! defined($this_parents->{father_id})) {
-	print STDERR "Can't compare fathers for this accession.\n";
+	$logger->debug("Can't compare fathers for this accession.");
 	$skip_father_comp = 1;
     }
     
@@ -1663,16 +1665,16 @@ sub merge {
     }
     
     if ( (!$skip_mother_comp && $mother_identical) && (!$skip_father_comp && $father_identical)) {
-	print STDERR "Mother and Father between this and other match ($other_parents->{mother_id} vs $this_parents->{mother_id}).\n";
+	$logger->debug("Mother and Father between this and other match ($other_parents->{mother_id} vs $this_parents->{mother_id}).");
     }
     elsif ($skip_mother_comp && $father_identical || $skip_father_comp && $mother_identical) {
-	print STDERR "One parent undefined, the other matches...\n";
+	$logger->debug("One parent undefined, the other matches...");
     }
     elsif ($skip_mother_comp && $skip_father_comp) {
-	print STDERR "Skipping this comparison - not enough data! \n";
+	$logger->debug("Skipping this comparison - not enough data! ");
     }
     else { 
-	print STDERR join ("\t", $self->uniquename(), $other_stock->uniquename(), "MOTHERS", $other_parents->{mother_id}, $other_parents->{mother}, $this_parents->{mother_id}, $this_parents->{mother}, "FATHERS", $other_parents->{father_id}, $other_parents->{father}, $this_parents->{father_id}, $this_parents->{father}, "PARENTS DO NOT MATCH!")."\n";
+	$logger->debug(join ("\t", $self->uniquename(), $other_stock->uniquename(), "MOTHERS", $other_parents->{mother_id}, $other_parents->{mother}, $this_parents->{mother_id}, $this_parents->{mother}, "FATHERS", $other_parents->{father_id}, $other_parents->{father}, $this_parents->{father_id}, $this_parents->{father}, "PARENTS DO NOT MATCH!")."");
 	return;
     }
     
@@ -1712,7 +1714,7 @@ sub merge {
 	    
 	    $row->update();
 	    
-	    print STDERR "MERGED stockprop_id ".$row->stockprop_id." for stock $other_stock_id type_id $type_id value $value into stock ".$self->stock_id()."\n";
+	    $logger->debug("MERGED stockprop_id ".$row->stockprop_id." for stock $other_stock_id type_id $type_id value $value into stock ".$self->stock_id()."");
 	    $stockprop_count++;
 	}
 
@@ -1731,7 +1733,7 @@ sub merge {
 	my $this_subject_rel_rs = $schema->resultset("Stock::StockRelationship")->search( { subject_id => $self->stock_id(), object_id => $other_stock_id, type_id => $row->type_id() });
 
 	if ($this_subject_rel_rs->count() != 0) { # this stock does not have the relationship
-	    print STDERR "Target object ".$row->uniquename()." already has this relationship (".$this_subject_rel_rs->count()." counts)\n";
+	    $logger->debug("Target object ".$row->uniquename()." already has this relationship (".$this_subject_rel_rs->count()." counts)");
 	}
 	else { 
 	    # get the max rank
@@ -1744,7 +1746,7 @@ sub merge {
 	    $row->rank($rank);
 	    $row->subject_id($self->stock_id());
 	    $row->update();
-	    print STDERR "Moving subject relationships from stock $other_stock_id to stock ".$self->stock_id()."\n";
+	    $logger->debug("Moving subject relationships from stock $other_stock_id to stock ".$self->stock_id()."");
 	    $subject_rel_count++;
 	}
     }
@@ -1754,7 +1756,7 @@ sub merge {
 	my $this_object_rel_rs = $schema->resultset("Stock::StockRelationship")->search( { object_id => $self->stock_id, subject_id => $other_stock_id, type_id => $row->type_id() });
 
 	if ($this_object_rel_rs->count() != 0) {
-	    print STDERR "Target object ".$row->uniquename()." already has this relationship with ".$this_object_rel_rs->count()." counts\n";;
+	    $logger->debug("Target object ".$row->uniquename()." already has this relationship with ".$this_object_rel_rs->count()." counts");;
 	}
 	else { 
 	    my $rank_rs = $schema->resultset("Stock::StockRelationship")->search( { object_id => $self->stock_id(), type_id => $row->type_id() });
@@ -1766,7 +1768,7 @@ sub merge {
 	    $row->rank($rank);
 	    $row->object_id($self->stock_id());
 	    $row->update();
-	    print STDERR "Moving object relationships from stock $other_stock_id to stock ".$self->stock_id()."\n";
+	    $logger->debug("Moving object relationships from stock $other_stock_id to stock ".$self->stock_id()."");
 	    $object_rel_count++;
 	}
     }
@@ -1777,7 +1779,7 @@ sub merge {
     while (my $row = $esrs->next()) {
 	$row->stock_id($self->stock_id());
 	$row->update();
-	print STDERR "Moving experiments for stock $other_stock_id to stock ".$self->stock_id()."\n";
+	$logger->debug("Moving experiments for stock $other_stock_id to stock ".$self->stock_id()."");
 	$experiment_stock_count++;
     }
 
@@ -1787,7 +1789,7 @@ sub merge {
     while (my $row = $scvr->next()) {
 	$row->stock_id($self->stock_id);
 	$row->update();
-	print STDERR "Moving stock_cvterm relationships for $other_stock_id to stock ".$self->stock_id()."\n";
+	$logger->debug("Moving stock_cvterm relationships for $other_stock_id to stock ".$self->stock_id()."");
     }
 
     # move stock_dbxref
@@ -1797,7 +1799,7 @@ sub merge {
 	$row->stock_id($self->stock_id());
 	$row->update();
 	$stock_dbxref_count++;
-	print STDERR "Moving stock_dbxref relationships from $other_stock_id to stock ".$self->stock_id()."\n";
+	$logger->debug("Moving stock_dbxref relationships from $other_stock_id to stock ".$self->stock_id()."");
     }
 
     # move sgn.pcr_exp_accession relationships
@@ -1816,7 +1818,7 @@ sub merge {
 	$row->stock_id($self->stock());
 	$row->update();
 	$nd_experiment_stock_count++;
-	print STDERR "Moving nd_experiment_stock relationships from $other_stock_id to stock ".$self->stock_id()."\n";
+	$logger->debug("Moving nd_experiment_stock relationships from $other_stock_id to stock ".$self->stock_id()."");
     }
     
     my $phenome_schema = CXGN::Phenome::Schema->connect(
@@ -1829,7 +1831,7 @@ sub merge {
     while (my $row = $sars->next()) {
 	$row->stock_id($self->stock_id());
 	$row->update();
-	print STDERR "Moving stock alleles from stock $other_stock_id to stock ".$self->stock_id()."\n";
+	$logger->debug("Moving stock alleles from stock $other_stock_id to stock ".$self->stock_id()."");
 	$stock_allele_count++;
     }
 
@@ -1842,11 +1844,11 @@ sub merge {
 	if ($this_rs->count() == 0) {
 	    $row->stock_id($self->stock_id());
 	    $row->update();
-	    print STDERR "Moving image ".$row->image_id()." from stock $other_stock_id to stock ".$self->stock_id()."\n";
+	    $logger->debug("Moving image ".$row->image_id()." from stock $other_stock_id to stock ".$self->stock_id()."");
 	    $image_count++;
 	}
 	else {
-	    print STDERR "Removing stock_image entry...\n";
+	    $logger->debug("Removing stock_image entry...");
 	    $row->delete(); # there is no cascade delete on image relationships, so we need to remove dangling relationships.
 	}
     }
@@ -1860,11 +1862,11 @@ sub merge {
 	if ($this_rs->count() == 0) {
 	    $row->stock_id($self->stock_id());
 	    $row->update();
-	    print STDERR "Moved stock_owner ".$row->sp_person_id()." of stock $other_stock_id to stock ".$self->stock_id()."\n";
+	    $logger->debug("Moved stock_owner ".$row->sp_person_id()." of stock $other_stock_id to stock ".$self->stock_id()."");
 	    $stock_owner_count++;
 	}
 	else {
-	    print STDERR "(Deleting stock owner entry for stock $other_stock_id, owner ".$row->sp_person_id()."\n";
+	    $logger->debug("(Deleting stock owner entry for stock $other_stock_id, owner ".$row->sp_person_id()."");
 	    $row->delete(); # see comment for move image relationships
 	}
     }
@@ -1879,7 +1881,7 @@ sub merge {
     while (my $row = $mrs1->next()) {
 	$row->parent_1($self->stock_id());
 	$row->update();
-	print STDERR "Move map parent_1 $other_stock_id to ".$self->stock_id()."\n";
+	$logger->debug("Move map parent_1 $other_stock_id to ".$self->stock_id()."");
 	$parent_1_count++;
     }
 
@@ -1887,7 +1889,7 @@ sub merge {
     while (my $row = $mrs2->next()) {
 	$row->parent_2($self->stock_id());
 	$row->update();
-	print STDERR "Move map parent_2 $other_stock_id to ".$self->stock_id()."\n";
+	$logger->debug("Move map parent_2 $other_stock_id to ".$self->stock_id()."");
 	$parent_2_count++;
     }
 
@@ -1904,9 +1906,9 @@ sub merge {
  #   }
 
 
-    print STDERR "Done with merge of stock_id $other_stock_id into ".$self->stock_id()."\n";
-    print STDERR "Relationships moved: \n";
-    print STDERR <<COUNTS;
+    $logger->debug("Done with merge of stock_id $other_stock_id into ".$self->stock_id()."");
+    $logger->debug("Relationships moved: ");
+    $logger->error(<<COUNTS);
     Stock props: $stockprop_count
     Subject rels: $subject_rel_count
     Object rels: $object_rel_count

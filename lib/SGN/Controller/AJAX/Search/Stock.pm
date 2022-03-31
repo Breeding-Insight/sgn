@@ -9,6 +9,8 @@ use Data::Dumper;
 use JSON;
 use CXGN::Stock::Search;
 
+my $logger = Log::Log4perl->get_logger();
+
 __PACKAGE__->config(
     default   => 'application/json',
     stash_key => 'rest',
@@ -19,12 +21,12 @@ __PACKAGE__->config(
 sub stock_search :Path('/ajax/search/stocks') Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR "Stock search AJAX\n";
+    $logger->debug("Stock search AJAX");
     my $schema = $c->dbic_schema("Bio::Chado::Schema", 'sgn_chado');
     my $people_schema = $c->dbic_schema("CXGN::People::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
     my $params = $c->req->params() || {};
-    #print STDERR Dumper $params;
+    #$logger->error(Dumper($params));
 
     my $owner_first_name;
     my $owner_last_name;
@@ -44,10 +46,10 @@ sub stock_search :Path('/ajax/search/stocks') Args(0) {
     # my %stockprops_values;
     my $stockprops_values = $params->{editable_stockprop_values} ? decode_json $params->{editable_stockprop_values} : {};
 
-    # print STDERR "Stockprops are: ".Dumper($stockprops_search);
+    # $logger->error("Stockprops are: ".Dumper($stockprops_search));
     #
     # while (my ($property, $value) = each %$stockprops_search){
-    #     print STDERR "Property is: $property and value is $value\n";
+    #     $logger->error("Property is: $property and value is $value");
         # my @values = split ',', $value;
         # foreach (@values){
         #     push @{$stockprops_values{$property}}, $_;
@@ -57,8 +59,8 @@ sub stock_search :Path('/ajax/search/stocks') Args(0) {
     #This defines the stockprops that will be returned in the results.
     my $stockprop_columns_view = $params->{extra_stockprop_columns_view} ? decode_json $params->{extra_stockprop_columns_view} : {};
     my $stockprop_columns_view_array = $params->{stockprop_extra_columns_view_array} ? decode_json $params->{stockprop_extra_columns_view_array} : [];
-    #print STDERR Dumper $stockprop_columns_view;
-    #print STDERR Dumper $stockprop_columns_view_array;
+    #$logger->error(Dumper($stockprop_columns_view));
+    #$logger->error(Dumper($stockprop_columns_view_array));
 
     my $stock_search = CXGN::Stock::Search->new({
         bcs_schema=>$schema,
@@ -91,7 +93,7 @@ sub stock_search :Path('/ajax/search/stocks') Args(0) {
         $draw =~ s/\D//g; # cast to int
     }
 
-    #print STDERR Dumper $result;
+    #$logger->error(Dumper($result));
     my @return;
     foreach (@$result){
         if (!$params->{minimal_info}){
@@ -127,7 +129,7 @@ sub stock_search :Path('/ajax/search/stocks') Args(0) {
         }
     }
 
-    #print STDERR Dumper \@return;
+    #$logger->error(Dumper(\@return));
     $c->stash->{rest} = { data => [ @return ], draw => $draw, recordsTotal => $records_total,  recordsFiltered => $records_total };
 }
 

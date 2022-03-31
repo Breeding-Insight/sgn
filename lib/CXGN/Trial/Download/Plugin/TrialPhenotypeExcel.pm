@@ -65,6 +65,7 @@ use CXGN::Trial;
 use CXGN::Phenotypes::PhenotypeMatrix;
 use CXGN::Phenotypes::MetaDataMatrix;
 use Data::Dumper;
+my $logger = Log::Log4perl->get_logger();
 
 sub verify {
     1;
@@ -124,9 +125,9 @@ sub download {
         );
         @data = $phenotypes_search->get_phenotype_matrix();
     }
-    #print STDERR Dumper \@data;
+    #$logger->error(Dumper(\@data));
 
-    print STDERR "Print Excel Start:".localtime."\n";
+    $logger->debug("Print Excel Start:".localtime."");
     my $ss = Spreadsheet::WriteExcel->new($self->filename());
     my $ws = $ss->add_worksheet();
 
@@ -159,7 +160,7 @@ sub download {
         $ws->write_row($line+$header_offset, 0, $columns);
     }
     $ss ->close();
-    print STDERR "Print Excel End:".localtime."\n";
+    $logger->debug("Print Excel End:".localtime."");
 }
 
 1;

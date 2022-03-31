@@ -27,6 +27,8 @@ use CXGN::String::FuzzyMatch;
 use SGN::Model::Cvterm;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
     is       => 'rw',
     isa      => 'DBIx::Class::Schema',
@@ -48,7 +50,7 @@ sub get_matches {
     my @found_stocks;
     my %results;
     my $error = '';
-    print STDERR "FuzzySearch 1".localtime()."\n";
+    $logger->debug("FuzzySearch 1".localtime()."");
     
     my $synonym_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'stock_synonym', 'stock_property')->cvterm_id();
     my $stock_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, $stock_type, 'stock_type')->cvterm_id();
@@ -82,7 +84,7 @@ sub get_matches {
         push @lowercased_synonyms, lc($_);
         $lowercase_synonym_lookup{lc($_)} = $_;
     }
-    print STDERR "FuzzySearch 2".localtime()."\n";
+    $logger->debug("FuzzySearch 2".localtime()."");
 
     foreach my $stock_name (@stock_list) {
 	#lookup case insensitive stock names#
@@ -151,7 +153,7 @@ sub get_matches {
     }
 
     if ($error){
-        print STDERR "FUZZY ERRORS: $error\n";
+        $logger->error("FUZZY ERRORS: $error");
         $results{'error'} = $error;
     }
 

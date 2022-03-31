@@ -5,15 +5,17 @@ use Moose;
 
 use Math::BigInt;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub BUILD { 
     my $self = shift;
     my $args = shift;
     
     if ($args->{vcf_string}) { 
-	#print STDERR "Building SNP from vcf_string $args->{vcf_string}...\n";
+	#$logger->error("Building SNP from vcf_string $args->{vcf_string}...");
 	$self->from_vcf_string($args->{vcf_string});
 	
-	#print STDERR "Counts: ".$self->ref_count().", ".$self->alt_count()."\n";
+	#$logger->error("Counts: ".$self->ref_count().", ".$self->alt_count()."");
     }
 }
 
@@ -62,7 +64,7 @@ sub from_vcf_string {
     }
     if (!@ids) { 
 	# usual order... but this is just guesswork
-	#print STDERR "(Guessing the format order...)\n";
+	#$logger->error("(Guessing the format order...)");
 	@ids = ( 'GT', 'AD', 'DP', 'GQ', 'PL' );
     }
     
@@ -76,7 +78,7 @@ sub from_vcf_string {
      #my ($allele, $counts) = split /\:/, $raw;
      my ($a1, $a2) = ("","");
      if (!exists($fields{GT})) { 
-	 print STDERR "No allele calls found for snp ".$self->id()."\n";
+	 $logger->debug("No allele calls found for snp ".$self->id()."");
      }
      else { 
 	 ($a1, $a2) = split /\//, $fields{GT};
@@ -87,15 +89,15 @@ sub from_vcf_string {
      my ($c1, $c2);
      if (!exists($fields{AD})) { 
 	 $c1 = 0;
-	 #print STDERR "C1: $c1\n";
+	 #$logger->error("C1: $c1");
 	 $c2 = 0;
-	 #print STDERR "C2: $c2\n";
+	 #$logger->error("C2: $c2");
      }
      else { 
 	 my @counts = split /\,/, $fields{AD};
-	 # print STDERR "FIELDS: $fields{AD}\n"; 
+	 # $logger->error("FIELDS: $fields{AD}");
 	 if (@counts > 2) { 
-	     #print STDERR "Multiple alleles found for SNP ".$self->id()."\n";
+	     #$logger->error("Multiple alleles found for SNP ".$self->id()."");
 	 }
 	 ($c1, $c2) = @counts;
      }
@@ -106,7 +108,7 @@ sub from_vcf_string {
      
     # debug
     #if ($self->id() eq "1002:250060174") { 
-	#print STDERR $self->id().": ".$fields{GT}.", ".$fields{AD}."\n";
+	#$logger->error($self->id().": ".$fields{GT}.", ".$fields{AD}."");
     #}
 
     return ($c1, $c2);

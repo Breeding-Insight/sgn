@@ -48,6 +48,8 @@ use CXGN::Stock::StockLookup;
 use CXGN::Trial::TrialLayout;
 use CXGN::Calendar;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -145,7 +147,7 @@ has 'experiment_type' => (
 sub search {
     my $self = shift;
     my $schema = $self->bcs_schema();
-    print STDERR "Search Start:".localtime."\n";
+    $logger->debug("Search Start:".localtime."");
     my $rep_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'replicate', 'stock_property')->cvterm_id();
     my $block_number_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'block', 'stock_property')->cvterm_id();
     my $plot_number_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'plot number', 'stock_property')->cvterm_id();
@@ -377,7 +379,7 @@ sub search {
 
     my  $q = $select_clause . $from_clause . $where_clause . $group_by . $order_clause . $limit_clause . $offset_clause;
 
-    print STDERR "QUERY: $q\n\n";
+    $logger->debug("QUERY: $q\n");
 
     my $location_rs = $schema->resultset('NaturalDiversity::NdGeolocation')->search();
     my %location_id_lookup;
@@ -489,7 +491,7 @@ sub search {
 
     }
 
-    print STDERR "Search End:".localtime."\n";
+    $logger->debug("Search End:".localtime."");
     return \@result;
 }
 

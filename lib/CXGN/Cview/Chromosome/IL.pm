@@ -30,6 +30,8 @@ package CXGN::Cview::Chromosome::IL;
 
 use base qw( CXGN::Cview::Chromosome );
 
+my $logger = Log::Log4perl->get_logger();
+
 sub new {
     my $class = shift;
     my $self = $class->SUPER::new(@_);
@@ -89,7 +91,7 @@ sub new {
 #     $self->_calculate_scaling_factor();
 #     $self->_calculate_chromosome_length();
 #     $self-> set_color(100,100,100);
-#     #print STDERR "Rendering ILs...\n";
+#     #$logger->error("Rendering ILs...");
 #     $self->{font}= GD::Font->Small();
 #     my $section_x = $self->get_horizontal_offset() - $self->get_width()/2;
 
@@ -117,7 +119,7 @@ sub new {
 
 #     # render fragments
 #     #
-#     if (!defined($self->{fragments})) { print STDERR "IL: no fragments to render.\n"; return; }
+#     if (!defined($self->{fragments})) { $logger->error("IL: no fragments to render."); return; }
 #     my $max_fragments = @{$self->{fragments}};
 
 #     foreach my $f (@{$self->{fragments}}) {

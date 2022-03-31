@@ -7,6 +7,8 @@ use CXGN::Trait;
 use CXGN::Trait::Search;
 use CXGN::BreederSearch;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller::REST'; }
 
@@ -21,7 +23,7 @@ sub search : Path('/ajax/search/traits') Args(0) {
     my $c    = shift;
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $params = $c->req->params() || {};
-    #print STDERR Dumper $params;
+    #$logger->error(Dumper($params));
 
     my $ontology_db_ids;
     if ($params->{'ontology_db_id[]'}){
@@ -124,7 +126,7 @@ sub search : Path('/ajax/search/traits') Args(0) {
                 $trait_accession
             ];
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     my $draw = $params->{draw};
     if ($draw){

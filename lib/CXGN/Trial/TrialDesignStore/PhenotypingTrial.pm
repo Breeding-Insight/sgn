@@ -8,10 +8,12 @@ use Data::Dumper;
 
 extends 'CXGN::Trial::TrialDesignStore::AbstractTrial';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub BUILD {   # adjust the cvterm ids for phenotyping trials
     my $self = shift;
 
-    #print STDERR "PhenotypingTrial BUILD setting stock type id etc....\n";
+    #$logger->error("PhenotypingTrial BUILD setting stock type id etc....");
     $self->set_nd_experiment_type_id(SGN::Model::Cvterm->get_cvterm_row($self->get_bcs_schema(), 'field_layout', 'experiment_type')->cvterm_id());
     $self->set_stock_type_id($self->get_plot_cvterm_id);
     $self->set_stock_relationship_type_id($self->get_plot_of_cvterm_id);
@@ -44,7 +46,7 @@ sub BUILD {   # adjust the cvterm ids for phenotyping trials
 sub validate_design {
     my $self = shift;
 
-    #print STDERR "validating design\n";
+    #$logger->error("validating design");
     my $chado_schema = $self->get_bcs_schema;
     my $design_type = $self->get_design_type;
     my %design = %{$self->get_design};
@@ -149,8 +151,8 @@ sub validate_design {
 
     my @source_stock_types = @{$self->get_source_stock_types()};
 
-    print STDERR "Source Stock types = ".join(", ",@source_stock_types)."\n";
-    print STDERR "Accession names = ".join(", ", @accession_names)."\n";
+    $logger->debug("Source Stock types = ".join(", ",@source_stock_types)."");
+    $logger->debug("Accession names = ".join(", ", @accession_names)."");
 
     my %found_data;
     foreach my $a (@accession_names) {
@@ -160,7 +162,7 @@ sub validate_design {
             'uniquename' => { ilike => $a } });
 
         while (my $s = $rs->next()) {
-            print STDERR "FOUND ".$s->uniquename()."\n";
+            $logger->debug("FOUND ".$s->uniquename()."");
             $found_data{$s->uniquename} = 1;
         }
     }

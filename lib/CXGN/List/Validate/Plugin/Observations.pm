@@ -3,6 +3,8 @@ package CXGN::List::Validate::Plugin::Observations;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "observations";
 }
@@ -16,7 +18,7 @@ sub validate {
     foreach my $l (@$list) {
     	my $rs = $schema->resultset("Phenotype::Phenotype")->search({ phenotype_id=>$l });
     	if ($rs->count() == 0) {
-            # print STDERR "Couldn't find $l\n";
+            # $logger->error("Couldn't find $l");
     	    push @missing, $l;
     	}
     }

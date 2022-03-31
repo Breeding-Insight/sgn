@@ -6,6 +6,7 @@ use CXGN::Stock::StockLookup;
 use SGN::Model::Cvterm;
 use Data::Dumper;
 use CXGN::List::Validate;
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
     my $self = shift;
@@ -164,7 +165,7 @@ sub _parse_with_plugin {
 
         push @cross_combination_list, \%cross_combination_hash;
     }
-#    print STDERR "CROSS COMBINATION LIST =".Dumper(\@cross_combination_list)."\n";
+#    $logger->error("CROSS COMBINATION LIST =".Dumper(\@cross_combination_list)."");
     my %parsed_result;
     $parsed_result{'wishlist'} = \@cross_combination_list;
 

@@ -30,6 +30,8 @@ use JSON;
 use POSIX;
 use List::Util qw(sum);
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'parental_genotypes' => (
     isa => 'ArrayRef[HashRef]',
     is => 'rw',
@@ -47,7 +49,7 @@ sub get_hybrid_genotype {
     my $parental_genotypes = $self->parental_genotypes();
     my $marker_objects = $self->marker_objects();
 
-    # print STDERR Dumper $parental_genotypes;
+    # $logger->error(Dumper($parental_genotypes));
 
     # If there are more than one genotype for the parents given, will average them
     if (scalar(@$parental_genotypes)>2) {

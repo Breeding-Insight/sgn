@@ -56,6 +56,8 @@ use CatalystX::GlobalContext '$c';
 
 use base qw| CXGN::Image |;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 new
 
  Usage:        my $image = SGN::Image->new($dbh)
@@ -135,19 +137,19 @@ sub process_image {
     $self->SUPER::process_image($filename);
 
     if ( $type eq "experiment" ) {
-        #print STDERR "Associating experiment $type_id...\n";
+        #$logger->error("Associating experiment $type_id...");
         $self->associate_experiment($type_id);
     }
     elsif ( $type eq "stock" ) {
-        #print STDERR "Associating stock $type_id...\n";
+        #$logger->error("Associating stock $type_id...");
         $self->associate_stock($type_id);
     }
     elsif ( $type eq "fish" ) {
-        #print STDERR "Associating to fish experiment $type_id\n";
+        #$logger->error("Associating to fish experiment $type_id");
         $self->associate_fish_result($type_id);
     }
     elsif ( $type eq "locus" ) {
-        #print STDERR "Associating to locus $type_id\n";
+        #$logger->error("Associating to locus $type_id");
         $self->associate_locus($type_id);
     }
     elsif ( $type eq "organism" ) {
@@ -335,7 +337,7 @@ sub upload_fieldbook_zipfile {
 
     foreach (@$file_members) {
         my $image = SGN::Image->new( $dbh, undef, $c );
-        #print STDERR Dumper $_;
+        #$logger->error(Dumper($_));
         my $img_name = substr($_->fileName(), 0, -24);
         $img_name =~ s/^.*photos\///;
         my $stock = $schema->resultset("Stock::Stock")->find( { uniquename => $img_name, 'me.type_id' => [$plot_cvterm_id, $plant_cvterm_id] } );
@@ -345,11 +347,11 @@ sub upload_fieldbook_zipfile {
 
         #Check if image already stored in database
         my $md5checksum = $image->calculate_md5sum($temp_file);
-        #print STDERR "MD5: $md5checksum\n";
+        #$logger->error("MD5: $md5checksum");
         my $md_image = $metadata_schema->resultset("MdImage")->search({md5sum=>$md5checksum})->count();
-        #print STDERR "Count: $md_image\n";
+        #$logger->error("Count: $md_image");
         if ($md_image > 0) {
-            print STDERR Dumper "Image $temp_file has already been added to the database and will not be added again.";
+            $logger->error(Dumper("Image $temp_file has already been added to the database and will not be added again."));
             $error_status .= "Image $temp_file has already been added to the database and will not be added again.<br/><br/>";
         } else {
             $image->set_sp_person_id($user_id);
@@ -368,7 +370,7 @@ sub upload_phenotypes_associated_images_zipfile {
     my $user_id = shift;
     my $image_observation_unit_hash = shift;
     my $image_type_name = shift;
-    print STDERR "Doing upload_phenotypes_associated_images_zipfile\n";
+    $logger->debug("Doing upload_phenotypes_associated_images_zipfile");
     my $c = $self->config();
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
@@ -417,7 +419,7 @@ sub upload_phenotypes_associated_images_zipfile {
             my ($saved_image_id) = $h->fetchrow_array();
             my $image_id;
             if ($saved_image_id) {
-                print STDERR Dumper "Image $temp_file has already been added to the database and will not be added again.";
+                $logger->error(Dumper("Image $temp_file has already been added to the database and will not be added again."));
                 $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
                 $image_id = $image->get_image_id();
             }
@@ -427,7 +429,7 @@ sub upload_phenotypes_associated_images_zipfile {
                 if (!$ret ) {
                     return {error => "Image processing for $temp_file did not work. Image not associated to stock_id $stock_id.<br/><br/>"};
                 }
-                print STDERR "Saved $temp_file\n";
+                $logger->debug("Saved $temp_file");
                 my $stock_associate = $image->associate_stock($stock_id);
                 $image_id = $image->get_image_id();
                 my $added_image_tag_id = $image->add_tag($image_tag);
@@ -435,7 +437,7 @@ sub upload_phenotypes_associated_images_zipfile {
             $observationunit_stock_id_image_id{$stock_id} = $image_id;
         }
         else {
-            print STDERR "$img_name Not Included in the uploaded phenotype spreadsheet, skipping..\n";
+            $logger->debug("$img_name Not Included in the uploaded phenotype spreadsheet, skipping..");
         }
     }
     return {return => \%observationunit_stock_id_image_id};
@@ -458,11 +460,11 @@ sub upload_drone_imagery_zipfile {
     }
 
     my $linking_table_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'raw_drone_imagery', 'project_md_image')->cvterm_id();
-    print STDERR Dumper scalar(@$file_members);
+    $logger->error(Dumper(scalar(@$file_members)));
     my @image_files;
     foreach (@$file_members) {
         my $image = SGN::Image->new( $dbh, undef, $c );
-        #print STDERR Dumper $_;
+        #$logger->error(Dumper($_));
         my $temp_file = $image->upload_zipfile_images($_);
         push @image_files, $temp_file;
     }

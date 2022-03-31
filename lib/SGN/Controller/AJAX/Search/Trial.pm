@@ -7,6 +7,8 @@ use CXGN::Trial;
 use CXGN::Trial::Search;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST'; }
 
 __PACKAGE__->config(
@@ -22,7 +24,7 @@ sub search : Path('/ajax/search/trials') Args(0) {
     my @location_ids;
     my $location_id = $c->req->param('location_id');
     if ($location_id && $location_id ne 'not_provided'){
-        #print STDERR "location id: " . $location_id . "\n";
+        #$logger->error("location id: " . $location_id . "");
         push @location_ids, $location_id;
     }
 
@@ -66,7 +68,7 @@ sub search : Path('/ajax/search/trials') Args(0) {
         );
         push @result, \@res;
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     $c->stash->{rest} = { data => \@result };
 }

@@ -35,6 +35,8 @@ use JSON;
 
 use namespace::autoclean;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -55,10 +57,10 @@ sub compose_trait: Path('/ajax/onto/store_composed_term') Args(0) {
   my $c = shift;
 
   #my @ids = $c->req->param("ids[]");
-  #print STDERR "Ids array for composing in AJAX Onto = @ids\n";
+  #$logger->error("Ids array for composing in AJAX Onto = @ids");
 
   my $new_trait_names = decode_json $c->req->param("new_trait_names");
-  #print STDERR Dumper $new_trait_names;
+  #$logger->error(Dumper($new_trait_names));
   my $new_terms;
   eval {
       my $onto = CXGN::Onto->new( { schema => $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado') } );
@@ -89,7 +91,7 @@ Creates a ontology identifier by adding an entry in the DB, cv, and cvterm table
 sub store_ontology_identifier: Path('/ajax/onto/store_ontology_identifier') Args(0) {
     my $self = shift;
     my $c = shift;
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
 
     my $user_id;
     my $user_name;
@@ -158,7 +160,7 @@ Creates a new term in the designated observation variable cv and links it to com
 sub store_trait_method_scale_observation_variable: Path('/ajax/onto/store_trait_method_scale_observation_variable') Args(0) {
     my $self = shift;
     my $c = shift;
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
 
     my $user_id;
     my $user_name;
@@ -295,7 +297,7 @@ sub get_traits_from_component_categories: Path('/ajax/onto/get_traits_from_compo
   my @gen_ids = $c->req->param("gen_ids[]");
   my @evt_ids = $c->req->param("evt_ids[]");
 
-  print STDERR "Obj ids are @object_ids\n Attr ids are @attribute_ids\n Method ids are @method_ids\n unit ids are @unit_ids\n trait ids are @trait_ids\n tod ids are @tod_ids\n toy ids are @toy_ids\n gen ids are @gen_ids\n evt ids are @evt_ids\n";
+  $logger->debug("Obj ids are @object_ids\n Attr ids are @attribute_ids\n Method ids are @method_ids\n unit ids are @unit_ids\n trait ids are @trait_ids\n tod ids are @tod_ids\n toy ids are @toy_ids\n gen ids are @gen_ids\n evt ids are @evt_ids");
   my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
 
   my $traits = SGN::Model::Cvterm->get_traits_from_component_categories($schema, \@allowed_composed_cvs, $composable_cvterm_delimiter, $composable_cvterm_format, {
@@ -442,13 +444,13 @@ sub menu_GET  {
 
     my $menudata = $c->config->{onto_root_namespaces};
 
-    print STDERR "MENUDATA: $menudata\n";
+    $logger->debug("MENUDATA: $menudata");
     my @menuitems = split ",", $menudata;
 
     my $menu = '<select name="cv_select">';
 
     foreach my $mi (@menuitems) {
-	print STDERR "MENU ITEM: $mi\n";
+	$logger->debug("MENU ITEM: $mi");
 	if ($mi =~ /\s*(\w+)?\s*(.*)$/) {
 	    my $value = $1;
 	    my $name = $2;
@@ -663,7 +665,7 @@ sub add_cache_list :Private {
     my $dbxref = $parent->dbxref();
     my $parent_accession = $dbxref->db()->name().":".$dbxref->accession();
     $hashref->{parent} = $parent_accession;
-    ##print STDERR "Adding to cache list: parent=$parent. child=$child\n";
+    ##$logger->error("Adding to cache list: parent=$parent. child=$child");
     push @{$self->{cache_list}}, $hashref;
 
 }

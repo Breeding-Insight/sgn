@@ -18,6 +18,8 @@ use JSON;
 
 extends 'CXGN::BrAPI::v2::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
     my $self = shift;
     my $params = shift;
@@ -99,7 +101,7 @@ sub search {
         }
     );
     my ($data, $unique_traits) = $phenotypes_search->search();
-    #print STDERR Dumper $data;
+    #$logger->error(Dumper($data));
     my $start_index = $page*$page_size;
     my $end_index = $page*$page_size + $page_size - 1;
 
@@ -464,13 +466,13 @@ sub observationunits_update {
 
             my $return_error = $replace_plot_accession_fieldmap->update_fieldmap_precheck();
             if ($return_error) { 
-                print STDERR Dumper $return_error;
+                $logger->error(Dumper($return_error));
                 return CXGN::BrAPI::JSONResponse->return_error($self->status, sprintf('Something went wrong. Accession cannot be replaced.'));
             }
 
             my $replace_return_error = $replace_plot_accession_fieldmap->replace_plot_accession_fieldMap();
             if ($replace_return_error) {
-                print STDERR Dumper $replace_return_error;
+                $logger->error(Dumper($replace_return_error));
                 return CXGN::BrAPI::JSONResponse->return_error($self->status, sprintf('Something went wrong. Accession cannot be replaced.'));
             }
         }

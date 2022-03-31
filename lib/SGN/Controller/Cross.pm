@@ -34,6 +34,8 @@ use File::Temp;
 use File::Basename qw | basename dirname|;
 use File::Spec::Functions;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'schema' => (
@@ -57,19 +59,19 @@ sub upload_cross :  Path('/cross/upload_cross')  Args(0) {
    my %upload_data;
    my $file_error = 0;
    my @contents = split /\n/, $upload->slurp;
-   print STDERR "loading cross file: $tempfile Basename: $basename $format_type $visible_to_role\n";
+   $logger->debug("loading cross file: $tempfile Basename: $basename $format_type $visible_to_role");
    $c->stash->{tempfile} = $tempfile;
    if ($format_type eq "spreadsheet") {
-     print STDERR "is spreadsheet \n";
+     $logger->debug("is spreadsheet ");
 
      if (!$c->user()) {
-       print STDERR "User not logged in... not adding crosses.\n";
+       $logger->debug("User not logged in... not adding crosses.");
        $c->stash->{rest} = {error => "You need to be logged in to add a cross." };
        return;
      }
 
     if (!any { $_ eq "curator" || $_ eq "submitter" } ($c->user()->roles)  ) {
-	print STDERR "User does not have sufficient privileges.\n";
+	$logger->debug("User does not have sufficient privileges.");
 	$c->stash->{rest} = {error =>  "you have insufficient privileges to add a cross." };
 	return;
     }
@@ -88,7 +90,7 @@ sub upload_cross :  Path('/cross/upload_cross')  Args(0) {
 	 $first_row[9] ne 'number_of_flowers' ||
 	 $first_row[10] ne 'number_of_seeds') {
        $header_error = "<b>Error in header:</b><br>Header should contain the following tab-delimited fields:<br>cross_name<br>cross_type<br>maternal_parent<br>paternal_parent<br>trial<br>location<br>number_of_progeny<br>prefix<br>suffix<br>number_of_flowers<br>number_of_seeds<br>";
-       print STDERR "$header_error\n";
+       $logger->debug("$header_error");
      }
      else {
        my $line_number = 0;
@@ -116,11 +118,11 @@ sub upload_cross :  Path('/cross/upload_cross')  Args(0) {
 	   if ($row[9]) {$cross{'number_of_seeds'} = $row[10];}
 	   my $line_verification = _verify_cross($c,\%cross, \%line_errors, $line_number);
 	   if ($line_verification) {
-	     print STDERR "Verified\n";
+	     $logger->debug("Verified");
 	     $upload_data{$line_number}=\%cross;
 	   }
 	   else {
-	     print STDERR "Not verified\n";
+	     $logger->debug("Not verified");
 	   }
 	 }
        }
@@ -137,7 +139,7 @@ sub upload_cross :  Path('/cross/upload_cross')  Args(0) {
 #	      );
    }
    else {
-     print STDERR "Upload file format type $format_type not recognized\n";
+     $logger->debug("Upload file format type $format_type not recognized");
    }
 
    if (%line_errors || $header_error) {
@@ -149,7 +151,7 @@ sub upload_cross :  Path('/cross/upload_cross')  Args(0) {
 	       line_errors_ref => \%line_errors,
 	       template => '/breeders_toolbox/upload_crosses_file_error.mas',
 	       );
-     #print STDERR "there are errors in the upload file\n$line_errors_string";
+     #$logger->error("there are errors in the upload file\n$line_errors_string");
    }
    else {#file is valid
      my $number_of_crosses_added = 0;
@@ -215,7 +217,7 @@ sub _verify_cross {
   my $max_progeny = 20000;
   my $max_flowers = 10000;
   my $max_seeds = 10000;
-  #print STDERR "name: ".$cross_ref->{'cross_name'}."\n";
+  #$logger->error("name: ".$cross_ref->{'cross_name'}."");
   if (! $schema->resultset("Stock::Stock")->find({name=>$maternal_parent,})){
     $error_ref->{$line_number} .= "Line number $line_number, Maternal parent $maternal_parent does not exist in database\n <br>";
     }
@@ -599,7 +601,7 @@ sub cross_detail : Path('/cross') Args(1) {
         $cross_id = $cross->stock_id();
     }
 
-    #print STDERR "Cross stock_id is $cross_id\n";
+    #$logger->error("Cross stock_id is $cross_id");
 
     my $progeny = $c->dbic_schema("Bio::Chado::Schema")->resultset("Stock::StockRelationship") -> search( { object_id => $cross_id, 'type.name' => 'offspring_of'  }, { join =>  'type' } );
 

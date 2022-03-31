@@ -17,6 +17,8 @@ use Moose;
 use Data::Dumper;
 use File::Slurp qw | slurp |;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'file' => (is => 'rw', isa => 'Str');
 
 has 'factors' => ( is => 'rw', isa => 'ArrayRef' );
@@ -40,9 +42,9 @@ sub BUILD {
 
     if ($self->remove_quotes()) {
 	foreach my $k (@keys) { 
-	    print STDERR "Removing quotes from $k...";
+	    $logger->error("Removing quotes from $k...");
 	    $k=~ s/^\"(.*)\"$/$1/;
-	    print STDERR "Now $k...\n";
+	    $logger->debug("Now $k...");
 	}
     }
     
@@ -55,9 +57,9 @@ sub BUILD {
 	my @fields = split /\t/, $lines[$i];
 	for(my $n=0; $n <@keys; $n++) {
 	    if ($self->remove_quotes()) {
-		print STDERR "Removing quotes from $fields[$n]...";
+		$logger->error("Removing quotes from $fields[$n]...");
 		$fields[$n]=~ s/^\"(.*)\"$/$1/;
-		print STDERR "Now $fields[$n]...\n"; 
+		$logger->debug("Now $fields[$n]...");
 	    }
 	    
 	    if (exists($fields[$n]) && defined($fields[$n])) {
@@ -81,7 +83,7 @@ sub distinct_levels_for_factor {
     my $self = shift;
     my $factor = shift;
 
-    print STDERR "LEVELS: ".Dumper($self->levels());
+    $logger->error("LEVELS: ".Dumper($self->levels()));
     return $self->levels()->{$factor}->{distinct};
 }
 

@@ -38,6 +38,8 @@ use SGN::Model::Cvterm;
 use CXGN::Trial;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -243,7 +245,7 @@ sub _retrieve_nd_protocolprop_markers_array {
 
 #class method
 sub list {
-    print STDERR "Protocol list search\n";
+    $logger->debug("Protocol list search");
     my $schema = shift;
     my $protocol_list = shift;
     my $accession_list = shift;
@@ -309,7 +311,7 @@ sub list {
         $limit_clause
         $offset_clause;";
 
-    #print STDERR Dumper $q;
+    #$logger->error(Dumper($q));
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute($vcf_map_details_cvterm_id, $pcr_marker_details_cvterm_id);
 
@@ -345,13 +347,13 @@ sub list {
             marker_type => $marker_type
         };
     }
-    print STDERR "PROTOCOL LIST =".Dumper(\@results);
+    $logger->error("PROTOCOL LIST =".Dumper(\@results));
     return \@results;
 }
 
 #class method
 sub list_simple {
-    print STDERR "Protocol list simple search\n";
+    $logger->debug("Protocol list simple search");
     my $schema = shift;
     my @where_clause;
 
@@ -395,7 +397,7 @@ sub list_simple {
             marker_type => $marker_type
         };
     }
-    #print STDERR "SIMPLE LIST =".Dumper \@results."\n";
+    #$logger->error("SIMPLE LIST =".Dumper \@results."");
     return \@results;
 }
 

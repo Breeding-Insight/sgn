@@ -19,6 +19,7 @@ use CXGN::Phenome::Locus::LinkageGroup;
 
 BEGIN { extends 'Catalyst::Controller' }
 with 'Catalyst::Component::ApplicationAttribute';
+my $logger = Log::Log4perl->get_logger();
 
 
 has 'schema' => (
@@ -145,7 +146,7 @@ sub view_locus : Chained('get_locus') PathPart('view') Args(0) {
     ###Check if a locus page can be printed###
     my $locus_id = $locus ? $locus->get_locus_id : undef ;
 
-    print STDERR "LOCUS_ID: $locus_id ACTION: $action\n\n";
+    $logger->debug("LOCUS_ID: $locus_id ACTION: $action\n");
 
     # print message if locus_id is not valid
     unless ( ( $locus_id =~ m /^\d+$/ ) || ($action eq 'new' && !$locus_id) ) {

@@ -4,6 +4,8 @@ package CXGN::List::Validate::Plugin::Locations;
 use Moose;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "locations";
 }
@@ -13,7 +15,7 @@ sub validate {
     my $schema = shift;
     my $list = shift;
 
-#    print STDERR "LIST: ".Data::Dumper::Dumper($list);
+#    $logger->error("LIST: ".Data::Dumper::Dumper($list));
 
     my @missing = ();
     foreach my $term (@$list) { 

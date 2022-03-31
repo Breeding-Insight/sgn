@@ -31,6 +31,8 @@ use SGN::Model::Cvterm;
 use CXGN::Stock::StockLookup;
 use CXGN::Phenotypes::SearchFactory;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -68,10 +70,10 @@ sub get_metadata_matrix {
     );
 
     my $data = $phenotypes_search->search();
-    #print STDERR Dumper $data;
+    #$logger->error(Dumper($data));
 
-    print STDERR "No of lines retrieved: ".scalar(@$data)."\n";
-    print STDERR "Construct Meta-data Matrix Start:".localtime."\n";
+    $logger->debug("No of lines retrieved: ".scalar(@$data)."");
+    $logger->debug("Construct Meta-data Matrix Start:".localtime."");
 
     my %project_data;
     foreach my $d (@$data) {
@@ -94,8 +96,8 @@ sub get_metadata_matrix {
         my @line = @{$project_data{$p}->{metadata}};
         push @info, \@line;
     }
-    #print STDERR Dumper \@info;
-    print STDERR "Construct Meta-data Matrix End:".localtime."\n";
+    #$logger->error(Dumper(\@info));
+    $logger->debug("Construct Meta-data Matrix End:".localtime."");
     return @info;
 }
 

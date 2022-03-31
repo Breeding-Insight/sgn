@@ -6,6 +6,8 @@ use JSON::Any;
 use SGN::Model::Cvterm;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => ( isa => 'Bio::Chado::Schema',
 		  is => 'rw',
 		  required => 1,
@@ -78,7 +80,7 @@ sub get_transactions_by_seedlot_id {
     my $schema = shift;
     my $seedlot_id = shift;
 
-    print STDERR "Get transactions by seedlot...$seedlot_id\n";
+    $logger->debug("Get transactions by seedlot...$seedlot_id");
     my $type_id = SGN::Model::Cvterm->get_cvterm_row($schema, "seed transaction", "stock_relationship")->cvterm_id();
     my $rs = $schema->resultset("Stock::StockRelationship")->search(
         { '-or' => 
@@ -96,7 +98,7 @@ sub get_transactions_by_seedlot_id {
         }
     );
 
-    print STDERR "Found ".$rs->count()." transactions...\n";
+    $logger->debug("Found ".$rs->count()." transactions...");
     my @transactions;
     while (my $row = $rs->next()) {
         my $t_obj = CXGN::Stock::Seedlot::Transaction->new( schema => $schema );
@@ -233,7 +235,7 @@ sub store {
     if($self->from_stock()->[0] == $self->to_stock()->[0]){
         $value->{factor} = $self->factor();
     }
-    #print STDERR Dumper $value;
+    #$logger->error(Dumper($value));
     my $json_value = JSON::Any->encode($value);
 
     if (!$self->has_transaction_id()) {
@@ -248,7 +250,7 @@ sub store {
         if ($row_rs->first) { 
             $new_rank = $row_rs->first->rank()+1;
         }
-        #print STDERR Dumper $new_rank;
+        #$logger->error(Dumper($new_rank));
 
         my $row = $self->schema()->resultset("Stock::StockRelationship")
             ->create({

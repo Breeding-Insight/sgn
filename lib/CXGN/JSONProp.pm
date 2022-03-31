@@ -60,6 +60,8 @@ use JSON::Any;
 use Try::Tiny;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema', is => 'rw');
 
 has 'people_schema' => ( isa => 'CXGN::People::Schema', is => 'rw');
@@ -92,7 +94,7 @@ sub load {  # must be called from BUILD in subclass
 
     select(STDERR);
     $|=1;
-    print STDERR "prop_type ".$self->prop_type()." cv_name ".$self->cv_name()."\n";
+    $logger->debug("prop_type ".$self->prop_type()." cv_name ".$self->cv_name()."");
 
     my $cvterm_row = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema(), $self->prop_type(), $self->cv_name());
 
@@ -100,7 +102,7 @@ sub load {  # must be called from BUILD in subclass
 
     $self->_prop_type_id($cvterm_row->cvterm_id());
 
-    print STDERR "LOAD PROP ID = ".$self->prop_id()."\n";
+    $logger->debug("LOAD PROP ID = ".$self->prop_id()."");
 
     if ($self->prop_id()) {
         my $rs;
@@ -111,13 +113,13 @@ sub load {  # must be called from BUILD in subclass
         }
 	    if (my $row = $rs->next()) {
 	        if ($row->type_id() == $self->_prop_type_id()) {
-		    #print STDERR "ROW VALUE = ".$row->value().", TYPEID=".$row->type_id()." TYPE = ".$self->prop_type()."\n";
+		    #$logger->error("ROW VALUE = ".$row->value().", TYPEID=".$row->type_id()." TYPE = ".$self->prop_type()."");
                 my $parent_primary_key = $self->parent_primary_key();
                 my $parent_id = $row->$parent_primary_key;
                 $self->parent_id($parent_id);
                 $self->from_json($row->value());
             } else {
-                print STDERR "Skipping property unrelated to metadata...\n";
+                $logger->debug("Skipping property unrelated to metadata...");
             }
         } else {
             die "The object with id ".$self->prop_id()." does not exist. Sorry!";
@@ -134,7 +136,7 @@ sub from_json {
 	$data = JSON::Any->decode($json);
     };
     if ($@) {
-	print STDERR "JSON not valid ($json) - ignoring.\n";
+	$logger->warn("JSON not valid ($json) - ignoring.");
     }
 
     $self->from_hash($data);
@@ -147,11 +149,11 @@ sub from_hash {
 
     my $allowed_fields = $self->allowed_fields();
 
-    #print STDERR Dumper($hash);
+    #$logger->error(Dumper($hash));
 
     foreach my $f (@$allowed_fields) {
 	if (exists($hash->{$f})) {
-	    #print STDERR "Processing $f ($hash->{$f})...\n";
+	    #$logger->error("Processing $f ($hash->{$f})...");
 	    $self->$f($hash->{$f});
 	}
     }
@@ -162,7 +164,7 @@ sub to_json {
 
     my $allowed_fields = $self->allowed_fields();
 
-    #print STDERR Dumper($allowed_fields);
+    #$logger->error(Dumper($allowed_fields));
     my $data;
 
     foreach my $f (@$allowed_fields) {
@@ -173,7 +175,7 @@ sub to_json {
 
     my $json;
     eval { $json = JSON::Any->encode($data); };
-    if ($@) { print STDERR "Warning! Data is not valid json ($json)\n"; }
+    if ($@) { $logger->warn("Warning! Data is not valid json ($json)"); }
     return $json;
 }
 
@@ -222,11 +224,11 @@ sub get_props {
     my $schema = shift;
     my $parent_id = shift;
 
-    print STDERR "get_props(): creating object; using parent_id $parent_id\n";
+    $logger->debug("get_props(): creating object; using parent_id $parent_id");
     my $obj = $class->new( { bcs_schema => $schema });
 
     my @props = $obj->_retrieve_props($schema, $parent_id);
-    print STDERR "Props = ".Dumper(\@props);
+    $logger->error("Props = ".Dumper(\@props));
     my @hashes = ();
     foreach my $sp (@props) {
 	my $json = $sp->[2];
@@ -239,7 +241,7 @@ sub get_props {
 	};
 
 	if ($@) {
-	    print STDERR "Warning: $json is not valid json in prop ".$sp->[0].".!\n";
+	    $logger->warn("Warning: $json is not valid json in prop ".$sp->[0].".!");
 	}
 	push @hashes, $hash;
     }
@@ -393,7 +395,7 @@ sub store {
 
     if ($self->prop_id()) {
 	# update
-	print STDERR "UPDATING JSONPROP ".$self->to_json()."\n";
+	$logger->debug("UPDATING JSONPROP ".$self->to_json()."");
 	my $row = $self->bcs_schema()->resultset($self->prop_namespace())->find( { $self->prop_primary_key() => $self->prop_id() } );
 	if ($row) {
 	    $row->value($self->to_json());
@@ -455,9 +457,9 @@ Example:
 
 sub store_sp_orderprop {
     my $self = shift;
-    print STDERR "PROP ID =".Dumper($self->prop_id())."\n";
+    $logger->debug("PROP ID =".Dumper($self->prop_id())."");
     if ($self->prop_id()) {
-        print STDERR "UPDATING JSONPROP ".$self->to_json()."\n";
+        $logger->debug("UPDATING JSONPROP ".$self->to_json()."");
         my $row = $self->people_schema()->resultset($self->prop_namespace())->find( { $self->prop_primary_key() => $self->prop_id() } );
         if ($row) {
             $row->value($self->to_json());
@@ -485,16 +487,16 @@ sub store_sp_orderprop {
 sub delete {
     my $self = shift;
 
-    print STDERR "Prop type id = ".$self->_prop_type_id()."\n";
-    print STDERR "Parent primary key: ".$self->parent_primary_key()."\n";
-    print STDERR "Parent id: ".$self->parent_id()."\n";
-    print STDERR "Prop primary key: ".$self->prop_primary_key()."\n";
-    print STDERR "Prop ID : ".$self->prop_id()."\n";
+    $logger->debug("Prop type id = ".$self->_prop_type_id()."");
+    $logger->debug("Parent primary key: ".$self->parent_primary_key()."");
+    $logger->debug("Parent id: ".$self->parent_id()."");
+    $logger->debug("Prop primary key: ".$self->prop_primary_key()."");
+    $logger->debug("Prop ID : ".$self->prop_id()."");
 
     my $prop = $self->bcs_schema()->resultset($self->prop_namespace())->find({ type_id=>$self->_prop_type_id(), $self->parent_primary_key() => $self->parent_id(), $self->prop_primary_key() => $self->prop_id() });
 
     if (!$prop) {
-	print STDERR "Prop not found!\n";
+	$logger->debug("Prop not found!");
 	return 0;
     }
     else {
@@ -519,7 +521,7 @@ sub _retrieve_props {
     my $schema = shift;
     my $parent_id = shift;
 
-    print STDERR "Getting props for parent_id $parent_id, ".join(",", $self->parent_primary_key(), $self->_prop_type_id(), $self->prop_primary_key())."\n";
+    $logger->debug("Getting props for parent_id $parent_id, ".join(",", $self->parent_primary_key(), $self->_prop_type_id(), $self->prop_primary_key())."");
     my @results;
 
     my $prop_primary_key = $self->prop_primary_key();
@@ -537,7 +539,7 @@ sub _retrieve_props {
     else {
 	eval {
 
-	    print STDERR "Searching all ".$self->_prop_type_id()." in namespace ".$self->prop_namespace()." (primary key is ".$prop_primary_key."...\n";
+	    $logger->debug("Searching all ".$self->_prop_type_id()." in namespace ".$self->prop_namespace()." (primary key is ".$prop_primary_key."...");
 
 	    my $rs = $schema->resultset($self->prop_namespace())->search({ type_id => $self->_prop_type_id() }, { order_by => {-asc => $prop_primary_key } });
 
@@ -548,7 +550,7 @@ sub _retrieve_props {
     }
 
     if ($@) {
-	print STDERR "ERROR $@\n";
+	$logger->error("ERROR $@");
     }
 
     return @results;

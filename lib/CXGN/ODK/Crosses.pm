@@ -60,6 +60,8 @@ use CXGN::Pedigree::AddProgeny;
 use Scalar::Util qw(looks_like_number);
 use Sort::Key::Natural qw(natsort);
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
@@ -168,8 +170,8 @@ has '_ona_germplasm_info_file_name' => (
 );
 
 sub save_ona_cross_info {
-    print STDERR "SAVE ONA CROSS INFO START\n";
     my $self = shift;
+    $logger->debug("SAVE ONA CROSS INFO START");
     my $context = shift; #Needed for SGN::Image to store images to plots
     my $schema = $self->bcs_schema;
     my $metadata_schema = $self->metadata_schema;
@@ -183,7 +185,7 @@ sub save_ona_cross_info {
     $ua->credentials( 'api.ona.io:443', 'DJANGO', $self->odk_crossing_data_service_username, $self->odk_crossing_data_service_password );
     my $login_resp = $ua->get("https://api.ona.io/api/v1/user.json");
     my $server_endpoint = "https://api.ona.io/api/v1/data/$form_id";
-    print STDERR $server_endpoint."\n";
+    $logger->debug($server_endpoint."");
     my $resp = $ua->get($server_endpoint);
 
     my $server_endpoint2 = "https://api.ona.io/api/v1/metadata?xform=".$form_id;
@@ -213,8 +215,8 @@ sub save_ona_cross_info {
     my @wishlist_file_name_loc_array = split '_', $wishlist_file_name_loc;
     $wishlist_file_name_loc = $wishlist_file_name_loc_array[0];
 
-#    print STDERR "WISHLIST FILE NAME =".Dumper($wishlist_file_name)."\n";
-#    print STDERR "WISHLIST LOCATION =".Dumper($wishlist_file_name_loc)."\n";
+#    $logger->error("WISHLIST FILE NAME =".Dumper($wishlist_file_name)."");
+#    $logger->error("WISHLIST LOCATION =".Dumper($wishlist_file_name_loc)."");
 
 
     my $cross_trial_id;
@@ -241,17 +243,17 @@ sub save_ona_cross_info {
         my $store_return = $add_crossingtrial->save_crossingtrial();
         $cross_trial_id = $store_return->{trial_id};
     }
-#    print STDERR "CROSSING EXPERIMENT ID =".Dumper($cross_trial_id)."\n";
+#    $logger->error("CROSSING EXPERIMENT ID =".Dumper($cross_trial_id)."");
 
     my $plot_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'plot', 'stock_type')->cvterm_id();
     my $plant_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'plant', 'stock_type')->cvterm_id();
 
-    print STDERR "ONA ODK CROSS SUMMARY 1\n";
+    $logger->debug("ONA ODK CROSS SUMMARY 1");
 
     if ($resp->is_success) {
         my $message = $resp->decoded_content;
         my $message_hash = decode_json $message;
-#        print STDERR "ONA DATA =".Dumper($message_hash)."\n";
+#        $logger->error("ONA DATA =".Dumper($message_hash)."");
 
         my %user_categories = (
             'field' => 'FieldActivities',
@@ -292,17 +294,17 @@ sub save_ona_cross_info {
         my %openfield_hash;
 
         foreach my $activity_hash (@$message_hash){
-            #print STDERR Dumper $activity_hash;
+            #$logger->error(Dumper($activity_hash));
 
             if ( ($activity_hash->{userCategory} && $activity_hash->{userCategory} eq 'lookup') || ($activity_hash->{Action} && ($activity_hash->{Action} eq 'reprint_barcodes' || $activity_hash->{Action} eq 'lookup'))) {
                 next;
             }
 
             my $activity_category = $activity_hash->{Category} || $activity_hash->{userCategory};
-            #print STDERR Dumper $activity_category;
+            #$logger->error(Dumper($activity_category));
 
             my $actions = $activity_hash->{$user_categories{$activity_category}};
-#            print STDERR "CHECKING ACTION =".Dumper($actions)."\n";
+#            $logger->error("CHECKING ACTION =".Dumper($actions)."");
 
             my $attachments = $activity_hash->{'_attachments'};
             my %attachment_lookup;
@@ -324,7 +326,7 @@ sub save_ona_cross_info {
 
             if (defined $actions) {
                 foreach my $a (@$actions){
-#                print STDERR "CHECKING HASH =".Dumper($a);
+#                $logger->error("CHECKING HASH =".Dumper($a));
                     $a->{userCategory} = $activity_hash->{userCategory};
                     $a->{startTime} = $activity_hash->{startTime};
                     $a->{userName} = $activity_hash->{userName};
@@ -335,7 +337,7 @@ sub save_ona_cross_info {
 
                     if ($activity_category eq 'field'){
                         if ($a->{'FieldActivities/fieldActivity'} eq 'status'){
-                        #print STDERR Dumper $a;
+                        #$logger->error(Dumper($a));
                             my $status_identifier;
                             my $attachment_identifier;
                             my $status_message_identifier = 'FieldActivities/plantstatus/plant_status';
@@ -411,7 +413,7 @@ sub save_ona_cross_info {
                                 $status_trial_identifier = 'FieldActivities/PlantStatus/plant_statusID';
                                 $status_accession_identifier = 'FieldActivities/PlantStatus/plant_statusID';
                             } else {
-                                #print STDERR Dumper $a;
+                                #$logger->error(Dumper($a));
                             }
                             my $image_temp_file_info = $attachment_lookup{$a->{$attachment_identifier}};
                             my $image_temp_file = $image_temp_file_info->[0];
@@ -435,9 +437,9 @@ sub save_ona_cross_info {
                                 if ($found_image_id){
                                     $image_id = $found_image_id;
                                     $image = SGN::Image->new( $schema->storage->dbh, $found_image_id, $context );
-#                                    print STDERR "Found Image $found_image_id\n";
+#                                    $logger->error("Found Image $found_image_id");
                                 } else {
-#                                    print STDERR "GET ODK IMAGE: $download_url to $image_temp_file\n";
+#                                    $logger->error("GET ODK IMAGE: $download_url to $image_temp_file");
                                     my $response = $ua->get($download_url);
                                     if ($response->is_success){
                                         my $content = $response->decoded_content;
@@ -449,13 +451,13 @@ sub save_ona_cross_info {
                                         my $stock_image_id = $image->process_image($image_temp_file, 'stock', $stock_id);
                                         $image_id = $image->get_image_id;
                                     } else {
-                                        print STDERR $response->status_line."\n";
+                                        $logger->debug($response->status_line."");
                                     }
                                 }
                                 if ($image && $image_id){
                                     my $image_source_tag_tiny = $image->get_img_src_tag("tiny");
                                     my $image_source_tag_thumb = $image->get_img_src_tag("thumbnail");
-                                    print STDERR "IMAGE FOR ".$stock_id.": ".$image_id.": ".$image_source_tag_tiny."\n";
+                                    $logger->debug("IMAGE FOR ".$stock_id.": ".$image_id.": ".$image_source_tag_tiny."");
                                     $plant_status_info{$a->{$status_identifier}}->{'status'}->{attachment_display_tiny} = '<a href="/image/view/'.$image_id.'" target="_blank">'.$image_source_tag_tiny.'</a>';
                                     $plant_status_info{$a->{$status_identifier}}->{'status'}->{attachment_display_thumb} = '<a href="/image/view/'.$image_id.'" target="_blank">'.$image_source_tag_thumb.'</a>';
                                 }
@@ -465,7 +467,7 @@ sub save_ona_cross_info {
                             $plot_name = _get_plot_name_from_barcode_id($plot_name);
                             $plant_status_info{$plot_name}->{'flowering'} = $a;
                         } elsif ($a->{'FieldActivities/fieldActivity'} eq 'firstPollination'){
-#                        print STDERR "CHECKING FIRST POLLINATION =".Dumper($a)."\n";
+#                        $logger->error("CHECKING FIRST POLLINATION =".Dumper($a)."");
                             push @{$cross_info{$a->{'FieldActivities/FirstPollination/print_crossBarcode/crossID'}}->{$a->{'FieldActivities/fieldActivity'}}}, $a;
 
                             my $female_accession_name = $a->{'FieldActivities/FirstPollination/FemaleName'};
@@ -505,18 +507,18 @@ sub save_ona_cross_info {
 #                            if (!defined $db_male_accession_name) {
 #                                push @checking_male_plots, $odk_male_plot_data;
 #                            }
-#                            print STDERR "CHECKING FEMALE PLOT =".Dumper(\@checking_female_plots)."\n";
-#                            print STDERR "CHECKING MALE PLOT =".Dumper(\@checking_male_plots)."\n";
+#                            $logger->error("CHECKING FEMALE PLOT =".Dumper(\@checking_female_plots)."");
+#                            $logger->error("CHECKING MALE PLOT =".Dumper(\@checking_male_plots)."");
 
                             $odk_cross_unique_id = $a->{'FieldActivities/FirstPollination/print_crossBarcode/crossID'};
                             $cross_combination = $db_female_accession_name.'/'.$db_male_accession_name;
 
-#                            print STDERR "ODK FEMALE PLOT NAME =".Dumper($female_plot_name)."\n";
-#                            print STDERR "ODK MALE PLOT NAME =".Dumper($male_plot_name)."\n";
-#                            print STDERR "DB FEMALE ACCESSION NAME =".Dumper($db_female_accession_name)."\n";
-#                            print STDERR "DB MALE ACCESSION NAME =".Dumper($db_male_accession_name)."\n";
-#                            print STDERR "ODK CROSS ID =".Dumper($odk_cross_unique_id)."\n";
-#                            print STDERR "CROSS COMBINATION =".Dumper($cross_combination)."\n";
+#                            $logger->error("ODK FEMALE PLOT NAME =".Dumper($female_plot_name)."");
+#                            $logger->error("ODK MALE PLOT NAME =".Dumper($male_plot_name)."");
+#                            $logger->error("DB FEMALE ACCESSION NAME =".Dumper($db_female_accession_name)."");
+#                            $logger->error("DB MALE ACCESSION NAME =".Dumper($db_male_accession_name)."");
+#                            $logger->error("ODK CROSS ID =".Dumper($odk_cross_unique_id)."");
+#                            $logger->error("CROSS COMBINATION =".Dumper($cross_combination)."");
 
                             my $cross_exists_rs = $schema->resultset("Stock::Stock")->find({uniquename => $odk_cross_unique_id});
                             if ((!defined $cross_exists_rs) && (defined $db_female_accession_name) && (defined $db_male_accession_name)) {
@@ -531,7 +533,7 @@ sub save_ona_cross_info {
                                 $pedigree->set_male_plot($male_plot_individual);
                                 push @new_crosses, $pedigree;
                             }
-#                           print STDERR "NEW CROSSES =".Dumper(\@new_crosses)."\n";
+#                           $logger->error("NEW CROSSES =".Dumper(\@new_crosses)."");
                             my $pollination_date_property = 'First Pollination Date';
                             my $firstPollinationDate = $a->{'FieldActivities/FirstPollination/firstpollination_date'};
                             $musa_cross_info{$pollination_date_property}{$odk_cross_unique_id} = $firstPollinationDate;
@@ -553,8 +555,8 @@ sub save_ona_cross_info {
                                     $harvest_cross_id =  $harvested_info->{'FieldActivities/harvesting/multiple_harvests/harvest/harvestID'} || $harvested_info->{'FieldActivities/harvesting/multiple_harvests/harvestID'};
                                     my $odk_harvest_date = $harvested_info->{'FieldActivities/harvesting/multiple_harvests/harvesting_date_grab'};
                                     ($harvest_date) = ($odk_harvest_date =~ /^([^T]+)/);
-#                                    print STDERR "ODK HARVEST DATE =".Dumper($odk_harvest_date)."\n";
-#                                    print STDERR "HARVEST DATE =".Dumper($harvest_date)."\n";
+#                                    $logger->error("ODK HARVEST DATE =".Dumper($odk_harvest_date)."");
+#                                    $logger->error("HARVEST DATE =".Dumper($harvest_date)."");
                                     if (defined $harvest_cross_id){
                                         $musa_cross_info{$harvest_date_property}{$harvest_cross_id} = $harvest_date;
                                      }
@@ -583,9 +585,9 @@ sub save_ona_cross_info {
                             }
                         }
                     } elsif ($activity_category eq 'laboratory'){
-#                        print STDERR "CHECK LABOTATORY HASH =".Dumper($activity_hash)."\n";
+#                        $logger->error("CHECK LABOTATORY HASH =".Dumper($activity_hash)."");
                         if ($a->{'Laboratory/labActivity'} eq 'embryoRescue'){
-#                            print STDERR "CHECKING EMBRYO RESCUE =".Dumper($a)."\n";
+#                            $logger->error("CHECKING EMBRYO RESCUE =".Dumper($a)."");
 
                             push @{$cross_info{$a->{'Laboratory/embryoRescue/embryorescueID'}}->{'embryoRescue'}}, $a;
 
@@ -675,7 +677,7 @@ sub save_ona_cross_info {
             } elsif (!defined $actions) {
                 if ($activity_category eq 'laboratory'){
                     if ($activity_hash->{'Laboratory/labActivity'} eq 'embryoRescue') {
-#                        print STDERR "EMBRYO RESCUE HASH =".Dumper($activity_hash)."\n";
+#                        $logger->error("EMBRYO RESCUE HASH =".Dumper($activity_hash)."");
                         my $embryo_rescue_cross_id = $activity_hash->{'Laboratory/embryoRescue/embryorescueID'};
                         my $embryorescue_date = $activity_hash->{'Laboratory/embryoRescue/embryorescue_date'};
                         my $embryorescue_date_property = 'Embryo Rescue Date';
@@ -730,7 +732,7 @@ sub save_ona_cross_info {
                 }
             }
         }
-#        print STDERR "EMBRYO ID HASH =".Dumper(\%embryoID_hash);
+#        $logger->error("EMBRYO ID HASH =".Dumper(\%embryoID_hash));
         foreach my $embryo_cross (keys %embryoID_hash) {
             my $embryo_ids = $embryoID_hash{$embryo_cross};
             my %embryo_hash = %{$embryo_ids};
@@ -826,8 +828,8 @@ sub save_ona_cross_info {
             $tissue_culture_details{$openfield_ids_property}{$openfield_cross} = \@all_openfield_ids;
         }
 
-#        print STDERR "CHECKING CROSS INFO =".Dumper(\%musa_cross_info)."\n";
-#        print STDERR "CHECKING TISSUE CULTURE INFO =".Dumper(\%tissue_culture_details)."\n";
+#        $logger->error("CHECKING CROSS INFO =".Dumper(\%musa_cross_info)."");
+#        $logger->error("CHECKING TISSUE CULTURE INFO =".Dumper(\%tissue_culture_details)."");
 
 
         my $cross_add = CXGN::Pedigree::AddCrosses->new({
@@ -846,10 +848,10 @@ sub save_ona_cross_info {
             return {error => 'Error saving crosses'};
         }
 
-#        print STDERR "FIELD CROSS INFO =".Dumper(\%musa_cross_info)."\n";
+#        $logger->error("FIELD CROSS INFO =".Dumper(\%musa_cross_info)."");
 
         my @cross_properties = split ',', $self->allowed_cross_properties;
-#        print STDERR "ALLOWED CROSS INFO =".Dumper(\@cross_properties)."\n";
+#        $logger->error("ALLOWED CROSS INFO =".Dumper(\@cross_properties)."");
 
         foreach my $info_type(@cross_properties){
             if ($musa_cross_info{$info_type}) {
@@ -917,15 +919,15 @@ sub save_ona_cross_info {
         return { success => 1 };
 
     } else {
-        #print STDERR Dumper $resp;
+        #$logger->error(Dumper($resp));
         return { error => "Could not connect to ONA" };
     }
 }
 
 
 sub create_odk_cross_progress_tree {
-    print STDERR "CREATE ODK CROSS PROGRESS TREE START\n";
     my $self = shift;
+    $logger->debug("CREATE ODK CROSS PROGRESS TREE START");
     my $odk_submission = shift;
     my $bcs_schema = $self->bcs_schema;
     my $phenome_schema = $self->phenome_schema;
@@ -943,7 +945,7 @@ sub create_odk_cross_progress_tree {
     my %top_level_title;
     my %all_plant_status_info;
 
-    print STDERR "cross_wishlist $cross_wishlist_temp_file_path\n";
+    $logger->debug("cross_wishlist $cross_wishlist_temp_file_path");
 
     open(my $fh, '<', $cross_wishlist_temp_file_path)
         or die "Could not open file '$cross_wishlist_temp_file_path' $!";
@@ -955,9 +957,9 @@ sub create_odk_cross_progress_tree {
         my @cols = split ',', $row;
         push @wishlist_file_lines, \@cols;
     }
-    #print STDERR Dumper \@wishlist_file_lines;
+    #$logger->error(Dumper(\@wishlist_file_lines));
 
-    print STDERR "ONA ODK CROSS SUMMARY 2\n";
+    $logger->debug("ONA ODK CROSS SUMMARY 2");
 
     my %cross_wishlist_hash;
     foreach (@wishlist_file_lines){
@@ -980,7 +982,7 @@ sub create_odk_cross_progress_tree {
             }
         }
     }
-    #print STDERR Dumper \%cross_wishlist_hash;
+    #$logger->error(Dumper(\%cross_wishlist_hash));
 
     my @all_cross_parents;
     my %all_cross_info;
@@ -995,11 +997,11 @@ sub create_odk_cross_progress_tree {
     foreach my $plant (keys %$plant_status_info){
         $all_plant_status_info{$plant} = $plant_status_info->{$plant};
     }
-    #print STDERR Dumper \@all_cross_parents;
-    #print STDERR Dumper \%all_plant_status_info;
-    #print STDERR Dumper \%all_cross_info;
+    #$logger->error(Dumper(\@all_cross_parents));
+    #$logger->error(Dumper(\%all_plant_status_info));
+    #$logger->error(Dumper(\%all_cross_info));
 
-    print STDERR "ONA ODK CROSS SUMMARY 3\n";
+    $logger->debug("ONA ODK CROSS SUMMARY 3");
 
     foreach my $top_level (keys %cross_wishlist_hash){
         foreach my $female_accession_name (keys %{$cross_wishlist_hash{$top_level}}){
@@ -1046,9 +1048,9 @@ sub create_odk_cross_progress_tree {
             }
         }
     }
-    #print STDERR Dumper \%combined;
+    #$logger->error(Dumper(\%combined));
 
-    print STDERR "ONA ODK CROSS SUMMARY 4\n";
+    $logger->debug("ONA ODK CROSS SUMMARY 4");
 
     my %seen_top_levels;
     my %top_level_contents;
@@ -1081,7 +1083,7 @@ sub create_odk_cross_progress_tree {
             $node->{icon} = 'glyphicon glyphicon-briefcase '.$icon_color;
         }
         if (exists($female_accession_hash->{wishlist_female_plot_match})){
-            #print STDERR Dumper $female_accession_hash;
+            #$logger->error(Dumper($female_accession_hash));
             $node->{text} = '<span order-field="0" title="'.$top_level_title{$top_level}.'" class="text-success">Crossed Wishlist Entry: '.$top_level.'</span>';
             $icon_color = 'text-success';
             $node->{icon} = 'glyphicon glyphicon-briefcase '.$icon_color;
@@ -1114,7 +1116,7 @@ sub create_odk_cross_progress_tree {
                     while (my ($male_accession_name, $crosses_cycle_hash) = each %$male_accession_hash){
                         if ($male_accession_name eq 'planned_female_plot_name_status'){
                             my $status = $crosses_cycle_hash;
-                            #print STDERR Dumper $status;
+                            #$logger->error(Dumper($status));
                             $planned_female_plot_node->{text} .= ' : '.$status->{'attachment_display_tiny'}.' : STATUS = '.$status->{'status_message'};
                         }
                         else {
@@ -1128,11 +1130,11 @@ sub create_odk_cross_progress_tree {
 
                                     while (my ($cross_name, $actions_hash) = each %$crosses_hash){
                                         if (exists($cross_combinations{$top_level}->{$female_accession_name}->{$planned_female_plot_name}->{$crossed_female_plot_name}->{$male_accession_name}->{$cycle}->{$cross_name})){
-                                            print STDERR "YES : ".$top_level." : ".$female_accession_name." : ".$planned_female_plot_name." : ".$crossed_female_plot_name." : ".$male_accession_name." : ".$cycle." : ".$cross_name."\n";
+                                            $logger->debug("YES : ".$top_level." : ".$female_accession_name." : ".$planned_female_plot_name." : ".$crossed_female_plot_name." : ".$male_accession_name." : ".$cycle." : ".$cross_name."");
                                             $planned_male_node->{icon} = 'glyphicon glyphicon-king '.$icon_color;
                                             $planned_female_plot_node->{state}->{opened} = JSON::true;
                                         } else {
-                                            print STDERR "NO : ".$top_level." : ".$female_accession_name." : ".$planned_female_plot_name." : ".$crossed_female_plot_name." : ".$male_accession_name." : ".$cycle." : ".$cross_name."\n";
+                                            $logger->debug("NO : ".$top_level." : ".$female_accession_name." : ".$planned_female_plot_name." : ".$crossed_female_plot_name." : ".$male_accession_name." : ".$cycle." : ".$cross_name."");
                                             $planned_male_node->{icon} = 'glyphicon glyphicon-king';
                                             $planned_male_node->{state}->{opened} = JSON::false;
                                             my $cross_node = {
@@ -1399,9 +1401,9 @@ sub create_odk_cross_progress_tree {
         }
         $top_level_contents{$top_level} = \@top_level_content_json;
     }
-    #print STDERR Dumper \%summary_info;
+    #$logger->error(Dumper(\%summary_info));
 
-    print STDERR "WRITING ONA ODK SUMMARY FILES\n";
+    $logger->debug("WRITING ONA ODK SUMMARY FILES");
     my $dir = $self->odk_cross_progress_tree_file_dir;
     eval { make_path($dir) };
     if ($@) {
@@ -1409,26 +1411,26 @@ sub create_odk_cross_progress_tree {
     }
 
     my $filename = $dir."/ona_odk_cross_progress_top_level_json_html_".$form_id.".txt";
-    print STDERR "Writing to $filename \n";
+    $logger->debug("Writing to $filename ");
     my $OUTFILE;
     open $OUTFILE, '>', $filename or die "Error opening $filename: $!";
     print { $OUTFILE } encode_json \@top_level_json or croak "Cannot write to $filename: $!";
     close $OUTFILE or croak "Cannot close $filename: $!";
 
     $filename = $dir."/ona_odk_cross_progress_top_level_contents_html_".$form_id.".txt";
-    print STDERR "Writing to $filename \n";
+    $logger->debug("Writing to $filename ");
     open $OUTFILE, '>', $filename or die "Error opening $filename: $!";
     print { $OUTFILE } encode_json \%top_level_contents or croak "Cannot write to $filename: $!";
     close $OUTFILE or croak "Cannot close $filename: $!";
 
     $filename = $dir."/ona_odk_cross_progress_summary_info_html_".$form_id.".txt";
-    print STDERR "Writing to $filename \n";
+    $logger->debug("Writing to $filename ");
     open $OUTFILE, '>', $filename or die "Error opening $filename: $!";
     print { $OUTFILE } encode_json \%summary_info or croak "Cannot write to $filename: $!";
     close $OUTFILE or croak "Cannot close $filename: $!";
 
     $filename = $dir."/ona_odk_cross_progress_summary_plant_status_info_html_".$form_id.".txt";
-    print STDERR "Writing to $filename \n";
+    $logger->debug("Writing to $filename ");
     open $OUTFILE, '>', $filename or die "Error opening $filename: $!";
     print { $OUTFILE } encode_json \%all_plant_status_info or croak "Cannot write to $filename: $!";
     close $OUTFILE or croak "Cannot close $filename: $!";
@@ -1436,7 +1438,7 @@ sub create_odk_cross_progress_tree {
     # find or create crossing trial using name of cross wishlist
     # create cross in db if not existing
     # save properties to cross
-    #print STDERR Dumper \%summary_info;
+    #$logger->error(Dumper(\%summary_info));
     my %parsed_data;
     foreach my $cross_hash (values %summary_info){
         while ( my ($cross_name, $activities) = each %$cross_hash){
@@ -1523,7 +1525,7 @@ sub create_odk_cross_progress_tree {
             }
         }
     }
-    #print STDERR Dumper \%parsed_data;
+    #$logger->error(Dumper(\%parsed_data));
 
     return {success => 1};
 }
@@ -1541,7 +1543,7 @@ sub _get_plot_id_from_barcode_id {
     my ($plot_id) = $id_full =~ /plot_id\:(.*)Accession/;
     $plot_id =~ s/^\s+|\s+$//g; #trim whitespace from front and end.
 
-    #print STDERR "BARCODE PLOT ID =".Dumper($plot_id)."\n";
+    #$logger->error("BARCODE PLOT ID =".Dumper($plot_id)."");
     return $plot_id;
 }
 
@@ -1549,7 +1551,7 @@ sub _get_plot_id_from_barcode_id {
 sub _get_accession_from_plot_id {
     my $self = shift;
     my $plot_id = shift;
-    #print STDERR "PLOT ID =".Dumper($plot_id)."\n";
+    #$logger->error("PLOT ID =".Dumper($plot_id)."");
 
     my $schema = $self->bcs_schema;
     my $plot_of_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'plot_of', 'stock_relationship')->cvterm_id();
@@ -1565,11 +1567,11 @@ sub _get_accession_from_plot_id {
     my @accession= $h->fetchrow_array();
     my $accession_name;
     if (scalar(@accession) > 1) {
-        print STDERR "This plot id is associated with more than one accession uniquename\n";
+        $logger->debug("This plot id is associated with more than one accession uniquename");
     } else {
         $accession_name = $accession[0];
     }
-    #print STDERR "ACCESSION NAME =".Dumper($accession_name)."\n";
+    #$logger->error("ACCESSION NAME =".Dumper($accession_name)."");
 
     return $accession_name;
 
@@ -1598,11 +1600,11 @@ sub _get_accession_from_plot_name {
     my @accession= $h->fetchrow_array();
     my $accession_name;
     if (scalar(@accession) > 1) {
-        print STDERR "This plot name is associated with more than one accession uniquename\n";
+        $logger->debug("This plot name is associated with more than one accession uniquename");
     } else {
         $accession_name = $accession[0];
     }
-    #print STDERR "ACCESSION NAME =".Dumper($accession_name)."\n";
+    #$logger->error("ACCESSION NAME =".Dumper($accession_name)."");
 
     return $accession_name;
 }

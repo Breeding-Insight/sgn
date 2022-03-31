@@ -145,6 +145,8 @@ use CXGN::Stock::StockLookup;
 use CXGN::Stock::Search;
 use JSON::Any;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 Accessor seedlot_id()
 
 the database id of the seedlot. Is equivalent to stock_id.
@@ -311,7 +313,7 @@ after 'stock_id' => sub {
 =cut
 
 sub list_seedlots {
-    my $class = shift;
+    my $self = shift;
     my $schema = shift;
     my $people_schema = shift;
     my $phenome_schema = shift;
@@ -351,23 +353,23 @@ sub list_seedlots {
     $search_criteria{'me.type_id'} = $type_id;
     $search_criteria{'stock_relationship_objects.type_id'} = $collection_of_cvterm_id;
     if ($seedlot_name) {
-	print STDERR "Adding seedlot name ($seedlot_name) to query...\n";
+	$logger->debug("Adding seedlot name ($seedlot_name) to query...");
         $search_criteria{'me.uniquename'} = { 'ilike' => '%'.$seedlot_name.'%' };
     }
     if ($seedlot_id) {
-	print STDERR "Adding seedlot_id ($seedlot_id) to query...\n";
+	$logger->debug("Adding seedlot_id ($seedlot_id) to query...");
         $search_criteria{'me.stock_id'} = { -in => $seedlot_id };
     }
     if ($breeding_program) {
-	print STDERR "Addint breeding_program $breeding_program to query...\n";
+	$logger->debug("Addint breeding_program $breeding_program to query...");
         $search_criteria{'project.name'} = { 'ilike' => '%'.$breeding_program.'%' };
     }
     if ($location) {
-	print STDERR "Adding location $location to query...\n";
+	$logger->debug("Adding location $location to query...");
         $search_criteria{'nd_geolocation.description'} = { 'ilike' => '%'.$location.'%' };
     }
     if ($contents_accession && scalar(@$contents_accession)>0) {
-	print STDERR "Adding $contents_accession ...\n";
+	$logger->debug("Adding $contents_accession ...");
         $search_criteria{'subject.type_id'} = $accession_type_id;
         if ($exact_match_uniquenames){
             $search_criteria{'subject.uniquename'} = { -in => $contents_accession };
@@ -400,21 +402,21 @@ sub list_seedlots {
 
     if ($minimum_count || $minimum_weight || $quality || $only_good_quality || $box_name) {
         if ($minimum_count) {
-	    print STDERR "Minimum count $minimum_count\n";
+	    $logger->debug("Minimum count $minimum_count");
             $search_criteria{'stockprops.value' }  = { '>=' => $minimum_count };
             $search_criteria{'stockprops.type_id' }  = $current_count_cvterm_id;
         } elsif ($minimum_weight) {
-	    print STDERR "Minimum weight $minimum_weight\n";
+	    $logger->debug("Minimum weight $minimum_weight");
             $search_criteria{'stockprops.value' }  = { '>=' => $minimum_weight };
             $search_criteria{'stockprops.type_id' }  = $current_weight_cvterm_id;
         }
 	if ($quality) {
-	    print STDERR "Quality $quality\n";
+	    $logger->debug("Quality $quality");
 	     $search_criteria{'stockprops.value' } = { '=' => $quality };
 	     $search_criteria{'stockprops.type_id' } = $seedlot_quality_cvterm_id;
 	}
         if ($box_name) {
-            print STDERR "Box Name $box_name\n";
+            $logger->debug("Box Name $box_name");
             $search_criteria{'stockprops.value'} = { 'ilike' => '%'.$box_name.'%' };
             $search_criteria{'stockprops.type_id'} = $location_code_cvterm_id;
         }
@@ -652,7 +654,7 @@ sub verify_seedlot_plot_compatibility {
 =cut
 
 sub verify_seedlot_accessions_crosses {
-    my $class = shift;
+    my $self = shift;
     my $schema = shift;
     my $pairs = shift; #arrayref of [ [seedlot_name, accession_name] ] #note: the variable accession_name can be either accession or cross stock type
     my $error = '';
@@ -704,7 +706,7 @@ sub verify_seedlot_accessions_crosses {
         if ($acc_synonyms_lookup{$accession_name}){
             my @accession_names = keys %{$acc_synonyms_lookup{$accession_name}};
             if (scalar(@accession_names)>1){
-                print STDERR "There is more than one uniquename for this synonym $accession_name. this should not happen!\n";
+                $logger->warn("There is more than one uniquename for this synonym $accession_name. this should not happen!");
             }
             $accession_name = $accession_names[0];
         }
@@ -875,7 +877,7 @@ sub _store_seedlot_accession {
     my $already_exists = $self->schema()->resultset("Stock::StockRelationship")->find({ object_id => $self->seedlot_id(), type_id => $type_id, subject_id=>$accession_stock_id });
 
     if ($already_exists) {
-        print STDERR "Accession with id $accession_stock_id is already associated with seedlot id ".$self->seedlot_id()."\n";
+        $logger->debug("Accession with id $accession_stock_id is already associated with seedlot id ".$self->seedlot_id()."");
         return "Accession with id $accession_stock_id is already associated with seedlot id ".$self->seedlot_id();
     }
     my $row = $self->schema()->resultset("Stock::StockRelationship")->create({
@@ -946,7 +948,7 @@ sub _store_seedlot_cross {
     my $already_exists = $self->schema()->resultset("Stock::StockRelationship")->find({ object_id => $self->seedlot_id(), type_id => $type_id, subject_id=>$cross_stock_id });
 
     if ($already_exists) {
-        print STDERR "Cross with id $cross_stock_id is already associated with seedlot id ".$self->seedlot_id()."\n";
+        $logger->debug("Cross with id $cross_stock_id is already associated with seedlot id ".$self->seedlot_id()."");
         return "Cross with id $cross_stock_id is already associated with seedlot id ".$self->seedlot_id();
     }
     my $row = $self->schema()->resultset("Stock::StockRelationship")->create({
@@ -1128,7 +1130,7 @@ sub store {
             $self->name($self->uniquename());
             $self->type('seedlot');
             my $id = $self->SUPER::store();
-            print STDERR "Saving seedlot returned ID $id.".localtime."\n";
+            $logger->debug("Saving seedlot returned ID $id.".localtime."");
             $self->seedlot_id($id);
             $self->_store_seedlot_location();
             $error = $self->_store_seedlot_relationships();
@@ -1181,7 +1183,7 @@ sub store {
             }
 
             my $id = $self->SUPER::store();
-            print STDERR "Updating seedlot returned ID $id.".localtime."\n";
+            $logger->debug("Updating seedlot returned ID $id.".localtime."");
             $self->seedlot_id($id);
             if($self->breeding_program_id){
                 $self->_update_seedlot_breeding_program();
@@ -1203,7 +1205,7 @@ sub store {
 	try {
 		$self->schema->txn_do($coderef);
 	} catch {
-		print STDERR "Transaction Error: $_\n";
+		$logger->error("Transaction Error: $_");
 		$transaction_error =  $_;
 	};
 	if ($transaction_error){

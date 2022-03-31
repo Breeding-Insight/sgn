@@ -17,6 +17,8 @@ use Moose;
 use Data::Dumper;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'dbh' => (
     is  => 'rw',
     required => 1,
@@ -96,12 +98,12 @@ sub metadata_query {
   my $dataref = shift;
   my $queryref = shift;
   my $h;
-  print STDERR "criteria_list=" . Dumper($criteria_list);
-  print STDERR "dataref=" . Dumper($dataref);
-  print STDERR "queryref=" . Dumper($queryref);
+  $logger->error("criteria_list=" . Dumper($criteria_list));
+  $logger->error("dataref=" . Dumper($dataref));
+  $logger->error("queryref=" . Dumper($queryref));
 
   my $target_table = $criteria_list->[-1];
-  print STDERR "target_table=". $target_table . "\n";
+  $logger->debug("target_table=". $target_table . "");
   my $target = $target_table;
   $target =~ s/s$//;
 
@@ -148,7 +150,7 @@ sub metadata_query {
     $full_query = join (" INTERSECT ", @queries);
   }
   $full_query .= " ORDER BY 2";
-  print STDERR "QUERY: $full_query\n";
+  $logger->debug("QUERY: $full_query");
   $h = $self->dbh->prepare($full_query);
   $h->execute();
 
@@ -191,7 +193,7 @@ sub avg_phenotypes_query {
   my $query = $select . $from . " ORDER BY 2";
   if ($allow_missing eq 'true') { $query =~ s/JOIN/FULL OUTER JOIN/g; }
 
-  print STDERR "QUERY: $query\n";
+  $logger->debug("QUERY: $query");
 
   my $h = $self->dbh->prepare($query);
   $h->execute(@$trait_ids);
@@ -205,7 +207,7 @@ sub avg_phenotypes_query {
     for my $i (0..$#controls) {
       my $control = $controls[$i] || 0;
       if ($id == $control) {
-        #print STDERR "Matched control accession $name with values @avg_values\n";
+        #$logger->error("Matched control accession $name with values @avg_values");
         if (!defined($avg_values[$i])) {
           return { error => "Can't scale values using control $name, it has a zero or undefined value for trait with id @$trait_ids[$i] in this trial. Please select a different control for this trait." };
         }
@@ -217,7 +219,7 @@ sub avg_phenotypes_query {
         $reference_values[$i] = 1 unless defined $reference_values[$i];
     }
 
-    #print STDERR "reference values = @reference_values\n";
+    #$logger->error("reference values = @reference_values");
     $h->execute(@$trait_ids);
     while (my ($id, $name, @avg_values) = $h->fetchrow_array()) {
 
@@ -262,8 +264,8 @@ sub avg_phenotypes_query {
     push @weighted_values3, [@temp_array];
   }
 
-  #print STDERR "avg_phenotypes: ".Dumper(@raw_avg_values);
-  #print STDERR "avg_phenotypes: ".Dumper(@weighted_values3);
+  #$logger->error("avg_phenotypes: ".Dumper(@raw_avg_values));
+  #$logger->error("avg_phenotypes: ".Dumper(@weighted_values3));
 
   return {
     raw_avg_values => \@raw_avg_values,
@@ -297,13 +299,13 @@ sub test_matviews {
     my $sth = $self->dbh->prepare($populated_query);
     $sth->execute();
   } catch { #if test query fails because views aren't populated
-    print STDERR "Using basic refresh to populate views . . .\n";
+    $logger->debug("Using basic refresh to populate views . . .");
     $status = $self->refresh_matviews($dbhost, $dbname, $dbuser, $dbpass, 'basic');
     %response_hash = %$status;
   };
 
   if (%response_hash && $response_hash{'message'} eq 'Wizard update completed!') {
-    print STDERR "Populated views, now proceeding with query . . . .\n";
+    $logger->debug("Populated views, now proceeding with query . . . .");
     return { status => "Populated views, query can proceed." };
   } elsif (%response_hash && $response_hash{'message'} eq 'Wizard update initiated.') {
     return { error => "The search wizard is temporarily unavailable while database indexes are being repopulated. Please try again later." };
@@ -348,11 +350,11 @@ sub refresh_matviews {
     else {
         try {
             if ($refresh_type eq 'concurrent') {
-                print STDERR "Using CXGN::Tools::Run to run perl bin/refresh_matviews.pl -H $dbhost -D $dbname -U $dbuser -P $dbpass -m $materialized_view -c\n";
+                $logger->debug("Using CXGN::Tools::Run to run perl bin/refresh_matviews.pl -H $dbhost -D $dbname -U $dbuser -P $dbpass -m $materialized_view -c");
                 $async_refresh = CXGN::Tools::Run->new();
                 $async_refresh->run_async("perl $basepath/bin/refresh_matviews.pl -H $dbhost -D $dbname -U $dbuser -P $dbpass -m $materialized_view -c");
             } else {
-                print STDERR "Using CXGN::Tools::Run to run perl bin/refresh_matviews.pl -H $dbhost -D $dbname -U $dbuser -P $dbpass -m $materialized_view\n";
+                $logger->debug("Using CXGN::Tools::Run to run perl bin/refresh_matviews.pl -H $dbhost -D $dbname -U $dbuser -P $dbpass -m $materialized_view");
                 $async_refresh = CXGN::Tools::Run->new();
                 $async_refresh->run_async("perl $basepath/bin/refresh_matviews.pl -H $dbhost -D $dbname -U $dbuser -P $dbpass -m $materialized_view");
             }
@@ -372,7 +374,7 @@ sub refresh_matviews {
                 return { message => $materialized_view.' update initiated.', connection => $async_refresh  };
             }
         } catch {
-            print STDERR 'Error initiating '.$materialized_view.' update.' . $@ . "\n";
+            $logger->error('Error initiating '.$materialized_view.' update.' . $@ . "");
             return { error => 'Error initiating '.$materialized_view.' update.' . $@ };
         }
     }
@@ -399,11 +401,11 @@ sub matviews_status {
   my ($refreshing, $timestamp) = $h->fetchrow_array();
 
   if ($refreshing) {
-    print STDERR "Wizard is already refreshing, current status: $refreshing \n";
+    $logger->debug("Wizard is already refreshing, current status: $refreshing ");
     return { refreshing => "<p id='wizard_status'>Wizard update in progress . . . </p>"};
   }
   else {
-    print STDERR "materialized views last updated $timestamp\n";
+    $logger->debug("materialized views last updated $timestamp");
     return { timestamp => "<p id='wizard_status'>Wizard last updated: $timestamp</p>" };
   }
 }

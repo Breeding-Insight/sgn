@@ -16,9 +16,12 @@ This is the main class for the Sol Genomics Network main website.
 package SGN;
 use Moose;
 use namespace::autoclean;
+use Log::Log4perl qw(:easy);
 
 BEGIN {
     $ENV{WEB_PROJECT_NAME} = $ENV{PROJECT_NAME} = __PACKAGE__;
+
+    Log::Log4perl->init('log4perl.conf');
 }
 
 use SGN::Exception;

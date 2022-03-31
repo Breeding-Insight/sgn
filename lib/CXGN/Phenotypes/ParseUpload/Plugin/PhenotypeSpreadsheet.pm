@@ -21,6 +21,8 @@ use Spreadsheet::ParseExcel;
 use JSON;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "phenotype spreadsheet";
 }
@@ -47,7 +49,7 @@ sub validate {
     $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
         $parse_result{'error'} = $parser->error();
-        print STDERR "validate error: ".$parser->error()."\n";
+        $logger->error("validate error: ".$parser->error()."");
         return \%parse_result;
     }
 
@@ -56,7 +58,7 @@ sub validate {
     my ( $col_min, $col_max ) = $worksheet->col_range();
     if (($col_max - $col_min)  < 1 || ($row_max - $row_min) < 1 ) { #must have header with at least plot_name and one trait, as well as one row of phenotypes
         $parse_result{'error'} = "Spreadsheet is missing plot_name and atleast one trait in header.";
-        print STDERR "Spreadsheet is missing header\n";
+        $logger->error("Spreadsheet is missing header");
         return \%parse_result;
     }
 
@@ -70,12 +72,12 @@ sub validate {
     }
     if (!$design_type ) {
         $parse_result{'error'} = "No design type in header. Make sure you are using the correct spreadsheet format. It may help to recreate your spreadsheet from the website.";
-        print STDERR "No design type in header\n";
+        $logger->error("No design type in header");
         return \%parse_result;
     }
     if (!$name_head || ($name_head ne 'plot_name' && $name_head ne 'plant_name' && $name_head ne 'subplot_name' && $name_head ne 'tissue_sample_name')) {
         $parse_result{'error'} = "No plot_name or plant_name or subplot_name or tissue_sample_name in header. Make sure you are using the correct spreadsheet format. It may help to recreate your spreadsheet from the website.";
-        print STDERR "No plot_name or plant_name or subplot_name or tissue_sample_name in header\n";
+        $logger->error("No plot_name or plant_name or subplot_name or tissue_sample_name in header");
         return \%parse_result;
     }
     if ($data_level eq 'plots' && ( $worksheet->get_cell(6,0)->value() ne 'plot_name' ||
@@ -88,7 +90,7 @@ sub validate {
                                     $worksheet->get_cell(6,7)->value() ne 'harvest_date' ||
                                     $worksheet->get_cell(6,8)->value() ne 'trial_name' ) ) {
         $parse_result{'error'} = "Data columns must be in this order for uploading Plot phenotypes: 'plot_name', 'accession_name' or 'family_name' or 'cross_unique_id', 'plot_number', 'block_number', 'is_a_control',  'rep_number', 'planting_date', 'harvest_date', 'trial_name'. Make sure to select the correct data level. It may help to recreate your spreadsheet from the website.";
-        print STDERR "Columns not correct and data_level is plots\n";
+        $logger->error("Columns not correct and data_level is plots");
         return \%parse_result;
     }
     if ($data_level eq 'plants' && ($worksheet->get_cell(6,0)->value() ne 'plant_name' ||
@@ -102,7 +104,7 @@ sub validate {
                                     $worksheet->get_cell(6,8)->value() ne 'harvest_date' ||
                                     $worksheet->get_cell(6,9)->value() ne 'trial_name') ) {
         $parse_result{'error'} = "Data columns must be in this order for uploading Plant phenotypes: 'plant_name', 'plot_name', 'accession_name' or 'family_name' or 'cross_unique_id', 'plot_number', 'block_number', 'is_a_control', 'rep_number', 'planting_date', 'harvest_date', 'trial_name'. Make sure to select the correct data level. It may help to recreate your spreadsheet from the website.";
-        print STDERR "Columns not correct and data_level is plants\n";
+        $logger->error("Columns not correct and data_level is plants");
         return \%parse_result;
     }
     if ($data_level eq 'tissue_samples' && ($worksheet->get_cell(6,0)->value() ne 'tissue_sample_name' ||
@@ -117,7 +119,7 @@ sub validate {
                                     $worksheet->get_cell(6,9)->value() ne 'harvest_date' ||
                                     $worksheet->get_cell(6,10)->value() ne 'trial_name') ) {
         $parse_result{'error'} = "Data columns must be in this order for uploading Tissue Sample phenotypes: 'tissue_sample_name', 'plant_name', 'plot_name', 'accession_name' or 'family_name' or 'cross_unique_id', 'plot_number', 'block_number', 'is_a_control', 'rep_number', 'planting_date', 'harvest_date', 'trial_name'. Make sure to select the correct data level. It may help to recreate your spreadsheet from the website.";
-        print STDERR "Columns not correct and data_level is tissue_samples\n";
+        $logger->error("Columns not correct and data_level is tissue_samples");
         return \%parse_result;
     }
     if ($data_level eq 'subplots' && ( ($worksheet->get_cell(6,0)->value() ne 'subplot_name' ||
@@ -141,7 +143,7 @@ sub validate {
                                                                     $worksheet->get_cell(6,9)->value() ne 'harvest_date' ||
                                                                     $worksheet->get_cell(6,10)->value() ne 'trial_name') ) ) {
         $parse_result{'error'} = "Data columns must be in one of these two orders for uploading Subplot phenotypes: 1) 'subplot_name', 'plot_name', 'accession_name' or 'family_name' or 'cross_unique_id', 'plot_number', 'block_number', 'is_a_control', 'rep_number', 'planting_date', 'harvest_date', 'trial_name' OR 2) 'plant_name', 'subplot_name', 'plot_name', 'accession_name' or 'family_name' or 'cross_unique_id', 'plot_number', 'block_number', 'is_a_control', 'rep_number', 'planting_date', 'harvest_date', 'trial_name'. Make sure to select the correct data level. It may help to recreate your spreadsheet from the website.";
-        print STDERR "Columns not correct and data_level is subplots\n";
+        $logger->error("Columns not correct and data_level is subplots");
         return \%parse_result;
     }
 
@@ -180,12 +182,12 @@ sub validate {
             my $timestamp = '';
             if ($worksheet->get_cell($row,$col)) {
                 $value_string = $worksheet->get_cell($row,$col)->value();
-                #print STDERR $value_string."\n";
+                #$logger->error($value_string."");
                 if ($timestamp_included) {
                     ($value, $timestamp) = split /,/, $value_string;
                     if (!$timestamp =~ m/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\S)(\d{4})/) {
                         $parse_result{'error'} = "Timestamp needs to be of form YYYY-MM-DD HH:MM:SS-0000 or YYYY-MM-DD HH:MM:SS+0000";
-                        print STDERR "value: $timestamp\n";
+                        $logger->debug("value: $timestamp");
                         return \%parse_result;
                     }
                 }
@@ -231,7 +233,7 @@ sub parse {
     $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
         $parse_result{'error'} = $parser->error();
-        print STDERR "validate error: ".$parser->error()."\n";
+        $logger->error("validate error: ".$parser->error()."");
         return \%parse_result;
     }
 
@@ -269,7 +271,7 @@ sub parse {
     }
 
     my $num_col_before_traits = $num_fixed_col + $num_predef_col;
-    print STDERR Dumper $num_col_before_traits;
+    $logger->error(Dumper($num_col_before_traits));
     my %composed_trait_name_map;
 
     for my $row ( 7 .. $row_max ) {
@@ -307,7 +309,7 @@ sub parse {
 					    }
 					    my $trait_name_cvterm_id = SGN::Model::Cvterm->get_trait_from_exact_components($schema, \@component_cvterm_ids);
 					    $trait_name = SGN::Model::Cvterm::get_trait_from_cvterm_id($schema, $trait_name_cvterm_id, $composable_cvterm_format);
-					    print STDERR Dumper $trait_name_composed;
+					    $logger->error(Dumper($trait_name_composed));
 					    if (!$trait_name) {
 						my $term_check = SGN::Model::Cvterm->get_cvterm_row($schema, $trait_name_composed, 'postcomposed_terms');
 						$trait_name = $term_check ? $term_check->name() : undef;
@@ -320,7 +322,7 @@ sub parse {
 					}
 				    }
 
-				    print STDERR Dumper $trait_name;
+				    $logger->error(Dumper($trait_name));
 				    if (!$trait_name){ die; }
                                     $traits_seen{$trait_name} = 1;
                                     my $value_string = '';
@@ -338,7 +340,7 @@ sub parse {
                                     if (!defined($timestamp)){
                                         $timestamp = '';
                                     }
-                                    #print STDERR $trait_value." : ".$timestamp."\n";
+                                    #$logger->error($trait_value." : ".$timestamp."");
 
                                     if ( defined($trait_value) && defined($timestamp) ) {
                                         if ($trait_value ne '.'){
@@ -364,7 +366,7 @@ sub parse {
     $parse_result{'data'} = \%data;
     $parse_result{'units'} = \@plots;
     $parse_result{'variables'} = \@traits;
-    #print STDERR Dumper \%parse_result;
+    #$logger->error(Dumper(\%parse_result));
 
     return \%parse_result;
 }

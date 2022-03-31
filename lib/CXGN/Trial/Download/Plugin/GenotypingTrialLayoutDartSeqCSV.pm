@@ -41,6 +41,8 @@ use CXGN::Trial;
 use CXGN::Trial::TrialLayout;
 use Text::CSV;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub verify { 
     return 1;
 } 
@@ -48,7 +50,7 @@ sub verify {
 sub download { 
     my $self = shift;
 
-    print STDERR "DATALEVEL ".$self->data_level."\n";
+    $logger->debug("DATALEVEL ".$self->data_level."");
 
     open(my $F, ">:encoding(utf8)", $self->filename()) || die "Can't open file ".$self->filename();
 
@@ -70,7 +72,7 @@ sub download {
         my $trial_name = $trial->get_name();
         my $trial_layout = CXGN::Trial::TrialLayout->new({schema => $self->bcs_schema, trial_id => $_, experiment_type => 'genotyping_layout'});
         my $design = $trial_layout->get_design();
-        #print STDERR Dumper $design;
+        #$logger->error(Dumper($design));
 
         my $q = "SELECT common_name FROM organism WHERE species = ?;";
         my $h = $self->bcs_schema->storage->dbh()->prepare($q);

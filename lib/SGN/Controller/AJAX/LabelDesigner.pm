@@ -17,6 +17,8 @@ use CXGN::Trial;
 use CXGN::Trial::TrialLayoutDownload;
 use CXGN::Cross;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -33,7 +35,7 @@ __PACKAGE__->config(
         my $source_id = $c->req->param("source_id");
         my $data_level = $c->req->param("data_level");
         my %longest_hash;
-        #print STDERR "Data type is $data_type and id is $source_id and data level is $data_level\n";
+        #$logger->error("Data type is $data_type and id is $source_id and data level is $data_level");
 
         my ($trial_num, $design) = get_data($c, $schema, $data_type, $data_level, $source_id);
 
@@ -60,26 +62,26 @@ __PACKAGE__->config(
 
            # if rep_number, find unique options and return them
            if ($field eq 'rep_number') {
-               print STDERR "Searching for unique rep numbers.\n";
+               $logger->debug("Searching for unique rep numbers.");
                $reps{$_->{'rep_number'}}++ foreach values %design;
-               print STDERR "Reps: ".Dumper(%reps);
+               $logger->error("Reps: ".Dumper(%reps));
            }
 
-           print STDERR " Searching for longest $field\n";
+           $logger->debug(" Searching for longest $field");
            #for each field order values by descending length, then save the first one
            foreach my $key ( sort { length($design{$b}{$field}) <=> length($design{$a}{$field}) or versioncmp($a, $b) } keys %design) {
-                print STDERR "Longest $field is: ".$design{$key}{$field}."\n";
+                $logger->debug("Longest $field is: ".$design{$key}{$field}."");
                 my $longest = $design{$key}{$field};
                 unless (ref($longest) || length($longest) < 1) { # skip if not scalar or undefined
                     $longest_hash{$field} = $longest;
                 } elsif (ref($longest) eq 'ARRAY') { # if array (ex. plants), sort array by length and take longest
-                    print STDERR "Processing array " . Dumper($longest) . "\n";
+                    $logger->debug("Processing array " . Dumper($longest) . "");
                     my @sorted = sort { length $a <=> length $b } @{$longest};
                     if (length($sorted[0]) > 0) {
                         $longest_hash{$field} = $sorted[0];
                     }
                 } elsif (ref($longest) eq 'HASH') {
-                    print STDERR "Not handling hashes yet\n";
+                    $logger->debug("Not handling hashes yet");
                 }
                 last;
             }
@@ -173,7 +175,7 @@ __PACKAGE__->config(
 
        if ($download_type eq 'pdf') {
 
-           print STDERR "Creating the PDF : ".localtime()."\n";
+           $logger->debug("Creating the PDF : ".localtime()."");
            my $pdf  = PDF::API2->new(-file => $FH);
            my $page = $pdf->page();
            my $text = $page->text();
@@ -195,12 +197,12 @@ __PACKAGE__->config(
                if ( $design_params->{'plot_filter'} eq 'all' || $design_params->{'plot_filter'} eq $design_info{'rep_number'}) { # filter by rep if needed
 
                     for (my $i=0; $i < $design_params->{'copies_per_plot'}; $i++) {
-                        #print STDERR "Working on label num $i\n";
+                        #$logger->error("Working on label num $i");
                         my $label_x = $design_params->{'left_margin'} + ($design_params->{'label_width'} + $design_params->{'horizontal_gap'}) * ($col_num-1);
                         my $label_y = $design_params->{'page_height'} - $design_params->{'top_margin'} - ($design_params->{'label_height'} + $design_params->{'vertical_gap'}) * ($row_num-1);
 
                        foreach my $element (@$label_params) {
-                           #print STDERR "Element Dumper\n" . Dumper($element);
+                           #$logger->error("Element Dumper") . Dumper($element);
                            my %element = %{$element};
                            my $elementx = $label_x + ( $element{'x'} / $conversion_factor );
                            my $elementy = $label_y - ( $element{'y'} / $conversion_factor );
@@ -224,7 +226,7 @@ __PACKAGE__->config(
                                     my $width = $element{'width'} / $conversion_factor ; # scale to 72 pts per inch
                                     my $elementy = $elementy - ($height/2); # adjust for img position sarting at bottom
                                     my $elementx = $elementx - ($width/2);
-                                    #print STDERR 'adding Code 128 params $image, $elementx, $elementy, $width, $height with: '."$image, $elementx, $elementy, $width, $height\n";
+                                    #$logger->error('adding Code 128 params $image, $elementx, $elementy, $width, $height with: '."$image, $elementx, $elementy, $width, $height");
                                     $gfx->image($image, $elementx, $elementy, $width, $height);
 
                               } else { #QRCode
@@ -274,12 +276,12 @@ __PACKAGE__->config(
              $key_number++;
              }
 
-           print STDERR "Saving the PDF : ".localtime()."\n";
+           $logger->debug("Saving the PDF : ".localtime()."");
            $pdf->save();
 
        } elsif ($download_type eq 'zpl') {
 
-           print STDERR "Generating zpl . . .\n";
+           $logger->debug("Generating zpl . . .");
            my $zpl_obj = CXGN::ZPL->new(
                print_width => $design_params->{'label_width'} * $conversion_factor,
                label_length => $design_params->{'label_height'} * $conversion_factor
@@ -315,7 +317,7 @@ __PACKAGE__->config(
        }
 
        close($FH);
-       print STDERR "Returning with filename . . .\n";
+       $logger->debug("Returning with filename . . .");
        $c->stash->{rest} = {
            filename => $urlencode{$filename},
            filepath => $c->config->{basepath}."/".$filename
@@ -328,11 +330,11 @@ sub process_field {
     my $key_number = shift;
     my $design_info = shift;
     my %design_info = %{$design_info};
-    #print STDERR "Field is $field\n";
+    #$logger->error("Field is $field");
     if ($field =~ m/Number:/) {
         our ($placeholder, $start_num, $increment) = split ':', $field;
         my $length = length($start_num);
-        #print STDERR "Increment is $increment\nKey Number is $key_number\n";
+        #$logger->error("Increment is $increment\nKey Number is $key_number");
         my $custom_num =  $start_num + ($increment * $key_number);
         return sprintf("%0${length}d", $custom_num);
     } else {
@@ -370,12 +372,12 @@ sub get_trial_from_stock_list {
     })->search_related('nd_experiment_projects');
     my %trials = ();
     while (my $row = $trial_rs->next()) {
-        #print STDERR "Looking at id ".$row->project_id()."\n";
+        #$logger->error("Looking at id ".$row->project_id()."");
         my $id = $row->project_id();
         $trials{$id} = 1;
     }
     my $num_trials = scalar keys %trials;
-    #print STDERR "Number of linked trials is $num_trials\n";
+    #$logger->error("Number of linked trials is $num_trials");
     my $trial_id = $trial_rs->first->project_id();
     return $trial_id, $num_trials;
 }
@@ -389,10 +391,10 @@ sub filter_by_list_items {
     my %plot_design;
 
     foreach my $i (0 .. $#stock_ids) {
-        #print STDERR "Stock id is ".$stock_ids[$i]."\n";
+        #$logger->error("Stock id is ".$stock_ids[$i]."");
         foreach my $key (keys %full_design) {
             if ($full_design{$key}->{$type} eq $stock_ids[$i]) {
-                #print STDERR "Plot name is ".$full_design{$key}->{'plot_name'}."\n";
+                #$logger->error("Plot name is ".$full_design{$key}->{'plot_name'}."");
                 $plot_design{$key} = $full_design{$key};
                 $plot_design{$key}->{'list_order'} = $i;
             }
@@ -425,7 +427,7 @@ sub get_trial_design {
 
     my $treatments = $trial->get_treatments();
     my @treatment_ids = map { $_->[0] } @{$treatments};
-    # print STDERR "treatment ids are @treatment_ids\n";
+    # $logger->error("treatment ids are @treatment_ids");
     my $trial_layout_download = CXGN::Trial::TrialLayoutDownload->new({
         schema => $schema,
         trial_id => $trial_id,
@@ -482,7 +484,7 @@ sub get_data {
     my $num_trials = 1;
     my $design;
 
-    # print STDERR "starting to get data,level is $data_level and type is $data_type\n";
+    # $logger->error("starting to get data,level is $data_level and type is $data_type");
     # use data level as well as type to determine and enact correct retrieval
 
     if ($data_level =~ /batch-/) {  # handle batches of identifiers
@@ -611,7 +613,7 @@ sub get_data {
         }
     }
 
-#    print STDERR "Design is ".Dumper($design)."\n";
+#    $logger->error("Design is ".Dumper($design)."");
     return $num_trials, $design;
 }
 

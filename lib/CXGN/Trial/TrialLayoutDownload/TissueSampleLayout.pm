@@ -41,6 +41,8 @@ use JSON;
 
 extends 'CXGN::Trial::TrialLayoutDownload';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub retrieve {
     my $self = shift;
     my $schema = $self->schema();
@@ -87,7 +89,7 @@ sub retrieve {
     my $trial_year = $trial->get_year ? $trial->get_year : '';
     my $pedigree_strings = $self->_get_all_pedigrees(\%design);
 
-    print STDERR "TrialLayoutDownload::TissueSample turning plot design into tissue design ".localtime()."\n";
+    $logger->debug("TrialLayoutDownload::TissueSample turning plot design into tissue design ".localtime()."");
 
     my @overall_trait_names = sort keys %$overall_performance_hash;
     my @exact_trait_names = sort keys %$exact_performance_hash;
@@ -159,12 +161,12 @@ sub retrieve {
             $i++;
         }
     }
-    print STDERR "TrialLayoutDownload::TissueSample sorting tissue design ".localtime()."\n";
+    $logger->debug("TrialLayoutDownload::TissueSample sorting tissue design ".localtime()."");
 
     no warnings 'uninitialized';
     @tissue_sample_design = sort { $a->{plot_number} <=> $b->{plot_number} || $a->{subplot_number} <=> $b->{subplot_number} || $a->{plant_number} <=> $b->{plant_number} || $a->{tissue_sample_number} <=> $b->{tissue_sample_number} } @tissue_sample_design;
 
-    print STDERR "TrialLayoutDownload::TissueSample turning tissue design into output ".localtime()."\n";
+    $logger->debug("TrialLayoutDownload::TissueSample turning tissue design into output ".localtime()."");
 
     foreach my $design_info (@tissue_sample_design) {
         my $line;
@@ -193,7 +195,7 @@ sub retrieve {
         push @output, $line;
     }
 
-    print STDERR "TrialLayoutDownload::TissueSample returning output ".localtime()."\n";
+    $logger->debug("TrialLayoutDownload::TissueSample returning output ".localtime()."");
 
     return \@output;
 }

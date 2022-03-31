@@ -40,6 +40,8 @@ use CXGN::List::Validate;
 use CXGN::List::Transform;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -113,8 +115,8 @@ sub create_fieldbook_from_trial_POST : Args(0) {
     }
     my $selected_columns = \%modified_columns;
 
-#    print STDERR "ORIGINAL SELECTED COLUMNS =".Dumper($original_selected_columns)."\n";
-#    print STDERR "MODIFIED COLUMNS =".Dumper(\%modified_columns)."\n";
+#    $logger->error("ORIGINAL SELECTED COLUMNS =".Dumper($original_selected_columns)."");
+#    $logger->error("MODIFIED COLUMNS =".Dumper(\%modified_columns)."");
     my $include_measured = $c->req->param('include_measured') || '';
     my $all_stats = $c->req->param('all_stats') || '';
     my $use_synonyms = $c->req->param('use_synonyms') || '';
@@ -217,18 +219,18 @@ sub create_trait_file_for_field_book_POST : Args(0) {
   if (! -d catfile($archive_path, $user_id,$subdirectory_name)) {
     mkdir (catfile($archive_path, $user_id, $subdirectory_name));
   }
-  print STDERR Dumper($file_destination);
+  $logger->error(Dumper($file_destination));
   open(my $FILE, "> :encoding(UTF-8)", $file_destination) or die $!;
   my $chado_schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
   print $FILE "trait,format,defaultValue,minimum,maximum,details,categories,isVisible,realPosition\n";
   my $order = 0;
 
   foreach my $term (@trait_list) {
-      #print STDERR "term is $term\n";
+      #$logger->error("term is $term");
       my @parts = split (/\|/ , $term);
       my ($db_name, $accession) = split ":", pop @parts;
       my $trait_name = join ("|", @parts);
-      #print STDERR "trait name is $trait_name, full cvterm accession is $full_cvterm_accession\n";
+      #$logger->error("trait name is $trait_name, full cvterm accession is $full_cvterm_accession");
       #my ( $db_name , $accession ) = split (/:/ , $full_cvterm_accession);
 
       $accession =~ s/\s+$//;
@@ -254,13 +256,13 @@ sub create_trait_file_for_field_book_POST : Args(0) {
       #return error if not $trait_info_string;
       #print line with trait info
       #print FILE "$trait_name:$db_name:$accession,text,,,,,,TRUE,$order\n";
-      #print STDERR " Adding line \"$name\t\t\t|$db_name:$accession\",$trait_info_string,\"TRUE\",\"$order\" to trait file\n";
+      #$logger->error(" Adding line \"$name\t\t\t|$db_name:$accession\",$trait_info_string,\"TRUE\",\"$order\" to trait file");
       print $FILE "\"$name\t\t\t|$db_name:$accession\",$trait_info_string,\"TRUE\",\"$order\"\n";
   }
 
   if ($include_notes eq 'true') {
       $order++;
-      #print STDERR " Adding notes line \"notes\",\"text\",\"\",\"\",\"\",\"Additional observations for future reference\",\"\",\"TRUE\",\"$order\"\n";
+      #$logger->error(" Adding notes line \"notes\",\"text\",\"\",\"\",\"\",\"Additional observations for future reference\",\"\",\"TRUE\",\"$order\"");
       print $FILE "\"notes\",\"text\",\"\",\"\",\"\",\"Additional observations for future reference\",\"\",\"TRUE\",\"$order\"\n";
   }
 

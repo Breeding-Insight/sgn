@@ -28,6 +28,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'chado_schema' => (isa => 'DBIx::Class::Schema', is => 'rw', predicate => 'has_chado_schema', required => 1);
 has 'cross_unique_id' => (isa =>'Str', is => 'rw', predicate => 'has_cross_unique_id', required => 1);
 has 'transaction_info' => (isa => "HashRef", is => 'rw', predicate => 'has_transaction_info', required => 1);
@@ -45,7 +47,7 @@ sub add_intercross_transaction {
         #get cross (stock of type cross)
         my $cross_stock = $self->_get_cross($cross_unique_id);
         if (!$cross_stock) {
-            print STDERR "Cross could not be found\n";
+            $logger->error("Cross could not be found");
             return;
         }
 
@@ -72,11 +74,11 @@ sub add_intercross_transaction {
             $previous_stockprop_rs->first->update({value => $updated_transaction_json_string});
 
         } elsif ($previous_stockprop_rs->count > 1) {
-            print STDERR "Error: More than one found!\n";
+            $logger->error("Error: More than one found!");
             return;
         } else {
             my $new_transaction_json_string = encode_json $new_transaction_info;
-#            print STDERR "NEW TRANSACTION JSON STRING =".Dumper($new_transaction_json_string)."\n";
+#            $logger->error("NEW TRANSACTION JSON STRING =".Dumper($new_transaction_json_string)."");
             $cross_stock->create_stockprops({$cross_transaction_cvterm->name() => $new_transaction_json_string});
 
             %transaction_hash = %new_transaction_info_hash;
@@ -118,7 +120,7 @@ sub add_intercross_transaction {
     };
 
     if ($transaction_error) {
-        print STDERR "Transaction error storing crossing activities: $transaction_error\n";
+        $logger->error("Transaction error storing crossing activities: $transaction_error");
         return;
     }
 
@@ -137,7 +139,7 @@ sub _get_cross {
     $stock = $stock_lookup->get_cross_exact();
 
     if (!$stock) {
-        print STDERR "Cross name does not exist\n";
+        $logger->error("Cross name does not exist");
         return;
     }
     return $stock;

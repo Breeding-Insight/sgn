@@ -38,6 +38,8 @@ use CXGN::Trial;
 use CXGN::Trial::TrialLayout;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -57,7 +59,7 @@ has 'trial_list' => (
 sub search {
     my $self = shift;
     my $schema = $self->bcs_schema();
-    print STDERR "Search Start:".localtime."\n";
+    $logger->debug("Search Start:".localtime."");
     my $year_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'project year', 'project_property')->cvterm_id();
     my $design_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'design', 'project_property')->cvterm_id();
     my $planting_date_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'project_planting_date', 'project_property')->cvterm_id();
@@ -116,7 +118,7 @@ sub search {
 
     my  $q = $select_clause . $from_clause . $where_clause . $group_by . $order_clause;
 
-    print STDERR "QUERY: $q\n\n";
+    $logger->debug("QUERY: $q\n");
     
     my $location_rs = $schema->resultset('NaturalDiversity::NdGeolocation')->search();
     my %location_id_lookup;
@@ -158,7 +160,7 @@ sub search {
         push @result, [ $project_id, $project_name, $project_description, $trial_type, $breeding_program_id, $breeding_program_name, $breeding_program_description, $year, $design, $location_id, $location_name, $planting_date_value, $harvest_date_value, $plot_width, $plot_length, $plants_per_plot, $number_of_blocks, $number_of_replicates, $field_size, $field_trial_is_planned_to_be_genotyped, $field_trial_is_planned_to_cross, $folder_id, $folder_name, $folder_description, $treatments ];
 
     }
-    print STDERR "Search End:".localtime."\n";
+    $logger->debug("Search End:".localtime."");
     return \@result;
 }
 

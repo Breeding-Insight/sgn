@@ -7,6 +7,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use CXGN::Trial::Folder;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'schema' => (
@@ -23,13 +25,13 @@ sub folder_page :Path("/folder") Args(1) {
     my $c = shift;
     my $folder_id = shift;
 
-    #print STDERR Dumper $folder_id;
+    #$logger->error(Dumper($folder_id));
 
     my $folder_project = $self->schema->resultset("Project::Project")->find( { project_id => $folder_id } );
     my $folder = CXGN::Trial::Folder->new({ bcs_schema => $self->schema, folder_id => $folder_id });
 
     my $children = $folder->children();
-    # print STDERR Dumper $children;
+    # $logger->error(Dumper($children));
     my @trials;
     my @cross_trials;
     my @genotyping_trials;
@@ -37,7 +39,7 @@ sub folder_page :Path("/folder") Args(1) {
     my @child_folders;
     my $has_child_folders;
     foreach (@$children) {
-        #print STDERR $_->folder_type." : ".$_->name."\n";
+        #$logger->error($_->folder_type." : ".$_->name."");
         if ($_->folder_type eq 'trial') {
             push @trials, $_;
         }
@@ -55,7 +57,7 @@ sub folder_page :Path("/folder") Args(1) {
             push @child_folders, $_;
         }
     }
-    #print STDERR Dumper \@crosses;
+    #$logger->error(Dumper(\@crosses));
 
     $c->stash->{trials} = \@trials;
     $c->stash->{crossing_trials} = \@cross_trials;

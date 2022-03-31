@@ -33,6 +33,7 @@ package CXGN::List;
 
 use Moose;
 use Data::Dumper;
+my $logger = Log::Log4perl->get_logger();
 
 has 'dbh' => ( isa => 'DBI::db',
 	       is => 'rw',
@@ -78,14 +79,14 @@ sub create_list {
     my $h = $dbh->prepare($q);
     $h->execute($name, $desc, $owner);
     ($new_list_id) = $h->fetchrow_array();
-    print STDERR "NEW LIST using returning = $new_list_id\n";
+    $logger->debug("NEW LIST using returning = $new_list_id");
 
     #$q = "SELECT list.name, list.description, type_id, cvterm.name, list_id FROM sgn_people.list LEFT JOIN cvterm ON (type_id=cvterm_id)";
     #$h = $dbh->prepare($q);
     #$h->execute();
     #while (my @data = $h->fetchrow_array()) {
-	#print STDERR join ", ", @data;
-	#print STDERR "\n";
+	#$logger->error(join ", ", @data);
+	#$logger->error("");
     #}
     ###END TEST
     };
@@ -310,7 +311,7 @@ after 'description' => sub {
     my $description = shift;
 
     if (!$description) {
-	#print STDERR "NO desc provided... skipping!\n";
+	#$logger->error("NO desc provided... skipping!");
 	return;
     }
 
@@ -345,7 +346,7 @@ sub add_element {
 	$ih->execute($self->list_id(), $element);
     };
     if ($@) {
-        print STDERR Dumper $@;
+        $logger->error(Dumper($@));
 	return "An error occurred storing the element $element ($@)";
     }
 
@@ -560,7 +561,7 @@ sub add_bulk {
 	my @elements_added;
 	my @duplicates;
 	s/^\s+|\s+$//g for @$elements;
-	#print STDERR Dumper $elements;
+	#$logger->error(Dumper($elements));
 
 	my $q = "SELECT content FROM sgn_people.list join sgn_people.list_item using(list_id) where list.list_id =?";
 	my $h = $self->dbh()->prepare($q);
@@ -605,7 +606,7 @@ sub add_bulk {
 			}
 			$step++;
 		}
-		#print STDERR Dumper $iq;
+		#$logger->error(Dumper($iq));
 		if ($count>0){
 			$self->dbh()->do($iq);
 		}

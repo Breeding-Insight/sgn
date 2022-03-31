@@ -4,6 +4,8 @@ use Moose;
 use Data::Dumper;
 use Spreadsheet::WriteExcel;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'absolute_file_path' => (
 	isa => 'File::Temp',
 	is => 'rw',
@@ -57,7 +59,7 @@ sub csv {
 
 	my $num_col = scalar(@{$data_array->[0]});
 	open(my $fh, ">", $file_path);
-		print STDERR $file_path."\n";
+		$logger->debug($file_path."");
 		foreach my $cols (@$data_array){
 			my $step = 1;
 			for(my $i=0; $i<$num_col; $i++) {
@@ -85,7 +87,7 @@ sub tsv {
 
 	my $num_col = scalar(@{$data_array->[0]});
 	open(my $fh, ">", $file_path);
-		print STDERR $file_path."\n";
+		$logger->debug($file_path."");
 		foreach my $cols (@$data_array){
 			my $step = 1;
 			for(my $i=0; $i<$num_col; $i++) {

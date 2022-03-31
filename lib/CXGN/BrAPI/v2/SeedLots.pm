@@ -7,6 +7,8 @@ use CXGN::BrAPI::JSONResponse;
 
 extends 'CXGN::BrAPI::v2::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
 	my $self = shift;
 	my $params = shift;
@@ -339,7 +341,7 @@ sub store_seedlots {
         my $person = CXGN::People::Person->new($dbh, $user_id);
         my $operator = $person->get_username;
 
-        print STDERR "Creating new Seedlot $seedlot_uniquename\n";
+        $logger->debug("Creating new Seedlot $seedlot_uniquename");
         my $seedlot_id;
 
         eval {

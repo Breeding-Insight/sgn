@@ -41,6 +41,8 @@ use Scalar::Util qw(looks_like_number);
 use DateTime;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -85,7 +87,7 @@ sub add_stockprop_POST {
             my $fuzzy_accession_search = CXGN::BreedersToolbox::StocksFuzzySearch->new({schema => $schema});
             my $max_distance = 0.2;
             my $fuzzy_search_result = $fuzzy_accession_search->get_matches([$prop], $max_distance, 'accession');
-            #print STDERR Dumper $fuzzy_search_result;
+            #$logger->error(Dumper($fuzzy_search_result));
             my $found_accessions = $fuzzy_search_result->{'found'};
             my $fuzzy_accessions = $fuzzy_search_result->{'fuzzy'};
             if ($fuzzy_search_result->{'error'}){
@@ -236,7 +238,7 @@ sub associate_locus_GET :Args(0) {
     $locus_data =~ m/(.*)\s\((.*)\)/ ;
     my $locus_name = $1;
     my $locus_symbol = $2;
-    #print STDERR "Name: $locus_name Symbol: $locus_symbol Allele: $allele_symbol Default: $is_default\n";
+    #$logger->error("Name: $locus_name Symbol: $locus_symbol Allele: $allele_symbol Default: $is_default");
 
     my $schema =  $c->dbic_schema('Bio::Chado::Schema' , 'sgn_chado');
     my ($allele) = $c->dbic_schema('CXGN::Phenome::Schema')
@@ -590,7 +592,7 @@ sub associate_ontology_POST :Args(0) {
                 $c->stash->{rest} = ['success'];
                 return;
             } catch {
-                print STDERR "***** associate_ontology failed! $_ \n\n";
+                $logger->error("***** associate_ontology failed! $_ \n");
                 $c->stash->{rest} = { error => "Failed: $_" };
                 # send an email to sgn bugs
                 $c->stash->{email} = {
@@ -603,7 +605,7 @@ sub associate_ontology_POST :Args(0) {
                 return;
             };
             # if you reached here this means associate_ontology worked. Now send an email to sgn-db-curation
-            print STDERR "***** User " . $logged_user->get_object->get_first_name . " " . $logged_user->get_object->get_last_name . "has stored a new ontology term for stock $stock_id\n\n";
+            $logger->debug("***** User " . $logged_user->get_object->get_first_name . " " . $logged_user->get_object->get_last_name . "has stored a new ontology term for stock $stock_id\n");
             $c->stash->{email} = {
                 to      => 'sgn-db-curation@sgn.cornell.edu',
                 from    => 'www-data@sgn-vm.sgn.cornell.edu',
@@ -912,7 +914,7 @@ sub stock_autocomplete_GET :Args(0) {
 	push @response_list, $stock_name;
     }
 
-    #print STDERR "stock_autocomplete RESPONSELIST = ".join ", ", @response_list;
+    #$logger->error("stock_autocomplete RESPONSELIST = ".join ", ", @response_list);
 
     $c->stash->{rest} = \@response_list;
 }
@@ -946,7 +948,7 @@ sub accession_autocomplete_GET :Args(0) {
 	push @response_list, $stock_name;
     }
 
-    #print STDERR Dumper @response_list;
+    #$logger->error(Dumper(@response_list));
 
     $c->stash->{rest} = \@response_list;
 }
@@ -980,7 +982,7 @@ sub accession_or_cross_autocomplete_GET :Args(0) {
 	push @response_list, $stock_name;
     }
 
-    #print STDERR Dumper @response_list;
+    #$logger->error(Dumper(@response_list));
 
     $c->stash->{rest} = \@response_list;
 }
@@ -1014,7 +1016,7 @@ sub cross_autocomplete_GET :Args(0) {
         push @response_list, $stock_name;
     }
 
-    #print STDERR Dumper @response_list;
+    #$logger->error(Dumper(@response_list));
     $c->stash->{rest} = \@response_list;
 }
 
@@ -1047,7 +1049,7 @@ sub family_name_autocomplete_GET :Args(0) {
         push @response_list, $stock_name;
     }
 
-    #print STDERR Dumper @response_list;
+    #$logger->error(Dumper(@response_list));
     $c->stash->{rest} = \@response_list;
 }
 
@@ -1084,7 +1086,7 @@ sub population_autocomplete_GET :Args(0) {
 	push @response_list, $stock_name;
     }
 
-    #print STDERR "stock_autocomplete RESPONSELIST = ".join ", ", @response_list;
+    #$logger->error("stock_autocomplete RESPONSELIST = ".join ", ", @response_list);
 
     $c->stash->{rest} = \@response_list;
 }
@@ -1118,7 +1120,7 @@ sub accession_population_autocomplete_GET :Args(0) {
 	push @response_list, $stock_name;
     }
 
-    #print STDERR "stock_autocomplete RESPONSELIST = ".join ", ", @response_list;
+    #$logger->error("stock_autocomplete RESPONSELIST = ".join ", ", @response_list);
 
     $c->stash->{rest} = \@response_list;
 }
@@ -1156,7 +1158,7 @@ sub pedigree_female_parent_autocomplete_GET : Args(0){
       push @response_list, $pedigree_female_parent;
     }
 
-  #print STDERR Dumper @response_list ;
+  #$logger->error(Dumper(@response_list ));
     $c->stash->{rest} = \@response_list;
 
 }
@@ -1231,7 +1233,7 @@ sub cross_female_parent_autocomplete_GET : Args(0){
       push @response_list, $cross_female_parent;
     }
 
-  #print STDERR Dumper @response_list ;
+  #$logger->error(Dumper(@response_list ));
     $c->stash->{rest} = \@response_list;
 
 }
@@ -1357,15 +1359,15 @@ sub add_stock_parent : Local : ActionClass('REST') { }
 sub add_stock_parent_GET :Args(0) {
     my ($self, $c) = @_;
 
-    print STDERR "Add_stock_parent function...\n";
+    $logger->debug("Add_stock_parent function...");
     if (!$c->user()) {
-	print STDERR "User not logged in... not associating stocks.\n";
+	$logger->debug("User not logged in... not associating stocks.");
 	$c->stash->{rest} = {error => "You need to be logged in to add pedigree information." };
 	return;
     }
 
     if (!any { $_ eq "curator" || $_ eq "submitter" } ($c->user()->roles)  ) {
-	print STDERR "User does not have sufficient privileges.\n";
+	$logger->debug("User does not have sufficient privileges.");
 	$c->stash->{rest} = {error =>  "you have insufficient privileges to add pedigree information." };
 	return;
     }
@@ -1396,12 +1398,12 @@ sub add_stock_parent_GET :Args(0) {
     });
 
     if ($previous_parent) {
-	print STDERR "The stock ".$previous_parent->subject_id." is already associated with stock $stock_id - returning.\n";
+	$logger->debug("The stock ".$previous_parent->subject_id." is already associated with stock $stock_id - returning.");
 	$c->stash->{rest} = { error => "A $parent_type parent with id ".$previous_parent->subject_id." is already associated with this stock. Please specify another parent." };
 	return;
     }
 
-    print STDERR "PARENT_NAME = $parent_name STOCK_ID $stock_id  $cvterm_name\n";
+    $logger->debug("PARENT_NAME = $parent_name STOCK_ID $stock_id  $cvterm_name");
 
     my $stock = $schema->resultset("Stock::Stock")->find( { stock_id => $stock_id });
 
@@ -1673,7 +1675,7 @@ sub get_shared_trials_GET :Args(1) {
 	      my $num_trials = scalar @current_trials;
 
 	      foreach my $t (@current_trials) {
-          print STDERR "t = " . Dumper($t);
+          $logger->error("t = " . Dumper($t));
           $trials_string = $trials_string . '<a href="/breeders/trial/'.$t->[0].'">'.$t->[1].'</a>,  ';
 	      }
 	      $trials_string =~ s/,\s+$//;
@@ -1715,10 +1717,10 @@ sub get_stock_trait_list :Chained('/stock/get_stock') PathPart('datatables/trait
 
     my @formatted_list;
     foreach my $t (@trait_list) {
-	print STDERR Dumper($t);
+	$logger->error(Dumper($t));
 	push @formatted_list, [ '<a href="/cvterm/'.$t->[0].'/view">'.$t->[1].'</a>', $t->[2], sprintf("%3.1f", $t->[3]), sprintf("%3.1f", $t->[4]), sprintf("%.0f", $t->[5])];
     }
-    print STDERR Dumper(\@formatted_list);
+    $logger->error(Dumper(\@formatted_list));
 
     $c->stash->{rest} = { data => \@formatted_list };
 }
@@ -1782,7 +1784,7 @@ sub get_pedigree_string :Chained('/stock/get_stock') PathPart('pedigree') Args(0
         stock_id => $c->stash->{stock}->get_stock_id()
     );
     my $parents = $stock->get_pedigree_string($level);
-    print STDERR "Parents are: ".Dumper($parents)."\n";
+    $logger->debug("Parents are: ".Dumper($parents)."");
 
     $c->stash->{rest} = { pedigree_string => $parents };
 }
@@ -1899,9 +1901,9 @@ sub stock_lookup_POST {
     my $lookup_field = shift;
     my $value_to_lookup = $c->req->param($lookup_from_field);
 
-    #print STDERR $lookup_from_field;
-    #print STDERR $lookup_field;
-    #print STDERR $value_to_lookup;
+    #$logger->error($lookup_from_field);
+    #$logger->error($lookup_field);
+    #$logger->error($value_to_lookup);
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $s = $schema->resultset("Stock::Stock")->find( { $lookup_from_field => $value_to_lookup } );
@@ -2038,7 +2040,7 @@ sub get_stock_datatables_genotype_data_GET  {
 
         my $start_index = $offset;
         my $end_index = $offset + $limit;
-        # print STDERR Dumper [$start_index, $end_index];
+        # $logger->error(Dumper([$start_index, $end_index]));
 
         while (my $gt_line = <$fh>) {
             if ($counter >= $start_index && $counter < $end_index) {

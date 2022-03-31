@@ -12,6 +12,8 @@ use List::MoreUtils qw | :all !before !after |;
 use Bio::Chado::Schema;
 use CXGN::Stock;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
 	is => 'rw',
 	required => 1,
@@ -82,7 +84,7 @@ sub display_fieldmap {
 
 	my $design = $layout-> get_design();
     my $design_type = $layout->get_design_type();
-    #print STDERR Dumper($design_type);
+    #$logger->error(Dumper($design_type));
 
 	my @plot_names = ();
     my @row_numbers = ();
@@ -190,8 +192,8 @@ sub display_fieldmap {
 		}
 		push @$result,  {plotname => $hash->{'plot_name'}, plot_id => $hash->{'plot_id'}, stock => $hash->{'accession_name'}, plotn => $hash->{'plot_number'}, blkn=>$hash->{'block_number'}, rep=>$hash->{'rep_number'}, row=>$hash->{'row_number'}, plot_image_ids=>$hash->{'plot_image_ids'}, col=>$hash->{'col_number'}, plot_msg=>$plot_popUp} ;
 	}
-	#print STDERR Dumper(\@col_numbers);
-	#print STDERR Dumper($result);
+	#$logger->error(Dumper(\@col_numbers));
+	#$logger->error(Dumper($result));
 	my @plot_name = ();
 	my @plot_id = ();
 	my @acc_name = ();
@@ -284,7 +286,7 @@ sub display_fieldmap {
 		result => $result,
         design_type => $design_type,
 	);
-	#print STDERR Dumper(\%return);
+	#$logger->error(Dumper(\%return));
 	return \%return;
 }
 
@@ -312,7 +314,7 @@ sub update_fieldmap_precheck {
 		trial_id => $trial_id
 	});
 	my $triat_name = $trial->get_traits_assayed();
-	#print STDERR Dumper($triat_name);
+	#$logger->error(Dumper($triat_name));
 
 	if (scalar(@{$triat_name}) != 0)  {
 	 $error = "One or more traits have been assayed for this trial; Map/Layout can not be modified. Please contact us.";

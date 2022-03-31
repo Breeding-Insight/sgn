@@ -24,6 +24,8 @@ use Try::Tiny;
 use CXGN::Stock::StockLookup;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'chado_schema' => (
 		 is       => 'rw',
 		 isa      => 'DBIx::Class::Schema',
@@ -60,7 +62,7 @@ sub add_progenies_existing_accessions {
        #Get stock of type cross matching cross name
         $cross_stock = $self->_get_cross($self->get_cross_name());
         if (!$cross_stock) {
-            print STDERR "Cross could not be found\n";
+            $logger->error("Cross could not be found");
             return;
         }
 
@@ -79,7 +81,7 @@ sub add_progenies_existing_accessions {
         foreach my $progeny_name (@progeny_names) {
             my $progeny_rs = $self->_get_progeny_name($progeny_name);
             if (!$progeny_rs) {
-                print STDERR "Progeny name could not be found\n";
+                $logger->error("Progeny name could not be found");
                 return;
             }
 
@@ -90,7 +92,7 @@ sub add_progenies_existing_accessions {
 				        object_id => $progeny_rs->stock_id(),
 			        });
 				    while(my $r = $previous_female_parent->next()){
-					    print STDERR "Deleted female parent stock_relationship_id: ".$r->stock_relationship_id."\n";
+					    $logger->debug("Deleted female parent stock_relationship_id: ".$r->stock_relationship_id."");
 					    $r->delete();
 				    }
                 }
@@ -109,7 +111,7 @@ sub add_progenies_existing_accessions {
 				        object_id => $progeny_rs->stock_id(),
 			        });
 				    while(my $r = $previous_male_parent->next()){
-					    print STDERR "Deleted male parent stock_relationship_id: ".$r->stock_relationship_id."\n";
+					    $logger->debug("Deleted male parent stock_relationship_id: ".$r->stock_relationship_id."");
 					    $r->delete();
 				    }
                 }
@@ -156,7 +158,7 @@ sub _get_cross {
     $stock = $stock_lookup->get_cross_exact();
 
     if (!$stock) {
-        print STDERR "Cross name does not exist\n";
+        $logger->error("Cross name does not exist");
         return;
     }
 
@@ -175,7 +177,7 @@ sub _get_progeny_name {
     $stock = $stock_lookup->get_accession_exact();
 
     if (!$stock) {
-        print STDERR "Progeny name does not exist\n";
+        $logger->error("Progeny name does not exist");
         return;
     }
 

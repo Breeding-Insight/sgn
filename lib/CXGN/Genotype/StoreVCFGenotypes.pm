@@ -264,6 +264,8 @@ use Text::CSV;
 use Hash::Case::Preserve;
 use Array::Utils qw(:all);
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -571,7 +573,7 @@ sub validate {
     #remove extra numbers, such as igd after : symbol
     my @observation_unit_uniquenames_stripped;
     foreach (@$observation_unit_uniquenames) {
-	print STDERR "Now dealing with observation unit $_...\n";
+	$logger->debug("Now dealing with observation unit $_...");
         $_ =~ s/^\s+|\s+$//g;
         if ($include_igd_numbers){
             my ($observation_unit_name_with_accession_name, $igd_number) = split(/:/, $_, 2);
@@ -697,14 +699,14 @@ sub validate {
     if ($genotyping_data_type eq 'ssr') {
         my @stock_keys = keys %{$genotype_info};
         my @marker_keys = sort keys %{$genotype_info->{$stock_keys[0]}};
-#        print STDERR "MARKER KEYS =".Dumper(\@marker_keys)."\n";
+#        $logger->error("MARKER KEYS =".Dumper(\@marker_keys)."");
 
         my $protocol_marker_names = $protocol_info->{'marker_names'};
         my @protocol_marker_array =  sort @$protocol_marker_names;
-#        print STDERR "PROTOCOL MARKER ARRAY =".Dumper(\@protocol_marker_array)."\n";
+#        $logger->error("PROTOCOL MARKER ARRAY =".Dumper(\@protocol_marker_array)."");
 
         my @diff_markers = array_diff(@marker_keys, @protocol_marker_array);
-        print STDERR "DIFF MARKERS =".Dumper(\@diff_markers)."\n";
+        $logger->debug("DIFF MARKERS =".Dumper(\@diff_markers)."");
 
         if (scalar(@diff_markers) > 0) {
             my $mismatch_markers = join(",", @diff_markers);
@@ -713,7 +715,7 @@ sub validate {
     }
 
     #check if genotype_info is correct
-    #print STDERR Dumper($genotype_info);
+    #$logger->error(Dumper($genotype_info));
 
     while (my ($observation_unit_name, $marker_result) = each %$genotype_info){
         if (!$observation_unit_name || !$marker_result){
@@ -747,7 +749,7 @@ sub validate {
         order_by => 'genotype.genotype_id'
     });
     while(my $r = $previous_genotypes_rs->next){
-        print STDERR "PREVIOUS GENOTYPES ".join (",", ($r->get_column('uniquename'), $r->get_column('protocol_name'), $r->get_column('project_name')))."\n";
+        $logger->debug("PREVIOUS GENOTYPES ".join (",", ($r->get_column('uniquename'), $r->get_column('protocol_name'), $r->get_column('project_name')))."");
         my $uniquename = $r->uniquename;
         my $protocol_name = $r->get_column('protocol_name');
         my $project_name = $r->get_column('project_name');
@@ -766,7 +768,7 @@ sub validate {
 
 sub store_metadata {
     my $self = shift;
-    print STDERR "Genotype VCF metadata store\n";
+    $logger->debug("Genotype VCF metadata store");
 
     my $schema = $self->bcs_schema;
     my $dbh = $schema->storage->dbh;
@@ -894,7 +896,7 @@ sub store_metadata {
 
         my %unique_chromosomes;
         while (my ($chromosome, $protocol_info_chrom) = each %{$nd_protocolprop_markers_array}) {
-            print STDERR "getting count for chrom $chromosome\n";
+            $logger->debug("getting count for chrom $chromosome");
             foreach (@$protocol_info_chrom) {
                 $unique_chromosomes{$_->{chrom}}++;
             }
@@ -909,7 +911,7 @@ sub store_metadata {
             };
             $chr_count++;
         }
-        print STDERR Dumper \%chromosomes;
+        $logger->error(Dumper(\%chromosomes));
         $new_protocol_info->{chromosomes} = \%chromosomes;
 
         delete($new_protocol_info->{markers});
@@ -921,14 +923,14 @@ sub store_metadata {
         $h_protocolprop->execute($protocol_id, $vcf_map_details_id, 0, $nd_protocol_json_string);
 
         foreach  my $chr_name (sort keys %unique_chromosomes) {
-#            print STDERR "Chromosome: $chr_name\n";
+#            $logger->error("Chromosome: $chr_name");
             my $rank = $chromosomes{$chr_name}->{rank};
             my $nd_protocolprop_markers_json_string = encode_json $nd_protocolprop_markers->{$chr_name};
             my $nd_protocolprop_markers_array_json_string = encode_json $nd_protocolprop_markers_array->{$chr_name};
             $h_protocolprop->execute($protocol_id, $vcf_map_details_markers_cvterm_id, $rank, $nd_protocolprop_markers_json_string);
             $h_protocolprop->execute($protocol_id, $vcf_map_details_markers_array_cvterm_id, $rank, $nd_protocolprop_markers_array_json_string);
 
-            print STDERR "Protocolprop stored...\n";
+            $logger->debug("Protocolprop stored...");
         }
     }
     $self->protocol_id($protocol_id);
@@ -938,7 +940,7 @@ sub store_metadata {
     my $tissue_sample_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'tissue_sample', 'stock_type')->cvterm_id();
     $self->tissue_sample_type_id($tissue_sample_type_id);
 
-    print STDERR "Generating stock synonym lookup table...\n";
+    $logger->debug("Generating stock synonym lookup table...");
     tie my (%stock_lookup), 'Hash::Case::Preserve';
     my %all_names;
     my $stock_lookup_where = '';
@@ -975,9 +977,9 @@ sub store_metadata {
         }
     }
     $self->stock_lookup(\%stock_lookup);
-#    print STDERR "Generated lookup table with ".scalar(keys(%stock_lookup))." entries.\n";
+#    $logger->error("Generated lookup table with ".scalar(keys(%stock_lookup))." entries.");
 
-    print STDERR "Generating md_file entry...\n";
+    $logger->debug("Generating md_file entry...");
     #create relationship between nd_experiment and originating archived file
     my $file = $self->archived_filename;
     my $md_row = $self->metadata_schema->resultset("MdMetadata")->create({create_person_id => $self->user_id});
@@ -993,7 +995,7 @@ sub store_metadata {
         metadata_id => $md_row->metadata_id(),
     });
     $self->md_file_id($file_row->file_id());
-    print STDERR "md_file_id is ".$self->md_file_id()."\n";
+    $logger->debug("md_file_id is ".$self->md_file_id()."");
 }
 
 sub store_identifiers {
@@ -1029,7 +1031,7 @@ sub store_identifiers {
     my $observation_unit_uniquenames = $self->observation_unit_uniquenames();
     foreach (@$observation_unit_uniquenames) {
         $_ =~ s/^\s+|\s+$//g;
-#        print STDERR "EACH NAME =".Dumper($_)."\n";
+#        $logger->error("EACH NAME =".Dumper($_)."");
         my $observation_unit_name_with_accession_name;
         my $observation_unit_name;
         my $accession_name;
@@ -1046,14 +1048,14 @@ sub store_identifiers {
         } else {
             ($observation_unit_name, $accession_name) = split(/\|\|\|/, $_);
         }
-#        print STDERR "OBSERVATION UNIT NAME =".Dumper($observation_unit_name)."\n";
-        #print STDERR "SAVING GENOTYPEPROP FOR $observation_unit_name \n";
+#        $logger->error("OBSERVATION UNIT NAME =".Dumper($observation_unit_name)."");
+        #$logger->error("SAVING GENOTYPEPROP FOR $observation_unit_name ");
         my $stock_lookup_obj = $self->stock_lookup()->{$observation_unit_name};
         my $stock_id = $stock_lookup_obj->{stock_id};
         my $genotype_id = $stock_lookup_obj->{genotype_id};
-#        print STDERR "STOCK ID =".Dumper($stock_id)."\n";
+#        $logger->error("STOCK ID =".Dumper($stock_id)."");
         my $genotypeprop_json = $genotypeprop_observation_units->{$_};
-#        print STDERR "GENOTYPEPROP JSON =".Dumper($genotypeprop_json)."\n";
+#        $logger->error("GENOTYPEPROP JSON =".Dumper($genotypeprop_json)."");
         if ($genotypeprop_json) {
 
             if ($self->accession_population_name){
@@ -1108,7 +1110,7 @@ sub store_identifiers {
                 my $json_string = encode_json $genotypeprop_json;
                 $h_new_genotypeprop->execute($genotype_id, $self->pcr_marker_genotyping_type_id(), $chromosome_counter, $json_string);
                 my $genotypeprop_id = $h_new_genotypeprop->fetchrow_array();
-#                print STDERR "GENOTYPEPROP ID =".Dumper($genotypeprop_id)."\n";
+#                $logger->error("GENOTYPEPROP ID =".Dumper($genotypeprop_id)."");
             } else {
                 foreach my $chromosome (sort keys %$genotypeprop_json) {
                     my $genotypeprop_id = $stock_lookup_obj->{chrom}->{$chromosome_counter};
@@ -1167,7 +1169,7 @@ sub store_genotypeprop_table {
     my $SQL = "COPY genotypeprop (genotype_id, type_id, rank, value) FROM STDIN WITH DELIMITER ',' CSV";
     my $sth = $dbh->do($SQL);
 
-    print STDERR "SQL COPY $temp_file_sql_copy\n";
+    $logger->debug("SQL COPY $temp_file_sql_copy");
 
     open(my $infile, "<", $temp_file_sql_copy) or die "Failed to open file in store_genotypeprop_table() $temp_file_sql_copy: $!";
     while (my $line = <$infile>) {

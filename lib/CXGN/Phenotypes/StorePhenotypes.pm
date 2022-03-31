@@ -58,6 +58,8 @@ use CXGN::List::Transform;
 use CXGN::Stock;
 use CXGN::Tools::Run;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -201,7 +203,7 @@ sub create_hash_lookups {
     my %trait_objs;
     my @trait_list = @{$self->trait_list};
     @trait_list = map { $_ eq 'notes' ? () : ($_) } @trait_list; # omit notes from trait validation
-    print STDERR "trait list after filtering @trait_list\n";
+    $logger->debug("trait list after filtering @trait_list");
     my @stock_list = @{$self->stock_list};
     my @cvterm_ids;
 
@@ -210,7 +212,7 @@ sub create_hash_lookups {
     $self->stock_id_list($stock_id_list->{'transform'});
 
     foreach my $trait_name (@trait_list) {
-        print STDERR "trait: $trait_name\n";
+        $logger->debug("trait: $trait_name");
         my $trait_cvterm = SGN::Model::Cvterm->get_cvterm_row_from_trait_name($schema, $trait_name);
         $trait_objs{$trait_name} = $trait_cvterm;
         push @cvterm_ids, $trait_cvterm->cvterm_id();
@@ -223,7 +225,7 @@ sub create_hash_lookups {
     my %check_unique_value_trait_stock;
 
     my $stock_ids_sql = join ("," , @{$self->stock_id_list});
-    #print STDERR "Cvterm ids are @cvterm_ids";
+    #$logger->error("Cvterm ids are @cvterm_ids");
     if (scalar @cvterm_ids > 0) {
         my $cvterm_ids_sql = join ("," , @cvterm_ids);
         my $previous_phenotype_q = "SELECT phenotype.value, phenotype.cvalue_id, phenotype.collect_date, stock.stock_id FROM phenotype LEFT JOIN nd_experiment_phenotype USING(phenotype_id) LEFT JOIN nd_experiment USING(nd_experiment_id) LEFT JOIN nd_experiment_stock USING(nd_experiment_id) LEFT JOIN stock USING(stock_id) WHERE stock.stock_id IN ($stock_ids_sql) AND phenotype.cvalue_id IN ($cvterm_ids_sql);";
@@ -253,20 +255,20 @@ sub create_hash_lookups {
 
 sub verify {
     my $self = shift;
-    print STDERR "CXGN::Phenotypes::StorePhenotypes verify\n";
+    $logger->debug("CXGN::Phenotypes::StorePhenotypes verify");
 
     my @plot_list = @{$self->stock_list};
     my @trait_list = @{$self->trait_list};
     @trait_list = map { $_ eq 'notes' ? () : ($_) } @trait_list; # omit notes from trait validation
-    print STDERR Dumper \@trait_list;
+    $logger->error(Dumper(\@trait_list));
     my %plot_trait_value = %{$self->values_hash};
     my %phenotype_metadata = %{$self->metadata_hash};
     my $timestamp_included = $self->has_timestamps;
     my $archived_image_zipfile_with_path = $self->image_zipfile_path;
     my $schema = $self->bcs_schema;
     my $transaction_error;
-    # print STDERR Dumper \@plot_list;
-    # print STDERR Dumper \%plot_trait_value;
+    # $logger->error(Dumper(\@plot_list));
+    # $logger->error(Dumper(\%plot_trait_value));
     my $plot_validator = CXGN::List::Validate->new();
     my $trait_validator = CXGN::List::Validate->new();
     my @plots_missing = @{$plot_validator->validate($schema,'plots_or_subplots_or_plants_or_tissue_samples_or_analysis_instances',\@plot_list)->{'missing'}};
@@ -275,9 +277,9 @@ sub verify {
     my $warning_message = '';
 
     if (scalar(@plots_missing) > 0 || scalar(@traits_missing) > 0) {
-        print STDERR "Plots or traits not valid\n";
-        print STDERR "Invalid plots: ".join(", ", map { "'$_'" } @plots_missing)."\n" if (@plots_missing);
-        print STDERR "Invalid traits: ".join(", ", map { "'$_'" } @traits_missing)."\n" if (@traits_missing);
+        $logger->error("Plots or traits not valid");
+        $logger->error("Invalid plots: ".join(", ", map { "'$_'" } @plots_missing)."") if (@plots_missing);
+        $logger->error("Invalid traits: ".join(", ", map { "'$_'" } @traits_missing)."") if (@traits_missing);
         $error_message = "Invalid plots: <br/>".join(", <br/>", map { "'$_'" } @plots_missing) if (@plots_missing);
         $error_message = "Invalid traits: <br/>".join(", <br/>", map { "'$_'" } @traits_missing) if (@traits_missing);
         return ($warning_message, $error_message);
@@ -337,10 +339,10 @@ sub verify {
     foreach my $plot_name (@plot_list) {
         foreach my $trait_name (@trait_list) {
             my $value_array = $plot_trait_value{$plot_name}->{$trait_name};
-            #print STDERR Dumper $value_array;
+            #$logger->error(Dumper($value_array));
             my $trait_value = $value_array->[0];
             my $timestamp = $value_array->[1];
-            #print STDERR "$plot_name, $trait_name, $trait_value\n";
+            #$logger->error("$plot_name, $trait_name, $trait_value");
             if ($trait_value || (defined($trait_value) && $trait_value eq '0')) {
                 my $trait_cvterm = $trait_objs{$trait_name};
                 my $trait_cvterm_id = $trait_cvterm->cvterm_id();
@@ -386,7 +388,7 @@ sub verify {
                     }
                 }
 
-                #print STDERR "$trait_value, $trait_cvterm_id, $stock_id\n";
+                #$logger->error("$trait_value, $trait_cvterm_id, $stock_id");
                 #check if the plot_name, trait_name combination already exists in database.
                 if (exists($check_unique_value_trait_stock{$trait_value, $trait_cvterm_id, $stock_id})) {
                     $warning_message = $warning_message."<small>$plot_name already has the same value as in your file ($trait_value) stored for the trait $trait_name.</small><hr>";
@@ -435,7 +437,7 @@ sub verify {
 
 sub store {
     my $self = shift;
-    print STDERR "CXGN::Phenotypes::StorePhenotypes store\n";
+    $logger->debug("CXGN::Phenotypes::StorePhenotypes store");
 
     $self->create_hash_lookups();
     my %linked_data = %{$self->get_linked_data()};
@@ -490,7 +492,7 @@ sub store {
         $data{$s->get_column('uniquename')} = [$s->get_column('stock_id'), $s->get_column('nd_geolocation_id'), $s->get_column('project_id') ];
     }
 
-    # print STDERR "DATA: ".Dumper(\%data);
+    # $logger->error("DATA: ".Dumper(\%data));
     ## Use txn_do with the following coderef so that if any part fails, the entire transaction fails.
     my $coderef = sub {
         my %trait_and_stock_to_overwrite;
@@ -542,7 +544,7 @@ sub store {
 
             foreach my $trait_name (@trait_list) {
 
-                #print STDERR "trait: $trait_name\n";
+                #$logger->error("trait: $trait_name");
                 my $trait_cvterm = $trait_objs{$trait_name};
 
                 my $value_array = $plot_trait_value{$plot_name}->{$trait_name};
@@ -721,7 +723,7 @@ sub store {
 
     if ($transaction_error) {
         $error_message = $transaction_error;
-        print STDERR "Transaction error storing phenotypes: $transaction_error\n";
+        $logger->error("Transaction error storing phenotypes: $transaction_error");
         return ($error_message, $success_message);
     }
 
@@ -744,7 +746,7 @@ sub store_stock_note {
     my $timestamp = $note_array->[1];
     $operator = $note_array->[2] ? $note_array->[2] : $operator;
 
-    print STDERR "Stock_id is $stock_id and note in sub is $note, timestamp is $timestamp, operator is $operator\n";
+    $logger->debug("Stock_id is $stock_id and note in sub is $note, timestamp is $timestamp, operator is $operator");
 
     $note = $note ." (Operator: $operator, Time: $timestamp)";
     my $stock = $self->bcs_schema()->resultset("Stock::Stock")->find( { stock_id => $stock_id } );
@@ -778,7 +780,7 @@ sub store_high_dimensional_data {
     $dbh = $self->bcs_schema->storage->dbh()->prepare($protocol_query);
     $dbh->execute($nd_experiment_id,$protocol_id);
 
-    print STDERR "[StorePhenotypes] Linked $md_json_type json with id $json_id to nd_experiment $nd_experiment_id to protocol $protocol_id\n";
+    $logger->debug("[StorePhenotypes] Linked $md_json_type json with id $json_id to nd_experiment $nd_experiment_id to protocol $protocol_id");
 }
 
 sub delete_previous_phenotypes {
@@ -825,7 +827,7 @@ sub delete_previous_phenotypes {
 sub check_overwritten_files_status {
     my $self = shift;
     my @file_ids = shift;
-    #print STDERR Dumper \@file_ids;
+    #$logger->error(Dumper(\@file_ids));
 
     my $q = "SELECT count(nd_experiment_md_files_id) FROM metadata.md_files JOIN phenome.nd_experiment_md_files using(file_id) WHERE file_id=?;";
     my $q2 = "UPDATE metadata.md_metadata SET obsolete=1 where metadata_id IN (SELECT metadata_id FROM metadata.md_files where file_id=?);";
@@ -838,17 +840,17 @@ sub check_overwritten_files_status {
         if ($_){
             $h->execute($_);
             my $count = $h->fetchrow;
-            print STDERR "COUNT $count \n";
+            $logger->debug("COUNT $count ");
             if ($count == 0){
                 $h2->execute($_);
                 $h3->execute($_);
                 my $basename = $h3->fetchrow;
                 push @obsoleted_files, [$_, $basename];
-                print STDERR "MADE file_id $_ OBSOLETE\n";
+                $logger->debug("MADE file_id $_ OBSOLETE");
             }
         }
     }
-    #print STDERR Dumper \@obsoleted_files;
+    #$logger->error(Dumper(\@obsoleted_files));
     return \@obsoleted_files;
 }
 
@@ -885,7 +887,7 @@ sub save_archived_file_metadata {
                 file_id => $file_row->file_id(),
             });
         $experiment_files->insert();
-        #print STDERR "[StorePhenotypes] Linking file: $archived_file \n\t to experiment id " . $nd_experiment_id . "\n";
+        #$logger->error("[StorePhenotypes] Linking file: $archived_file \n\t to experiment id " . $nd_experiment_id . "");
     }
 }
 

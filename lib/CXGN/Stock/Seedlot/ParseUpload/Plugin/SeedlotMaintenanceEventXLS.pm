@@ -6,6 +6,7 @@ use SGN::Model::Cvterm;
 use CXGN::List::Validate;
 use CXGN::Onto;
 use Data::Dumper;
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
     my $self = shift;
@@ -215,7 +216,7 @@ sub _parse_with_plugin {
     my $event_ontology_root = $self->get_event_ontology_root();
     my $parser = Spreadsheet::ParseExcel->new();
 
-    print STDERR "===> PARSE SME FILE: $filename\n";
+    $logger->debug("===> PARSE SME FILE: $filename");
 
     # Get Excel file and worksheet
     my $excel_obj = $parser->parse($filename);

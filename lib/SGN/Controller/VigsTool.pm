@@ -4,6 +4,8 @@ package SGN::Controller::VigsTool;
 use Moose;
 use File::Basename;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 # this function read the database files (Bowtie2) and
@@ -23,7 +25,7 @@ sub input :Path('/tools/vigs/')  :Args(0) {
 		push(@databases, basename($full_name, ".rev.1.ebwt"));
 		# push(@databases, basename($full_name, ".rev.1.bt2"));
 	}
-	# print STDERR "DATABASE ID: ".join(", ", @databases)."\n";
+	# $logger->error("DATABASE ID: ".join(", ", @databases)."");
 	
 	# send the database names to the view file input.mas
 	$c->stash->{template} = '/tools/vigs/input.mas';

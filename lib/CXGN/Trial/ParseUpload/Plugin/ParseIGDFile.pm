@@ -13,6 +13,7 @@ package CXGN::Trial::ParseUpload::Plugin::ParseIGDFile;
 
 use Moose::Role;
 use File::Slurp "read_file";
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
     my $self = shift;
@@ -53,13 +54,13 @@ sub _validate_with_plugin {
     my @distinct_users = keys(%user_ids);
     my $user_id = shift(@distinct_users);
     if (@distinct_users > 1) { 
-	print STDERR "Ignoring multiple user_ids provided, will work with $user_id...\n";
+	$logger->debug("Ignoring multiple user_ids provided, will work with $user_id...");
     }
 	
     my @distinct_project_names = keys(%project_names);
     my $project_name = shift(@distinct_project_names);
     if (@distinct_project_names > 1) { 
-	print STDERR "Ignoring multiple project_names, working with $project_name\n";
+	$logger->debug("Ignoring multiple project_names, working with $project_name");
     }
 
     $errors{'error_messages'} = \@error_messages;

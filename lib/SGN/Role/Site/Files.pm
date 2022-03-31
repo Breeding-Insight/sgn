@@ -24,45 +24,47 @@ attempt to chown tempfiles_subdir and children to the web user
 
 =cut
 
+my $logger = Log::Log4perl->get_logger();
+
 before 'setup_finalize' => sub {
     my $c = shift;
 
-    print STDERR "CURRENT USER IDS: $<, $>\n";
+    $logger->debug("CURRENT USER IDS: $<, $>");
     # the tempfiles_subdir() function makes and chmods the given
     # directory.  with no arguments, will make and chmod the main
     # tempfiles directory
     my $temp_subdir = Path::Class::Dir->new( $c->path_to( $c->get_conf('tempfiles_subdir') ) );
     my $temp_base   = $c->tempfiles_base;
 
-    print STDERR "TEMP_SUBDIR: $temp_subdir\n";
-    print STDERR "TEMP_BASE: $temp_base\n";
+    $logger->debug("TEMP_SUBDIR: $temp_subdir");
+    $logger->debug("TEMP_BASE: $temp_base");
     
 
     # if clear_tempfiles_on_restart, attempt to delete our temp_base dir
     if( $c->config->{clear_tempfiles_on_restart} ) {
-        $c->log->debug("clear_tempfiles_on_restart set, cleaning $temp_base") if $c->debug;
+        $logger->debug("clear_tempfiles_on_restart set, cleaning $temp_base") if $c->debug;
         rmtree( [ $temp_base ] );
         if( -e $temp_base ) {
-            $c->log->warn(
+            $logger->warn(
                 "WARNING: clear_tempfiles_on_restart set, but failed to completely clean out tempfiles_base '$temp_base':\n"
                 .`find '$temp_base' -ls`
                );
         }
     }
 
-    print STDERR "symlinking tempfiles_base '$temp_base' -> legacy location '$temp_subdir'\n";
+    $logger->debug("symlinking tempfiles_base '$temp_base' -> legacy location '$temp_subdir'");
     $c->make_generated_dir($temp_base);
 
     # Only symlink if it doesn't exist already
     unless( -l $temp_subdir ) {
         symlink $temp_base, $temp_subdir or warn "ERROR! $! linking $temp_base => $temp_subdir";
     }
-    else { 
-	print STDERR "$temp_subdir successfully linked to $temp_base\n";
+    else {
+        $logger->debug("$temp_subdir successfully linked to $temp_base");
     }
 
 #     unless( $temp_subdir eq $temp_base ) {
-#         $c->log->warn("WARNING: symlinking tempfiles_subdir() $temp_subdir to $temp_base");
+#         $logger->warn("WARNING: symlinking tempfiles_subdir() $temp_subdir to $temp_base");
 #         unlink $temp_subdir;
 #         symlink $temp_subdir, $temp_base
 #             or die "$! symlinking $temp_subdir => $temp_base";
@@ -233,9 +235,9 @@ sub make_generated_dir {
     eval { mkpath( readlink($tempdir) || $tempdir ); };
 
     if ($@) { 
-	print STDERR "the following error occurred while attempting to generate $tempdir : $@ (may be ok)\n";
+	$logger->debug("the following error occurred while attempting to generate $tempdir : $@ (may be ok)");
     }
-    else { print STDERR "Successfully created dir $tempdir.\n";  }
+    else { $logger->debug("Successfully created dir $tempdir.");  }
 
     unless( -d $tempdir ) {
         warn "dir '$tempdir' creation failed ($!)";
@@ -252,7 +254,7 @@ sub chown_generated_dir {
     my ( $self, $temp ) = @_;
 
     if ($< != 0) { 
-	print STDERR "Not running as root - skipping chown of $temp.\n";
+	$logger->debug("Not running as root - skipping chown of $temp.");
 	return;
     }
 
@@ -263,7 +265,7 @@ sub chown_generated_dir {
 
     return unless $www_uid && $www_gid;
 
-    print STDERR "CHOWNING WITH $www_uid, $www_gid\n";
+    $logger->debug("CHOWNING WITH $www_uid, $www_gid");
 
     chown $www_uid, $www_gid, $temp;
 

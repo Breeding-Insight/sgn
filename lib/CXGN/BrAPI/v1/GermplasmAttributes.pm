@@ -10,6 +10,8 @@ use CXGN::BrAPI::JSONResponse;
 
 extends 'CXGN::BrAPI::v1::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
 	my $self = shift;
 	my $inputs = shift;
@@ -183,7 +185,7 @@ sub get_cvtermprop_hash {
 	while (my $r = $prop_rs->next()){
 		push @{ $prop_hash->{$r->get_column('name')} }, $r->get_column('value');
 	}
-	#print STDERR Dumper $prop_hash;
+	#$logger->error(Dumper($prop_hash));
 	return $prop_hash;
 }
 

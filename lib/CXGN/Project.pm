@@ -42,6 +42,8 @@ use JSON;
 use File::Basename qw | basename dirname|;
 use Scalar::Util qw | looks_like_number |;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 accessor bcs_schema()
 
 accessor for bcs_schema. Needs to be set when calling the constructor.
@@ -104,7 +106,7 @@ sub BUILD {
     my $self = shift;
     my $args = shift;
 
-    print STDERR "BUILD CXGN::Project... with ".$args->{trial_id}."\n";
+    $logger->debug("BUILD CXGN::Project... with ".$args->{trial_id}."");
 
     if (! $args->{description}) {
 	    $args->{description} = "(No description provided)";
@@ -112,7 +114,7 @@ sub BUILD {
 
     my $row = $self->bcs_schema()->resultset("Project::Project")->find( { project_id => $args->{trial_id} });
 
-    # print STDERR "PROJECT ID = $args->{trial_id}\n";
+    # $logger->error("PROJECT ID = $args->{trial_id}");
     if ($row){
 	    $self->name( $row->name() );
     }
@@ -129,17 +131,17 @@ sub BUILD {
     }
 
     if (! $args->{trial_id} && ! $row) {
-        print STDERR "INSERTING A NEW ROW...\n";
+        $logger->debug("INSERTING A NEW ROW...");
 
         my $new_row = $args->{bcs_schema}->resultset("Project::Project")->create( { name => $args->{name}, description => $args->{description} });
         my $project_id = $new_row->project_id();
-        print STDERR "new project object has project id $project_id\n";
+        $logger->debug("new project object has project id $project_id");
 
         $self->set_trial_id($project_id);
     }
 
     if ($args->{trial_id} && $row) {
-        # print STDERR "Existing project... populating object.\n";
+        # $logger->error("Existing project... populating object.");
         $self->set_trial_id($args->{trial_id});
         $self->name($args->{name});
         $self->description($args->{description});
@@ -179,7 +181,7 @@ has 'layout' => (isa => 'CXGN::Trial::TrialLayout::Phenotyping |
 
 sub _get_layout {
     my $self = shift;
-    print STDERR "RETRIEVING LAYOUT...\n";
+    $logger->debug("RETRIEVING LAYOUT...");
     my $layout = CXGN::Trial::TrialLayout->new( { schema => $self->bcs_schema, trial_id => $self->get_trial_id(), experiment_type=>$self->get_cxgn_project_type()->{experiment_type} });
     $self->set_layout($layout);
 }
@@ -253,7 +255,7 @@ getter/setter for the year property. The setter modifies the database.
 sub get_year {
     my $self = shift;
 
-    print STDERR "get_year()...\n";
+    $logger->debug("get_year()...");
 
     if ($self->year()) { return $self->year(); }
 
@@ -275,22 +277,22 @@ sub set_year {
     my $year = shift;
 
     if (!$year) {
-	print STDERR "set_year(): No year provided, not setting.\n";
+	$logger->debug("set_year(): No year provided, not setting.");
 	return;
     }
 
-    print STDERR "set_year()... (with parameter $year)\n";
+    $logger->debug("set_year()... (with parameter $year)");
     my $type_id = $self->get_year_type_id();
 
     my $row = $self->bcs_schema->resultset('Project::Projectprop')->find( { project_id => $self->get_trial_id(), type_id => $type_id  });
 
     if ($row) {
-	print STDERR "Updating year to $year...\n";
+	$logger->debug("Updating year to $year...");
 	$row->value($year);
 	$row->update();
     }
     else {
-	print STDERR "inserting new year ($year)...\n";
+	$logger->debug("inserting new year ($year)...");
 	$row = $self->bcs_schema->resultset('Project::Projectprop')->create(
 	    {
 		type_id => $type_id,
@@ -311,7 +313,7 @@ getter/setter for the description
 sub get_description {
     my $self = shift;
 
-    # print STDERR "Get description for trial id ".$self->get_trial_id()."\n";
+    # $logger->error("Get description for trial id ".$self->get_trial_id()."");
     my $rs = $self->bcs_schema->resultset('Project::Project')->search( { project_id => $self->get_trial_id() });
 
     return $rs->first()->description();
@@ -325,7 +327,7 @@ sub set_description {
 
     my $row = $self->bcs_schema->resultset('Project::Project')->find( { project_id => $self->get_trial_id() });
 
-    #print STDERR "Setting new description $description for trial ".$self->get_trial_id()."\n";
+    #$logger->error("Setting new description $description for trial ".$self->get_trial_id()."");
 
     $row->description($description);
 
@@ -906,7 +908,7 @@ sub get_project_type {
 	my $type_id = $rs->first()->type_id();
 	foreach my $pt (@project_type_ids) {
 	    if ($type_id == $pt->[0]) {
-		#print STDERR "[get_project_type] ".$pt->[0]." ".$pt->[1]."\n";
+		#$logger->error("[get_project_type] ".$pt->[0]." ".$pt->[1]."");
 		return $pt;
 	    }
 	}
@@ -968,7 +970,7 @@ sub set_design_type {
 
     my $design_cv_type = $self->bcs_schema->resultset('Cv::Cvterm')->find( { name => 'design' });
     if (!$design_cv_type) {
-	print STDERR "Design CV term not found. Cannot set design type.\n";
+	$logger->debug("Design CV term not found. Cannot set design type.");
 	return;
     }
     my $row = $self->bcs_schema->resultset('Project::Projectprop')->find_or_create(
@@ -1045,7 +1047,7 @@ sub set_breeding_program {
 	};
 
 	if ($@) {
-		print STDERR "ERROR: $@\n";
+		$logger->error("ERROR: $@");
 		return { error => "An error occurred while setting the trial's breeding program." };
 	}
 	return {};
@@ -1123,7 +1125,7 @@ sub set_project_start_date {
         $row->value($project_start_date_event);
         $row->update();
     } else {
-        print STDERR "date format did not pass check while preparing to set project start date: $project_start_date  \n";
+        $logger->error("date format did not pass check while preparing to set project start date: $project_start_date  ");
     }
 }
 
@@ -1179,7 +1181,7 @@ sub set_harvest_date {
         $row->value($harvest_event);
         $row->update();
     } else {
-			print STDERR "date format did not pass check while preparing to set harvest date: $harvest_date  \n";
+			$logger->error("date format did not pass check while preparing to set harvest date: $harvest_date  ");
 		}
 }
 
@@ -1200,11 +1202,11 @@ sub remove_harvest_date {
 				});
 
     	if ($row) {
-				print STDERR "Removing harvest date $harvest_event from trial ".$self->get_trial_id()."\n";
+				$logger->debug("Removing harvest date $harvest_event from trial ".$self->get_trial_id()."");
 				$row->delete();
     	}
 		} else {
-			print STDERR "date format did not pass check while preparing to delete harvest date: $harvest_date  \n";
+			$logger->error("date format did not pass check while preparing to delete harvest date: $harvest_date  ");
 		}
 }
 
@@ -1259,7 +1261,7 @@ sub set_planting_date {
 	    $row->value($planting_event);
 	    $row->update();
     } else {
-			print STDERR "date format did not pass check while preparing to set planting date: $planting_date \n";
+			$logger->error("date format did not pass check while preparing to set planting date: $planting_date ");
 		}
 }
 
@@ -1280,11 +1282,11 @@ sub remove_planting_date {
 				});
 
     	if ($row) {
-				print STDERR "Removing planting date $planting_event from trial ".$self->get_trial_id()."\n";
+				$logger->debug("Removing planting date $planting_event from trial ".$self->get_trial_id()."");
 				$row->delete();
     	}
 		} else {
-			print STDERR "date format did not pass check while preparing to delete planting date: $planting_date  \n";
+			$logger->error("date format did not pass check while preparing to delete planting date: $planting_date  ");
 		}
 }
 
@@ -1340,7 +1342,7 @@ sub remove_temperature_averaged_gdd {
         value => $temperature_averaged_gdd,
     });
     if ($row) {
-        print STDERR "Removing $temperature_averaged_gdd from trial ".$self->get_trial_id()."\n";
+        $logger->debug("Removing $temperature_averaged_gdd from trial ".$self->get_trial_id()."");
         $row->delete();
     }
 }
@@ -1401,7 +1403,7 @@ sub remove_precipitation_averaged_sum {
         value => $precipitation,
     });
     if ($row) {
-        print STDERR "Removing $precipitation from trial ".$self->get_trial_id()."\n";
+        $logger->debug("Removing $precipitation from trial ".$self->get_trial_id()."");
         $row->delete();
     }
 }
@@ -1462,7 +1464,7 @@ sub remove_related_time_cvterms_json {
         value => $related_time_terms_json,
     });
     if ($row) {
-        print STDERR "Removing $related_time_terms_json from trial ".$self->get_trial_id()."\n";
+        $logger->debug("Removing $related_time_terms_json from trial ".$self->get_trial_id()."");
         $row->delete();
     }
 }
@@ -1514,7 +1516,7 @@ sub set_management_factor_date {
         $row->value($management_factor_event);
         $row->update();
     } else {
-        print STDERR "date format did not pass check while preparing to set management factor date: $management_factor_date \n";
+        $logger->error("date format did not pass check while preparing to set management factor date: $management_factor_date ");
     }
 }
 
@@ -2011,7 +2013,7 @@ sub delete_phenotype_values_and_nd_experiment_md_values {
         my $h2 = $schema->storage->dbh()->prepare($q_pheno_delete);
         $h2->execute();
 
-        print STDERR "DELETED ".scalar(@{$phenotype_ids_and_nd_experiment_ids_to_delete->{phenotype_ids}})." Phenotype Values\n";
+        $logger->debug("DELETED ".scalar(@{$phenotype_ids_and_nd_experiment_ids_to_delete->{phenotype_ids}})." Phenotype Values");
 
         my $nd_experiment_id_sql = join (",", @{$phenotype_ids_and_nd_experiment_ids_to_delete->{nd_experiment_ids}});
 
@@ -2050,7 +2052,7 @@ sub delete_phenotype_values_and_nd_experiment_md_values {
             my $async_delete = CXGN::Tools::Run->new();
             $async_delete->run_async("perl $basepath/bin/delete_nd_experiment_entries.pl -H $dbhost -D $dbname -U $dbuser -P $dbpass -i $temp_file_nd_experiment_id");
 
-            print STDERR "DELETED ".scalar(@{$phenotype_ids_and_nd_experiment_ids_to_delete->{phenotype_ids}})." Phenotype Values and nd_experiment_md_file_links (and ".scalar(@nd_experiment_ids)." nd_experiment entries may still be in deletion in asynchronous process.)\n";
+            $logger->debug("DELETED ".scalar(@{$phenotype_ids_and_nd_experiment_ids_to_delete->{phenotype_ids}})." Phenotype Values and nd_experiment_md_file_links (and ".scalar(@nd_experiment_ids)." nd_experiment entries may still be in deletion in asynchronous process.)");
         }
     };
 
@@ -2058,7 +2060,7 @@ sub delete_phenotype_values_and_nd_experiment_md_values {
     try {
         $schema->txn_do($coderef);
     } catch {
-        print STDERR "ERROR: $_\n";
+        $logger->error("ERROR: $_");
         $error =  $_;
     };
     return $error;
@@ -2102,15 +2104,15 @@ sub delete_field_layout {
     eval {
         $self->bcs_schema()->txn_do(
             sub {
-                #print STDERR "DELETING FIELD LAYOUT FOR TRIAL $trial_id...\n";
+                #$logger->error("DELETING FIELD LAYOUT FOR TRIAL $trial_id...");
                 $self->_delete_field_layout_experiment();
-                #print STDERR "DELETE MANAGEMENT FACTORS FOR TRIAL $trial_id...\n";
+                #$logger->error("DELETE MANAGEMENT FACTORS FOR TRIAL $trial_id...");
                 $self->_delete_management_factors_experiments();
             }
         );
     };
     if ($@) {
-        print STDERR "ERROR $@\n";
+        $logger->error("ERROR $@");
         return "An error occurred: $@\n";
     }
 
@@ -2166,7 +2168,7 @@ sub delete_phenotype_metadata {
 
     my $trial_id = $self->get_trial_id();
 
-    #print STDERR "Deleting metadata for trial $trial_id...\n";
+    #$logger->error("Deleting metadata for trial $trial_id...");
 
     # first, deal with entries in the md_metadata table, which may reference nd_experiment (through linking table)
     #
@@ -2175,16 +2177,16 @@ sub delete_phenotype_metadata {
     $h->execute($trial_id);
 
     while (my ($md_id) = $h->fetchrow_array()) {
-	#print STDERR "Associated metadata id: $md_id\n";
+	#$logger->error("Associated metadata id: $md_id");
 	my $mdmd_row = $metadata_schema->resultset("MdMetadata")->find( { metadata_id => $md_id } );
 	if ($mdmd_row) {
-	    #print STDERR "Obsoleting $md_id...\n";
+	    #$logger->error("Obsoleting $md_id...");
 
 	    $mdmd_row -> update( { obsolete => 1 });
 	}
     }
 
-    #print STDERR "Deleting the entries in the linking table...\n";
+    #$logger->error("Deleting the entries in the linking table...");
 
     # delete the entries from the linking table...
     $q = "SELECT distinct(file_id) FROM nd_experiment_project JOIN nd_experiment_phenotype USING(nd_experiment_id) JOIN phenome.nd_experiment_md_files ON (nd_experiment_phenotype.nd_experiment_id=nd_experiment_md_files.nd_experiment_id) LEFT JOIN metadata.md_files using(file_id) LEFT JOIN metadata.md_metadata using(metadata_id) WHERE project_id=?";
@@ -2192,11 +2194,11 @@ sub delete_phenotype_metadata {
     $h->execute($trial_id);
 
     while (my ($file_id) = $h->fetchrow_array()) {
-	print STDERR "trying to delete association for file with id $file_id...\n";
+	$logger->debug("trying to delete association for file with id $file_id...");
 	my $ndemdf_rs = $phenome_schema->resultset("NdExperimentMdFiles")->search( { file_id=>$file_id });
-	print STDERR "Deleting md_files linking table entries...\n";
+	$logger->debug("Deleting md_files linking table entries...");
 	foreach my $row ($ndemdf_rs->all()) {
-	    print STDERR "DELETING !!!!\n";
+	    $logger->debug("DELETING !!!!");
 	    $row->delete();
 	}
     }
@@ -2237,7 +2239,7 @@ sub delete_metadata {
         return 'This crossing trial has been linked to field trials already, and cannot be easily deleted.';
     }
 
-    #print STDERR "Deleting metadata for trial $trial_id...\n";
+    #$logger->error("Deleting metadata for trial $trial_id...");
 
     # first, deal with entries in the md_metadata table, which may reference nd_experiment (through linking table)
     #
@@ -2246,16 +2248,16 @@ sub delete_metadata {
     $h->execute($trial_id);
 
     while (my ($md_id) = $h->fetchrow_array()) {
-	#print STDERR "Associated metadata id: $md_id\n";
+	#$logger->error("Associated metadata id: $md_id");
 	my $mdmd_row = $metadata_schema->resultset("MdMetadata")->find( { metadata_id => $md_id } );
 	if ($mdmd_row) {
-	    #print STDERR "Obsoleting $md_id...\n";
+	    #$logger->error("Obsoleting $md_id...");
 
 	    $mdmd_row -> update( { obsolete => 1 });
 	}
     }
 
-    #print STDERR "Deleting the entries in the linking table...\n";
+    #$logger->error("Deleting the entries in the linking table...");
 
     # delete the entries from the linking table... (left joins are due to sometimes missing md_file entries)
     $q = "SELECT distinct(file_id) FROM nd_experiment_project LEFT JOIN phenome.nd_experiment_md_files using(nd_experiment_id) LEFT JOIN metadata.md_files using(file_id) LEFT JOIN metadata.md_metadata using(metadata_id) WHERE project_id=?";
@@ -2263,11 +2265,11 @@ sub delete_metadata {
     $h->execute($trial_id);
 
     while (my ($file_id) = $h->fetchrow_array()) {
-	print STDERR "trying to delete association for file with id $file_id...\n";
+	$logger->debug("trying to delete association for file with id $file_id...");
 	my $ndemdf_rs = $phenome_schema->resultset("NdExperimentMdFiles")->search( { file_id=>$file_id });
-	print STDERR "Deleting md_files linking table entries...\n";
+	$logger->debug("Deleting md_files linking table entries...");
 	foreach my $row ($ndemdf_rs->all()) {
-	    print STDERR "DELETING !!!!\n";
+	    $logger->debug("DELETING !!!!");
 	    $row->delete();
 	}
     }
@@ -2279,12 +2281,12 @@ sub _delete_field_layout_experiment {
 
     my $trial_id = $self->get_trial_id();
 
-    print STDERR "_delete_field_layout_experiment...\n";
+    $logger->debug("_delete_field_layout_experiment...");
 
     # check if there are still associated phenotypes...
     #
     if ($self->phenotype_count() > 0) {
-        print STDERR "Attempt to delete field layout that still has associated phenotype data.\n";
+        $logger->debug("Attempt to delete field layout that still has associated phenotype data.");
         die "cannot delete because of associated phenotypes\n";
         return { error => "Trial still has associated phenotyping experiment, cannot delete." };
     }
@@ -2400,7 +2402,7 @@ sub delete_project_entry {
     my $self = shift;
 
     if ($self->phenotype_count() > 0) {
-	print STDERR "Cannot delete trial with associated phenotypes.\n";
+	$logger->debug("Cannot delete trial with associated phenotypes.");
 	return;
     }
 
@@ -2428,10 +2430,10 @@ sub delete_project_entry {
     eval {
 	    my $row = $self->bcs_schema->resultset("Project::Project")->find( { project_id=> $self->get_trial_id() });
 	    $row->delete();
-        print STDERR "deleted project ".$self->get_trial_id."\n";
+        $logger->debug("deleted project ".$self->get_trial_id."");
     };
     if ($@) {
-	    print STDERR "An error occurred during deletion: $@\n";
+	    $logger->error("An error occurred during deletion: $@");
 	    return $@;
     }
 }
@@ -2665,7 +2667,7 @@ sub get_stock_phenotypes_for_traits {
 		$where_clause
 		ORDER BY stock.stock_id;";
 
-    print STDERR "QUERY = $q\n";
+    $logger->debug("QUERY = $q");
     my $h = $dbh->prepare($q);
 
     my $numeric_regex = '^-?[0-9]+([,.][0-9]+)?$';
@@ -2771,7 +2773,7 @@ sub get_traits_assayed {
         LEFT JOIN cvterm AS cv_type on (cv_type.cvterm_id = cvprop.type_id)
         WHERE cvterm.cvterm_id=? ;";
 
-    print STDERR Dumper $q;
+    $logger->error(Dumper($q));
 
     my $traits_assayed_h = $dbh->prepare($q);
     my $component_h = $dbh->prepare($component_q);
@@ -3006,11 +3008,11 @@ sub create_plant_entities {
         my $field_layout_experiment = $chado_schema->resultset("Project::Project")->search( { 'me.project_id' => $self->get_trial_id() }, {select=>['nd_experiment.nd_experiment_id']})->search_related('nd_experiment_projects')->search_related('nd_experiment', { type_id => $field_layout_cvterm })->single();
 
         foreach my $plot (keys %$design) {
-            print STDERR " ... creating plants for plot $plot...\n";
+            $logger->debug(" ... creating plants for plot $plot...");
             my $plot_row = $chado_schema->resultset("Stock::Stock")->find( { uniquename => $design->{$plot}->{plot_name}, type_id=>$plot_cvterm });
 
             if (! $plot_row) {
-                print STDERR "The plot $plot is not found in the database\n";
+                $logger->debug("The plot $plot is not found in the database");
                 return "The plot $plot is not yet in the database. Cannot create plant entries.";
             }
 
@@ -3020,7 +3022,7 @@ sub create_plant_entities {
 
             foreach my $plant_index_number (1..$plants_per_plot) {
                 my $plant_name = $parent_plot_name."_plant_$plant_index_number";
-                #print STDERR "... ... creating plant $plant_name...\n";
+                #$logger->error("... ... creating plant $plant_name...");
 
                 $self->_save_plant_entry($chado_schema, $accession_cvterm, $cross_cvterm, $family_name_cvterm, $parent_plot_organism, $parent_plot_name, 
                 $parent_plot, $plant_name, $plant_cvterm, $plant_index_number, $plant_index_number_cvterm, $block_cvterm, $plot_number_cvterm, 
@@ -3036,11 +3038,11 @@ sub create_plant_entities {
         $self->bcs_schema()->txn_do($create_plant_entities_txn);
     };
     if ($@) {
-        print STDERR "An error occurred creating the plant entities. $@\n";
+        $logger->debug("An error occurred creating the plant entities. $@");
         return 0;
     }
 
-    print STDERR "Plant entities created.\n";
+    $logger->debug("Plant entities created.");
     return 1;
 }
 
@@ -3121,11 +3123,11 @@ sub save_plant_entries {
         while( my ($key, $val) = each %$parsed_data){
             my $plot_stock_id = $key;
             my $plot_name = $val->{plot_name};
-            print STDERR " ... creating plants for plot $plot_name...\n";
+            $logger->debug(" ... creating plants for plot $plot_name...");
             my $plot_row = $chado_schema->resultset("Stock::Stock")->find( { stock_id=>$plot_stock_id });
 
             if (!$plot_row) {
-                print STDERR "The plot $plot_name is not found in the database\n";
+                $logger->debug("The plot $plot_name is not found in the database");
                 return "The plot $plot_name is not yet in the database. Cannot create plant entries.";
             }
 
@@ -3154,11 +3156,11 @@ sub save_plant_entries {
         $self->bcs_schema()->txn_do($create_plant_entities_txn);
     };
     if ($@) {
-        print STDERR "An error occurred creating the plant entities. $@\n";
+        $logger->debug("An error occurred creating the plant entities. $@");
         return 0;
     }
 
-    print STDERR "Plant entities created.\n";
+    $logger->debug("Plant entities created.");
     return 1;
 }
 
@@ -3246,11 +3248,11 @@ sub create_plant_subplot_entities {
         my $field_layout_experiment = $chado_schema->resultset("Project::Project")->search( { 'me.project_id' => $self->get_trial_id() }, {select=>['nd_experiment.nd_experiment_id']})->search_related('nd_experiment_projects')->search_related('nd_experiment', { type_id => $field_layout_cvterm })->single();
 
         foreach my $plot (keys %$design) {
-            print STDERR " ... creating plants for plot $plot...\n";
+            $logger->debug(" ... creating plants for plot $plot...");
 
             my $plot_row = $chado_schema->resultset("Stock::Stock")->find( { uniquename => $design->{$plot}->{plot_name}, type_id=>$plot_cvterm });
             if (! $plot_row) {
-                print STDERR "The plot $plot is not found in the database\n";
+                $logger->debug("The plot $plot is not found in the database");
                 return "The plot $plot is not yet in the database. Cannot create plant entries.";
             }
 
@@ -3260,11 +3262,11 @@ sub create_plant_subplot_entities {
 
             my $subplots = $design->{$plot}->{subplot_names};
             foreach my $subplot (@$subplots) {
-                print STDERR " ... ... creating plants for subplot $subplot...\n";
+                $logger->debug(" ... ... creating plants for subplot $subplot...");
 
                 my $subplot_row = $chado_schema->resultset("Stock::Stock")->find({ uniquename => $subplot, type_id => $subplot_cvterm });
                 if ( !$subplot_row ) {
-                    print STDERR "The subplot $subplot is not found in the database\n";
+                    $logger->debug("The subplot $subplot is not found in the database");
                     return "The subplot $subplot is not yet in the database. Cannot create plant entries.";
                 }
 
@@ -3272,7 +3274,7 @@ sub create_plant_subplot_entities {
 
                 foreach my $plant_index_number (1..$plants_per_subplot) {
                     my $plant_name = $subplot."_plant_$plant_index_number";
-                    print STDERR "... ... ... creating plant $plant_name...\n";
+                    $logger->debug("... ... ... creating plant $plant_name...");
 
                     $self->_save_plant_entry($chado_schema, $accession_cvterm, $cross_cvterm, $family_name_cvterm, $parent_plot_organism, $parent_plot_name, 
                     $parent_plot, $plant_name, $plant_cvterm, $plant_index_number, $plant_index_number_cvterm, $block_cvterm, $plot_number_cvterm, 
@@ -3290,11 +3292,11 @@ sub create_plant_subplot_entities {
         $self->bcs_schema()->txn_do($create_plant_entities_txn);
     };
     if ($@) {
-        print STDERR "An error occurred creating the plant entities. $@\n";
+        $logger->error("An error occurred creating the plant entities. $@");
         return 0;
     }
 
-    print STDERR "Plant entities created.\n";
+    $logger->debug("Plant entities created.");
     return 1;
 }
 
@@ -3389,11 +3391,11 @@ sub save_plant_subplot_entries {
         while( my ($key, $val) = each %$parsed_data){
             my $subplot_stock_id = $key;
             my $subplot_name = $val->{subplot_name};
-            print STDERR " ... creating plants for subplot $subplot_name...\n";
+            $logger->debug(" ... creating plants for subplot $subplot_name...");
 
             my $subplot_row = $chado_schema->resultset("Stock::Stock")->find( { stock_id=>$subplot_stock_id });
             if (!$subplot_row) {
-                print STDERR "The subplot $subplot_name is not found in the database\n";
+                $logger->debug("The subplot $subplot_name is not found in the database");
                 return "The subplot $subplot_name is not yet in the database. Cannot create plant entries.";
             }
 
@@ -3402,12 +3404,12 @@ sub save_plant_subplot_entries {
                 type_id => $subplot_relationship_cvterm
             });
             if (!$plot_relationship_row) {
-                print STDERR "The subplot $subplot_name does not have a defined plot relationship in the database\n";
+                $logger->debug("The subplot $subplot_name does not have a defined plot relationship in the database");
                 return "The subplot $subplot_name does not have a defined plot relationship in the database. Cannot create plant entries.";
             }
             my $plot_row = $chado_schema->resultset("Stock::Stock")->find({ stock_id => $plot_relationship_row->subject_id() });
             if (!$plot_row) {
-                print STDERR "The parent plot of subplot $subplot_name is not found in the database\n";
+                $logger->debug("The parent plot of subplot $subplot_name is not found in the database");
                 return "The parent plot of subplot $subplot_name is not yet in the database. Cannot create plant entries.";
             }
 
@@ -3437,11 +3439,11 @@ sub save_plant_subplot_entries {
         $self->bcs_schema()->txn_do($create_plant_entities_txn);
     };
     if ($@) {
-        print STDERR "An error occurred creating the plant entities. $@\n";
+        $logger->error("An error occurred creating the plant entities. $@");
         return 0;
     }
 
-    print STDERR "Plant entities created.\n";
+    $logger->debug("Plant entities created.");
     return 1;
 }
 
@@ -3498,7 +3500,7 @@ sub _save_plant_entry {
     #The plant inherits the properties of the plot.
     my $plot_props = $chado_schema->resultset("Stock::Stockprop")->search({ stock_id => $parent_plot, type_id => [$block_cvterm, $plot_number_cvterm, $replicate_cvterm] });
     while (my $prop = $plot_props->next() ) {
-        #print STDERR $plant->uniquename()." ".$prop->type_id()."\n";
+        #$logger->error($plant->uniquename()." ".$prop->type_id()."");
         $plantprop = $chado_schema->resultset("Stock::Stockprop")->create( {
             stock_id => $plant->stock_id(),
             type_id => $prop->type_id(),
@@ -3677,7 +3679,7 @@ sub create_tissue_samples {
                 my $plant_row = $chado_schema->resultset("Stock::Stock")->find( { uniquename => $plant_name, type_id=>$plant_cvterm });
 
                 if (! $plant_row) {
-                    print STDERR "The plant $plant_name is not found in the database\n";
+                    $logger->debug("The plant $plant_name is not found in the database");
                     return "The plant $plant_name is not yet in the database. Cannot create tissue entries.";
                 }
 
@@ -3688,7 +3690,7 @@ sub create_tissue_samples {
                 my $tissue_index_number = 1;
                 foreach my $tissue_name (@$tissue_names){
                     my $tissue_name = $parent_plant_name."_".$tissue_name.$tissue_index_number;
-                    print STDERR "... ... creating tissue $tissue_name...\n";
+                    $logger->debug("... ... creating tissue $tissue_name...");
 
                     my $tissue = $chado_schema->resultset("Stock::Stock")->create({
                         organism_id => $parent_plant_organism,
@@ -3798,11 +3800,11 @@ sub create_tissue_samples {
         $self->bcs_schema()->txn_do($create_tissue_sample_entries_txn);
     };
     if ($@) {
-        print STDERR "An error occurred creating the tissue sample entities. $@\n";
+        $logger->error("An error occurred creating the tissue sample entities. $@");
         return 0;
     }
 
-    print STDERR "Tissue sample entities created.\n";
+    $logger->debug("Tissue sample entities created.");
     return 1;
 }
 
@@ -3952,11 +3954,11 @@ sub create_subplot_entities {
         my $field_layout_experiment = $chado_schema->resultset("Project::Project")->search( { 'me.project_id' => $self->get_trial_id() }, {select=>['nd_experiment.nd_experiment_id']})->search_related('nd_experiment_projects')->search_related('nd_experiment', { type_id => $field_layout_cvterm })->single();
 
         foreach my $plot (keys %$design) {
-            print STDERR " ... creating subplots for plot $plot...\n";
+            $logger->debug(" ... creating subplots for plot $plot...");
             my $plot_row = $chado_schema->resultset("Stock::Stock")->find( { uniquename => $design->{$plot}->{plot_name}, type_id=>$plot_cvterm });
 
             if (! $plot_row) {
-                print STDERR "The plot $plot is not found in the database\n";
+                $logger->debug("The plot $plot is not found in the database");
                 return "The plot $plot is not yet in the database. Cannot create subplot entries.";
             }
 
@@ -3966,7 +3968,7 @@ sub create_subplot_entities {
 
             foreach my $subplot_index_number (1..$subplots_per_plot) {
                 my $subplot_name = $parent_plot_name."_subplot_$subplot_index_number";
-                #print STDERR "... ... creating subplot $subplot_name...\n";
+                #$logger->error("... ... creating subplot $subplot_name...");
 
                 $self->_save_subplot_entry($chado_schema, $accession_cvterm, $cross_cvterm, $family_name_cvterm, $parent_plot_organism, $parent_plot_name, 
                 $parent_plot, $subplot_name, $subplot_cvterm, $subplot_index_number, $subplot_index_number_cvterm, $block_cvterm, $plot_number_cvterm, 
@@ -3982,11 +3984,11 @@ sub create_subplot_entities {
         $self->bcs_schema()->txn_do($create_subplot_entities_txn);
     };
     if ($@) {
-        print STDERR "An error occurred creating the subplot entities. $@\n";
+        $logger->error("An error occurred creating the subplot entities. $@");
         return 0;
     }
 
-    print STDERR "Subplot entities created.\n";
+    $logger->debug("Subplot entities created.");
     return 1;
 }
 
@@ -4068,11 +4070,11 @@ sub save_subplot_entries {
         while( my ($key, $val) = each %$parsed_data){
             my $plot_stock_id = $key;
             my $plot_name = $val->{plot_name};
-            print STDERR " ... creating subplots for plot $plot_name...\n";
+            $logger->debug(" ... creating subplots for plot $plot_name...");
             my $plot_row = $chado_schema->resultset("Stock::Stock")->find( { stock_id=>$plot_stock_id });
 
             if (!$plot_row) {
-                print STDERR "The plot $plot_name is not found in the database\n";
+                $logger->debug("The plot $plot_name is not found in the database");
                 return "The plot $plot_name is not yet in the database. Cannot create subplot entries.";
             }
 
@@ -4101,11 +4103,11 @@ sub save_subplot_entries {
         $self->bcs_schema()->txn_do($create_subplot_entities_txn);
     };
     if ($@) {
-        print STDERR "An error occurred creating the subplot entities. $@\n";
+        $logger->error("An error occurred creating the subplot entities. $@");
         return 0;
     }
 
-    print STDERR "Subplot entities created.\n";
+    $logger->debug("Subplot entities created.");
     return 1;
 }
 
@@ -4160,7 +4162,7 @@ sub _save_subplot_entry {
     #The subplot inherits the properties of the plot.
     my $plot_props = $chado_schema->resultset("Stock::Stockprop")->search({ stock_id => $parent_plot, type_id => [$block_cvterm, $plot_number_cvterm, $replicate_cvterm] });
     while (my $prop = $plot_props->next() ) {
-        #print STDERR $subplot->uniquename()." ".$prop->type_id()."\n";
+        #$logger->error($subplot->uniquename()." ".$prop->type_id()."");
         $subplotprop = $chado_schema->resultset("Stock::Stockprop")->create( {
             stock_id => $subplot->stock_id(),
             type_id => $prop->type_id(),
@@ -4452,7 +4454,7 @@ sub get_plants_per_accession {
     while (my ($key, $value) = each %unique_plants) {
         push @{$return{$value->[1]}}, [$value->[0], $key];
     }
-    #print STDERR Dumper \%return;
+    #$logger->error(Dumper(\%return));
     return \%return;
 }
 
@@ -4582,7 +4584,7 @@ sub get_plots_per_accession {
     push @type_ids, $plot_cvterm_id if $plot_cvterm_id;
     push @type_ids, $tissue_sample_cvterm_id if $tissue_sample_cvterm_id;
 
-    print STDERR "TYPE IDS: ".join(", ", @type_ids);
+    $logger->error("TYPE IDS: ".join(", ", @type_ids));
 
     my @trial_stock_type_ids;
     push @trial_stock_type_ids, $accession_cvterm_id, $cross_cvterm_id, $family_name_cvterm_id;
@@ -4596,7 +4598,7 @@ sub get_plots_per_accession {
     while (my ($key, $value) = each %unique_plots) {
         push @{$return{$value->[1]}}, [$value->[0], $key];
     }
-    #print STDERR Dumper \%return;
+    #$logger->error(Dumper(\%return));
     return \%return;
 }
 
@@ -4632,7 +4634,7 @@ sub get_subplots {
     } else {
         @subplots = @{$self->get_observation_units_direct('subplot')};
     }
-    print STDERR Dumper \@subplots;
+    $logger->error(Dumper(\@subplots));
     return \@subplots;
 }
 
@@ -4980,10 +4982,10 @@ sub delete_empty_crossing_experiment {
     eval {
 	my $row = $self->bcs_schema->resultset("Project::Project")->find( { project_id=> $self->get_trial_id() });
 	$row->delete();
-    print STDERR "deleted project ".$self->get_trial_id."\n";
+    $logger->debug("deleted project ".$self->get_trial_id."");
     };
     if ($@) {
-	print STDERR "An error occurred during deletion: $@\n";
+	$logger->error("An error occurred during deletion: $@");
 	return $@;
     }
 }

@@ -4,6 +4,8 @@ package CXGN::List::Transform::Plugin::Dataset2DatasetIds;
 use Moose;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "dataset_2_dataset_ids";
 }
@@ -33,7 +35,7 @@ sub transform {
     my @ids= ();
     my @missing_ids = ();
 
-    print STDERR "Untransformed list data: ".Dumper($list)."\n";
+    $logger->debug("Untransformed list data: ".Dumper($list)."");
 
     foreach my $l (@$list) {
 

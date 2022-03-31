@@ -11,6 +11,8 @@ use File::Path qw(make_path);
 use File::Spec::Functions qw / catfile catdir/;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST'; }
 
 __PACKAGE__->config(
@@ -47,7 +49,7 @@ sub get_trials_with_folders : Path('/ajax/breeders/get_trials_with_folders') Arg
     my $dir = catdir($c->config->{static_content_path}, "folder");
     eval { make_path($dir) };
     if ($@) {
-        print STDERR "Couldn't create $dir: $@";
+        $logger->error("Couldn't create $dir: $@");
     }
     my $filename = $dir."/entire_jstree_html_$tree_type.txt";
 
@@ -80,7 +82,7 @@ sub get_trials_with_folders_cached : Path('/ajax/breeders/get_trials_with_folder
         $html = _write_cached_folder_tree($schema, $tree_type, $filename);
     }
 
-    #print STDERR $html;
+    #$logger->error($html);
     $c->stash->{rest} = { html => $html };
 }
 
@@ -95,12 +97,12 @@ sub _write_cached_folder_tree {
     my $html = "";
     my $folder_obj = CXGN::Trial::Folder->new( { bcs_schema => $schema, folder_id => @$projects[0]->[0] });
 
-    print STDERR "Starting trial tree refresh for $tree_type at time ".localtime()."\n";
+    $logger->debug("Starting trial tree refresh for $tree_type at time ".localtime()."");
     foreach my $project (@$projects) {
         my %project = ( "id" => $project->[0], "name" => $project->[1]);
         $html .= $folder_obj->get_jstree_html(\%project, $schema, 'breeding_program', $tree_type);
     }
-    print STDERR "Finished trial tree refresh for $tree_type at time ".localtime()."\n";
+    $logger->debug("Finished trial tree refresh for $tree_type at time ".localtime()."");
 
     my $OUTFILE;
     open $OUTFILE, '> :encoding(UTF-8)', $filename or die "Error opening $filename: $!";
@@ -117,7 +119,7 @@ sub trial_autocomplete_GET :Args(0) {
 
     my $term = $c->req->param('term');
 
-    print STDERR "Term: $term\n";
+    $logger->debug("Term: $term");
     $term =~ s/(^\s+|\s+)$//g;
     $term =~ s/\s+/ /g;
 
@@ -129,9 +131,9 @@ sub trial_autocomplete_GET :Args(0) {
     while (my ($project_name) = $sth->fetchrow_array) {
         push @response_list, $project_name;
     }
-    #print STDERR Dumper \@response_list;
+    #$logger->error(Dumper(\@response_list));
 
-    print STDERR "Returning...\n";
+    $logger->debug("Returning...");
     $c->stash->{rest} = \@response_list;
 }
 

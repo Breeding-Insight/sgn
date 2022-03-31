@@ -31,6 +31,8 @@ use CXGN::Phenotypes::DataCollectorSpreadsheet;
 use CXGN::Trial::Download;
 use Tie::UrlEncoder; our(%urlencode);
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -49,8 +51,8 @@ sub create_DataCollector_spreadsheet_GET : Args(0) {
 }
 
 sub create_DataCollector_spreadsheet_POST : Args(0) {
-  print STDERR "phenotype download controller\n";
   my ($self, $c) = @_;
+  $logger->debug("phenotype download controller");
   my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
   my $trial_id = $c->req->param('trial_id');
   my $trait_list_ref = $c->req->param('trait_list');
@@ -86,16 +88,16 @@ sub create_DataCollector_spreadsheet_POST : Args(0) {
   my $spreadsheet_response = $create_spreadsheet->download();
 
   if ($spreadsheet_response->{error}) {
-    print STDERR "Returning with error . . .\n";
+    $logger->debug("Returning with error . . .");
     $c->stash->{rest} = { error => $spreadsheet_response->{error} };
     return;
   }
 
-  print STDERR "DOWNLOAD FILENAME = ".$create_spreadsheet->filename()."\n";
-  print STDERR "RELATIVE  = $tempfile\n";
+  $logger->debug("DOWNLOAD FILENAME = ".$create_spreadsheet->filename()."");
+  $logger->debug("RELATIVE  = $tempfile");
 
   my $file_name = basename($file_path);
-  print STDERR "file name= $file_name\n";
+  $logger->debug("file name= $file_name");
 
   $c->stash->{rest} = { filename => $urlencode{$tempfile.".xls"} };
 

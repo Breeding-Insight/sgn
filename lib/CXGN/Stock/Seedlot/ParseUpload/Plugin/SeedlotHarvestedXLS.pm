@@ -309,7 +309,7 @@ sub _parse_with_plugin {
             operator_name => $operator_name
         };
     }
-    #print STDERR Dumper \%parsed_seedlots;
+    #$logger->error(Dumper(\%parsed_seedlots));
 
     $self->_set_parsed_data(\%parsed_seedlots);
     return 1;

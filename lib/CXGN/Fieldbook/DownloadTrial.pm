@@ -56,6 +56,8 @@ use CXGN::Stock;
 use CXGN::Phenotypes::Summary;
 use CXGN::Trial::TrialLayoutDownload;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => "Bio::Chado::Schema",
     is => 'ro',
@@ -263,7 +265,7 @@ sub download {
     unlink $tempfile;
 
     my $result = $file_row->file_id;
-    print STDERR "FIeldbook file generated $file_destination ".localtime()."\n";
+    $logger->debug("FIeldbook file generated $file_destination ".localtime()."");
     return {result => $result, file => $file_destination, file_id=>$file_row->file_id() };
 }
 

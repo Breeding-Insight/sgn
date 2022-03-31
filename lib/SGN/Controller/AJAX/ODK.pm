@@ -29,6 +29,8 @@ use File::Spec::Functions qw / catfile catdir/;
 use File::Path qw(make_path);
 use CXGN::List;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -48,15 +50,15 @@ sub get_phenotyping_data_GET {
     if ($odk_phenotyping_data_service_name eq 'SMAP'){
         my $ua = LWP::UserAgent->new;
         my $server_endpoint = "https://".$odk_phenotyping_data_service_username.":".$odk_phenotyping_data_service_password."\@bio.smap.com.au/api/v1/data";
-        print STDERR $server_endpoint."\n";
+        $logger->debug($server_endpoint."");
 
         my $resp = $ua->get($server_endpoint);
         if ($resp->is_success) {
             my $message = $resp->decoded_content;
             my $message_hash = decode_json $message;
-            print STDERR Dumper $message_hash;
+            $logger->error(Dumper($message_hash));
         } else {
-            print STDERR Dumper $resp;
+            $logger->error(Dumper($resp));
         }
 
     } else {
@@ -120,7 +122,7 @@ sub get_crossing_data : Path('/ajax/odk/get_crossing_data') : ActionClass('REST'
 sub get_crossing_data_GET {
     my ( $self, $c ) = @_;
     my $form_id = $c->req->param('form_id');
-    print STDERR Dumper $form_id;
+    $logger->error(Dumper($form_id));
     my $session_id = $c->req->param("sgn_session_id");
     my $user_id;
     my $user_name;
@@ -263,7 +265,7 @@ sub schedule_get_crossing_data_GET {
         $timing = "0 0,12 * * * ";
     }
     my $crontab_line = $timing.$perl_command."\n";
-    #print STDERR $crontab_line;
+    #$logger->error($crontab_line);
     my $crontab_file = $c->config->{crontab_file};
     open (my $F, "> :encoding(UTF-8)", $crontab_file) || die "Could not open $crontab_file: $!\n";
         if ($timing){
@@ -364,7 +366,7 @@ sub get_crossing_available_wishlists_GET {
             push @wishlists, [$r->file_id, $r->filetype];
         }
     }
-    #print STDERR Dumper \@wishlists;
+    #$logger->error(Dumper(\@wishlists));
 
     $c->stash->{rest} = { success => 1, wishlists => \@wishlists };
     $c->detach();
@@ -408,7 +410,7 @@ sub get_odk_cross_progress_cached_GET {
         print "Couldn't create $dir: $@";
     }
     my $filename = $dir."/ona_odk_cross_progress_top_level_json_html_".$ona_form_id.".txt";
-    print STDERR "Opening $filename \n";
+    $logger->debug("Opening $filename ");
     my $json;
     open(my $fh, '< ":encoding(UTF-8)', $filename) or warn "cannot open file $filename";
     {
@@ -419,13 +421,13 @@ sub get_odk_cross_progress_cached_GET {
     close($fh);
 
     my $top_level_id = $c->req->param('id');
-    print STDERR "ODK Cross Tree Progress Node: ".$top_level_id."\n";
+    $logger->debug("ODK Cross Tree Progress Node: ".$top_level_id."");
     if ($top_level_id eq '#'){
         $top_level_id = undef;
     }
     if ($top_level_id){
         $filename = $dir."/ona_odk_cross_progress_top_level_contents_html_".$ona_form_id.".txt";
-        print STDERR "Opening $filename \n";
+        $logger->debug("Opening $filename ");
         my $top_level_contents;
         open(my $fh, '< :encoding(UTF-8)', $filename) or warn "cannot open file $filename";
         {
@@ -437,7 +439,7 @@ sub get_odk_cross_progress_cached_GET {
         $json = $top_level_contents->{$top_level_id};
     }
 
-    #print STDERR Dumper $json;
+    #$logger->error(Dumper($json));
     $c->stash->{rest} = $json;
 }
 
@@ -479,7 +481,7 @@ sub get_odk_cross_summary_cached_GET {
         print "Couldn't create $dir: $@";
     }
     my $filename = $dir."/ona_odk_cross_progress_summary_info_html_".$ona_form_id.".txt";
-    print STDERR "Opening $filename \n";
+    $logger->debug("Opening $filename ");
     my $summary;
     open(my $fh, '< :encoding(UTF-8)', $filename) or warn "cannot open file $filename";
     {
@@ -489,7 +491,7 @@ sub get_odk_cross_summary_cached_GET {
     }
     close($fh);
     $filename = $dir."/ona_odk_cross_progress_summary_plant_status_info_html_".$ona_form_id.".txt";
-    print STDERR "Opening $filename \n";
+    $logger->debug("Opening $filename ");
     my $plant_status_summary;
     open($fh, '< :encoding(UTF-8)', $filename) or warn "cannot open file $filename";
     {
@@ -499,7 +501,7 @@ sub get_odk_cross_summary_cached_GET {
     }
     close($fh);
 
-    #print STDERR Dumper $summary;
+    #$logger->error(Dumper($summary));
     $c->stash->{rest} = { summary => $summary, plant_status_summary => $plant_status_summary };
 }
 

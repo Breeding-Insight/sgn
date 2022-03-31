@@ -32,6 +32,8 @@ use CXGN::Genotype::Protocol;
 use File::Basename qw | basename dirname|;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -52,7 +54,7 @@ sub upload_genotype_verify_POST : Args(0) {
     my @error_status;
     my @success_status;
 
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
     my $session_id = $c->req->param("sgn_session_id");
     my $user_id;
     my $user_role;
@@ -220,7 +222,7 @@ sub upload_genotype_verify_POST : Args(0) {
         my $output_dir = $c->tempfiles_subdir('/genotype_upload_tassel_hdf5');
         $upload_tempfile = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'genotype_upload_tassel_hdf5/temp_vcf_XXXX').".vcf";
         my $cmd = "perl ".$c->config->{rootpath}."/tassel-5-standalone/run_pipeline.pl -Xmx12g -h5 ".$archived_tassel_hdf5_file." -export ".$upload_tempfile." -exportType VCF";
-        print STDERR Dumper $cmd;
+        $logger->error(Dumper($cmd));
         my $status = system($cmd);
 
         my $temp_file_transposed = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'genotype_upload_tassel_hdf5/fileXXXX');
@@ -394,7 +396,7 @@ sub upload_genotype_verify_POST : Args(0) {
         if ($parser->get_parse_errors()) {
             my $return_error = '';
             my $parse_errors = $parser->get_parse_errors();
-            print STDERR Dumper $parse_errors;
+            $logger->error(Dumper($parse_errors));
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error=$return_error.$error_string."<br>";
             }
@@ -415,22 +417,22 @@ sub upload_genotype_verify_POST : Args(0) {
         my $store_genotypes;
         my ($observation_unit_names, $genotype_info) = $parser->next();
         if (scalar(keys %$genotype_info) > 0) {
-            #print STDERR Dumper [$observation_unit_names, $genotype_info];
-            print STDERR "Parsing first genotype and extracting protocol info... \n";
+            #$logger->error(Dumper([$observation_unit_names, $genotype_info]));
+            $logger->debug("Parsing first genotype and extracting protocol info... ");
 
             $store_args->{protocol_info} = $protocol;
             $store_args->{genotype_info} = $genotype_info;
 
             $store_genotypes = CXGN::Genotype::StoreVCFGenotypes->new($store_args);
             my $verified_errors = $store_genotypes->validate();
-            # print STDERR Dumper $verified_errors;
+            # $logger->error(Dumper($verified_errors));
             if (scalar(@{$verified_errors->{error_messages}}) > 0){
                 my $error_string = join ', ', @{$verified_errors->{error_messages}};
                 $c->stash->{rest} = { error => "There exist errors in your file. $error_string", missing_stocks => $verified_errors->{missing_stocks} };
                 $c->detach();
             }
             if (scalar(@{$verified_errors->{warning_messages}}) > 0){
-                #print STDERR Dumper $verified_errors->{warning_messages};
+                #$logger->error(Dumper($verified_errors->{warning_messages}));
                 my $warning_string = join ', ', @{$verified_errors->{warning_messages}};
                 if (!$accept_warnings){
                     $c->stash->{rest} = { warning => $warning_string, previous_genotypes_exist => $verified_errors->{previous_genotypes_exist} };
@@ -468,7 +470,7 @@ sub upload_genotype_verify_POST : Args(0) {
             $store_genotypes->store_identifiers();
         }
 
-        print STDERR "Done loading first line, moving on...\n";
+        $logger->debug("Done loading first line, moving on...");
 
         my $continue_iterate = 1;
         while ($continue_iterate == 1) {
@@ -495,7 +497,7 @@ sub upload_genotype_verify_POST : Args(0) {
                 $c->stash->{rest} = {error_string => $return_error,};
             } else {
                 $parse_errors = $parser->get_parse_errors();
-                #print STDERR Dumper $parse_errors;
+                #$logger->error(Dumper($parse_errors));
                 foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                     $return_error=$return_error.$error_string."<br>";
                 }
@@ -503,7 +505,7 @@ sub upload_genotype_verify_POST : Args(0) {
             $c->stash->{rest} = {error_string => $return_error, missing_stocks => $parse_errors->{'missing_stocks'}};
             $c->detach();
         }
-        #print STDERR Dumper $parsed_data;
+        #$logger->error(Dumper($parsed_data));
         my $observation_unit_uniquenames = $parsed_data->{observation_unit_uniquenames};
         my $genotype_info = $parsed_data->{genotypes_info};
         my $protocol_info = $parsed_data->{protocol_info};
@@ -522,7 +524,7 @@ sub upload_genotype_verify_POST : Args(0) {
             $c->detach();
         }
         if (scalar(@{$verified_errors->{warning_messages}}) > 0){
-            #print STDERR Dumper $verified_errors->{warning_messages};
+            #$logger->error(Dumper($verified_errors->{warning_messages}));
             my $warning_string = join ', ', @{$verified_errors->{warning_messages}};
             if (!$accept_warnings){
                 $c->stash->{rest} = { warning => $warning_string, previous_genotypes_exist => $verified_errors->{previous_genotypes_exist} };
@@ -562,7 +564,7 @@ sub upload_genotype_verify_POST : Args(0) {
 
     } elsif ($parser_plugin eq 'SSRExcel') {
         my $parsed_data = $parser->parse();
-        print STDERR "SSR PARSED DATA =".Dumper($parsed_data)."\n";
+        $logger->debug("SSR PARSED DATA =".Dumper($parsed_data)."");
         my $parse_errors;
         if (!$parsed_data) {
             my $return_error = '';
@@ -571,7 +573,7 @@ sub upload_genotype_verify_POST : Args(0) {
                 $c->stash->{rest} = {error_string => $return_error,};
             } else {
                 $parse_errors = $parser->get_parse_errors();
-                #print STDERR Dumper $parse_errors;
+                #$logger->error(Dumper($parse_errors));
                 foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                     $return_error=$return_error.$error_string."<br>";
                 }
@@ -612,7 +614,7 @@ sub upload_genotype_verify_POST : Args(0) {
             $c->detach();
         }
         if (scalar(@{$verified_errors->{warning_messages}}) > 0){
-            #print STDERR Dumper $verified_errors->{warning_messages};
+            #$logger->error(Dumper($verified_errors->{warning_messages}));
             my $warning_string = join ', ', @{$verified_errors->{warning_messages}};
             if (!$accept_warnings){
                 $c->stash->{rest} = { warning => $warning_string, previous_genotypes_exist => $verified_errors->{previous_genotypes_exist} };
@@ -624,7 +626,7 @@ sub upload_genotype_verify_POST : Args(0) {
         $return = $store_genotypes->store_identifiers();
 
     } else {
-        print STDERR "Parser plugin $parser_plugin not recognized!\n";
+        $logger->debug("Parser plugin $parser_plugin not recognized!");
         $c->stash->{rest} = { error => "Parser plugin $parser_plugin not recognized!" };
         $c->detach();
     }

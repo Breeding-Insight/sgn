@@ -33,6 +33,8 @@ use Bio::GeneticRelationships::Population;
 use CXGN::Stock::StockLookup;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 #class_type 'Pedigree', { class => 'Bio::GeneticRelationships::Pedigree' };
 has 'schema' => (
 		 is       => 'rw',
@@ -63,13 +65,13 @@ sub add_pedigrees {
     my %return;
 
     @pedigrees = @{$self->get_pedigrees()};
-    #print STDERR Dumper \@pedigrees;
+    #$logger->error(Dumper(\@pedigrees));
 
     my @added_stock_ids;
     my $transaction_error = "";
 
     my $coderef = sub {
-        #print STDERR "Getting cvterms...\n";
+        #$logger->error("Getting cvterms...");
         # get cvterms for parents and offspring
         my $female_parent_cvterm = SGN::Model::Cvterm->get_cvterm_row($self->get_schema(), 'female_parent', 'stock_relationship');
         my $male_parent_cvterm = SGN::Model::Cvterm->get_cvterm_row($self->get_schema(), 'male_parent', 'stock_relationship');
@@ -80,7 +82,7 @@ sub add_pedigrees {
 
         foreach my $pedigree (@pedigrees) {
 
-            #print STDERR Dumper($pedigree);
+            #$logger->error(Dumper($pedigree));
             my $organism_id;
             my $female_parent_name;
             my $male_parent_name;
@@ -101,7 +103,7 @@ sub add_pedigrees {
                 $male_parent = $accessions_crosses_populations_hash{$male_parent_name};
             }
 
-            print STDERR "Creating pedigree $cross_type\n";
+            $logger->debug("Creating pedigree $cross_type");
 
             my $progeny_accession = $accessions_crosses_hash{$pedigree->get_name()};
 
@@ -119,7 +121,7 @@ sub add_pedigrees {
                         object_id => $progeny_accession->[0],
                     });
                     while(my $r = $previous_female_parent->next()){
-                        print STDERR "Deleted female parent stock_relationship_id: ".$r->stock_relationship_id."\n";
+                        $logger->debug("Deleted female parent stock_relationship_id: ".$r->stock_relationship_id."");
                         $r->delete();
                     }
                 }
@@ -139,7 +141,7 @@ sub add_pedigrees {
                         object_id => $progeny_accession->[0],
                     });
                     while(my $r = $previous_male_parent->next()){
-                        print STDERR "Deleted male parent stock_relationship_id: ".$r->stock_relationship_id."\n";
+                        $logger->debug("Deleted male parent stock_relationship_id: ".$r->stock_relationship_id."");
                         $r->delete();
                     }
                 }
@@ -150,22 +152,22 @@ sub add_pedigrees {
                 });
             }
 
-            print STDERR "Successfully added pedigree ".$pedigree->get_name()."\n";
+            $logger->debug("Successfully added pedigree ".$pedigree->get_name()."");
         }
     };
 
     # try to add all crosses in a transaction
     try {
-        print STDERR "Performing database operations... \n";
+        $logger->debug("Performing database operations... ");
         $self->get_schema()->txn_do($coderef);
-        print STDERR "Done.\n";
+        $logger->debug("Done.");
     } catch {
         $transaction_error =  $_;
     };
 
     if ($transaction_error) {
         $return{error} = "Transaction error creating pedigrees: $transaction_error";
-        print STDERR "Transaction error creating pedigrees: $transaction_error\n";
+        $logger->error("Transaction error creating pedigrees: $transaction_error");
         return \%return;
     }
 

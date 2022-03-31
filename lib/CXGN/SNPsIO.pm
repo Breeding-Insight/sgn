@@ -17,6 +17,8 @@ use Data::Dumper;
 use IO::File;
 use CXGN::Genotype::SNP;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'file' => ( isa => 'Str',
 		is  => 'rw',
 		required => 1,
@@ -63,14 +65,14 @@ sub BUILD {
 
 	if (m/^\#CHROM/) { 
 	    chomp($_);
-	    #print STDERR "found header $_\n";
+	    #$logger->error("found header $_");
 	    $self->header($_);
 	    # CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT SNPS..
 	    my @fields = split /\s+/, $_;
 	    chomp(@fields);
 	    my @accessions = @fields[9..$#fields];
 	    $self->accessions(\@accessions);
-	    print STDERR "ACCESSIONS: ".join("|", @accessions)."\n";
+	    $logger->debug("ACCESSIONS: ".join("|", @accessions)."");
 	    last;
 	}
     }
@@ -101,7 +103,7 @@ sub next {
     if (defined($line)) { 
 	
 	my ($chr, $position, $snp_id, $ref_allele, $alt_allele, $qual, $filter, $info, $format,  @snps) = split /\t/, $line;
-	#print STDERR "Processing $snp_id\n";
+	#$logger->error("Processing $snp_id");
 	my $snps = CXGN::SNPs->new( );
 	$snps->raw($line);
 	$snps->id($snp_id);
@@ -119,7 +121,7 @@ sub next {
 	$snps->format($format);
 	$snps->accessions($self->accessions());
 	$snps->valid_accessions($self->accessions());
-	#print STDERR "ACCESSIONS: ".(join ",", @{$self->{accessions}})."\n";
+	#$logger->error("ACCESSIONS: ".(join ",", @{$self->{accessions}})."");
 	my %snp_objects = ();
 	for(my $n=0; $n<@snps; $n++) { 
 	    my $snp = CXGN::Genotype::SNP->new( { id=>$snp_id, format => $format, vcf_string => $snps[$n] } );
@@ -131,12 +133,12 @@ sub next {
 	    $snp->accession($accession);
 	    $snp_objects{$accession} = $snp;
 	}
-	#print STDERR Dumper(\%snp_objects);
+	#$logger->error(Dumper(\%snp_objects));
 	$snps->snps(\%snp_objects);
 	return $snps;
     }
     else { 
-	#print STDERR "LINE NOT DEFINED.\n";
+	#$logger->error("LINE NOT DEFINED.");
 	return undef;
     }
 }

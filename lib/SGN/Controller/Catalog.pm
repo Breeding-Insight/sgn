@@ -6,6 +6,8 @@ use SGN::Model::Cvterm;
 use CXGN::People::Person;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 
@@ -43,7 +45,7 @@ sub catalog_item_details : Path('/catalog/item_details') Args(1) {
     }
 
     my $item_id = shift;
-#    print STDERR "CATALOG STOCK ID =".Dumper($item_id)."\n";
+#    $logger->error("CATALOG STOCK ID =".Dumper($item_id)."");
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $stock_catalog_type_id = SGN::Model::Cvterm->get_cvterm_row($c->dbic_schema("Bio::Chado::Schema"), 'stock_catalog_json', 'stock_property')->cvterm_id();
 
@@ -56,7 +58,7 @@ sub catalog_item_details : Path('/catalog/item_details') Args(1) {
         return;
     } else {
         $item_prop_id = $stock_catalog_info->stockprop_id();
-#        print STDERR "STOCKPROP ID =".Dumper($item_prop_id)."\n";
+#        $logger->error("STOCKPROP ID =".Dumper($item_prop_id)."");
     }
 
     my $stock_catalog_item = $schema->resultset("Stock::Stock")->find({stock_id => $item_id});
@@ -86,7 +88,7 @@ sub catalog_item_details : Path('/catalog/item_details') Args(1) {
     my $program_rs = $schema->resultset('Project::Project')->find({project_id => $program_id});
     my $program_name = $program_rs->name();
 
-#    print STDERR "CONTACT PERSON NAME=".Dumper($contact_person_username)."\n";
+#    $logger->error("CONTACT PERSON NAME=".Dumper($contact_person_username)."");
     $c->stash->{item_id} = $item_id;
     $c->stash->{item_name} = $item_name;
     $c->stash->{species} = $species;

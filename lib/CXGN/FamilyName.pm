@@ -24,6 +24,8 @@ use JSON;
 
 extends 'CXGN::Stock';
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'family_stock_id' => (isa => "Int",
     is => 'rw',
     required => 1,
@@ -80,7 +82,7 @@ sub get_family_parents {
     while (my ($female_parent_id,  $female_parent_name, $female_stock_type, $female_ploidy, $male_parent_id, $male_parent_name, $male_stock_type, $male_ploidy) = $h->fetchrow_array()){
         push @family_parents, [$female_parent_id,  $female_parent_name, $female_stock_type, $female_ploidy, $male_parent_id, $male_parent_name, $male_stock_type, $male_ploidy]
     }
-#    print STDERR Dumper(\@family_parents);
+#    $logger->error(Dumper(\@family_parents));
     return \@family_parents;
 }
 
@@ -119,7 +121,7 @@ sub get_family_members {
             push @data, [$cross_id, $cross_name, $cross_type, $crossing_experiment_id, $crossing_experiment_name, $progeny_number]
         }
 
-#        print STDERR "CROSS MEMBERS =".Dumper(\@data);
+#        $logger->error("CROSS MEMBERS =".Dumper(\@data));
         return \@data;
 }
 
@@ -147,7 +149,7 @@ sub get_all_progenies {
     while (my ($progeny_id,  $progeny_name, $cross_id, $cross_name) = $h->fetchrow_array()){
         push @progenies, [$progeny_id, $progeny_name, $cross_id, $cross_name]
     }
-    print STDERR Dumper(\@progenies);
+    $logger->error(Dumper(\@progenies));
     return \@progenies;
 }
 

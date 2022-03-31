@@ -3,6 +3,7 @@ package CXGN::Trial::TrialDesign::Plugin::Lattice;
 
 use Moose::Role;
 use List::Util qw| max |;
+my $logger = Log::Log4perl->get_logger();
 
 sub create_design {
     my $self = shift;
@@ -94,15 +95,15 @@ sub create_design {
     $r_block->add_command('lattice_book<-as.matrix(lattice_book)');
     
     my @commands = $r_block->read_commands();
-    print STDERR join "\n", @commands;
-    print STDERR "\n";
-    
+    $logger->debug(join ("\n", @commands));
+    $logger->debug();
+
     
     $r_block->run_block();
     
     $result_matrix = R::YapRI::Data::Matrix->read_rbase( $rbase,'r_block','lattice_book');
     @plot_numbers = $result_matrix->get_column("plots");
-    #print STDERR Dumper(@plot_numbers);
+    #$logger->error(Dumper(@plot_numbers));
     @block_numbers = $result_matrix->get_column("block");
     my $max = max( @block_numbers );
     @rep_numbers = $result_matrix->get_column("r");
@@ -112,7 +113,7 @@ sub create_design {
     if ($plot_layout_format eq "zigzag") {
 	if (!$fieldmap_col_number){
 	    @col_number_fieldmaps = ((1..$number_of_blocks) x ($number_of_blocks * $number_of_reps));
-	    #print STDERR Dumper(\@col_number_fieldmaps);
+	    #$logger->error(Dumper(\@col_number_fieldmaps));
 	} else {
 	    @col_number_fieldmaps = ((1..$fieldmap_col_number) x $fieldmap_row_number);
 	}

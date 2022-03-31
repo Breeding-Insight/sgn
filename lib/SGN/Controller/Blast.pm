@@ -13,6 +13,8 @@ use CXGN::Tools::Text qw/ sanitize_string /;
 use CXGN::Blast;
 use CXGN::Blast::SeqQuery;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -82,11 +84,11 @@ sub index :Path('/tools/blast/') :Args(0) {
   #   }
   # }
 
-  #print STDERR "INPUT OPTIONS: ".Data::Dumper::Dumper(\@input_options);
-  #print STDERR "GROUPS: ".Data::Dumper::Dumper($dataset_groups);
-  #print STDERR "DATASETS: ".Data::Dumper::Dumper($databases);
+  #$logger->error("INPUT OPTIONS: ".Data::Dumper::Dumper(\@input_options));
+  #$logger->error("GROUPS: ".Data::Dumper::Dumper($dataset_groups));
+  #$logger->error("DATASETS: ".Data::Dumper::Dumper($databases));
 
-  # print STDERR "controller pre-selected db: $preselected_database\n";
+  # $logger->error("controller pre-selected db: $preselected_database");
 
   $c->stash->{input_options} = \@input_options;
   $c->stash->{parse_options} = \@parse_options;
@@ -206,7 +208,7 @@ sub show_match_seq : Path('/tools/blast/match/show') Args(0) {
 	dbpath => $c->config->{blast_db_path}	       
 			       });
 
-    print STDERR "Path:". $c->config->{blast_db_path}." db_id: ".$blast_db_id."\n";
+    $logger->debug("Path:". $c->config->{blast_db_path}." db_id: ".$blast_db_id."");
 
     my $seq = $bo->get_sequence($id) # returns a Bio::Seq object.
 	or $c->throw( is_error => 0,

@@ -14,6 +14,8 @@ use Math::Base36 ':all';
 use CXGN::QRcode;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 our %urlencode;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -261,7 +263,7 @@ sub barcode_element : Path('/barcode/element/') :Args(2) {
     my $white = $barcode_slice->colorAllocate(255,255,255);
     $barcode_slice->filledRectangle(0, 0, $barcode->width, $height, $white);
 
-    print STDERR "Creating barcode with width ".($barcode->width)." and height $height\n";
+    $logger->debug("Creating barcode with width ".($barcode->width)." and height $height");
     $barcode_slice->copy($barcode, 0, 0, 0, 0, $barcode->width, $height);
 
     $c->res->headers->content_type('image/png');
@@ -294,11 +296,10 @@ sub barcode_tool :Path('/barcode/tool') Args(3) {
 
     my ($db, $accession) = split ":", $cvterm;
 
-    print STDERR "Searching $cvterm, DB $db...\n";
+    $logger->debug("Searching $cvterm, DB $db...");
     my ($db_row) = $c->dbic_schema('Bio::Chado::Schema')->resultset('General::Db')->search( { name => $db } );
 
-    print STDERR $db_row->db_id;
-    print STDERR "DB_ID for $db: $\n";
+    $logger->debug("DB_ID for $db:${$db_row->db_id}");
 
 
     my $dbxref_rs = $c->dbic_schema('Bio::Chado::Schema')->resultset('General::Dbxref')->search_rs( { accession=>$accession, db_id=>$db_row->db_id } );
@@ -337,11 +338,10 @@ sub barcode_multitool :Path('/barcode/multitool') Args(0) {
 
 	my ($db, $accession) = split ":", $cvterm;
 
-	print STDERR "Searching $cvterm, DB $db...\n";
+	$logger->debug("Searching $cvterm, DB $db...");
 	my ($db_row) = $c->dbic_schema('Bio::Chado::Schema')->resultset('General::Db')->search( { name => $db } );
 
-	print STDERR $db_row->db_id;
-	print STDERR "DB_ID for $db: $\n";
+	$logger->debug("DB_ID for $db: ${$db_row->db_id}");
 
 
 	my $dbxref_rs = $c->dbic_schema('Bio::Chado::Schema')->resultset('General::Dbxref')->search_rs( { accession=>$accession, db_id=>$db_row->db_id } );
@@ -380,7 +380,7 @@ sub continuous_scale : Path('/barcode/continuous_scale') Args(0) {
 
     for(my $i = $start; $i <= $end; $i += $step) {
 	my $text = $urlencode{sprintf "%".$text_width."d", $i};
-	print STDERR "TEXT: $text\n";
+	$logger->debug("TEXT: $text");
 	push @barcodes, qq { <img src="/barcode/element/$i/$height" align="right" /> };
 
     }
@@ -493,7 +493,7 @@ sub generate_unique_barcode_labels : Path('/barcode/unique') Args(0) {
 
     my $dir = $c->tempfiles_subdir('pdfs');
     my ($FH, $filename) = $c->tempfile(TEMPLATE=>"pdfs/pdf-XXXXX", SUFFIX=>".pdf", UNLINK=>0);
-    print STDERR "FILENAME: $filename \n\n\n";
+    $logger->debug("FILENAME: $filename \n\n");
     my $pdf = PDF::Create->new(filename=>$c->path_to($filename),
 			       Author=>$c->config->{project_name},
 			       Title=>'Labels',
@@ -503,7 +503,7 @@ sub generate_unique_barcode_labels : Path('/barcode/unique') Args(0) {
 
     if (!$page_format) { $page_format = "Letter"; }
 
-    print STDERR "PAGE FORMAT IS: $page_format. LABEL ROWS: $label_rows, COLS: $label_cols. TOTAL LABELS: $total_labels\n";
+    $logger->debug("PAGE FORMAT IS: $page_format. LABEL ROWS: $label_rows, COLS: $label_cols. TOTAL LABELS: $total_labels");
 
     my @pages = ();
     push @pages, PDF::LabelPage->new( { top_margin=>$top_margin, bottom_margin=>$bottom_margin, left_margin=>$left_margin, right_margin=>$right_margin, pdf=>$pdf, cols => $label_cols, rows => $label_rows });
@@ -511,24 +511,24 @@ sub generate_unique_barcode_labels : Path('/barcode/unique') Args(0) {
     foreach my $label_count (1..$total_labels) {
 	my $label_code = $self->generate_label_code($c);
 
-	print STDERR "LABEL CODE: $label_code\n";
+	$logger->debug("LABEL CODE: $label_code");
 
 	# generate barcode
 	#
 	my $tempfile = $c->forward('/barcode/barcode_tempfile_jpg', [ $label_code, $label_code ,  'large',  20  ]);
 	my $image = $pdf->image($tempfile);
-	print STDERR "IMAGE: ".Data::Dumper::Dumper($image);
+	$logger->error("IMAGE: ".Data::Dumper::Dumper($image));
 
 	# note: pdf coord system zero is lower left corner
 	#
 
 	if ($pages[-1]->need_more_labels()) {
-	    print STDERR "ADDING LABEL...\n";
+	    $logger->debug("ADDING LABEL...");
 	    $pages[-1]->add_label($image);
 	}
 
 	else {
-	    print STDERR "CREATING NEW PAGE...\n";
+	    $logger->debug("CREATING NEW PAGE...");
 
 	    push @pages, PDF::LabelPage->new({ top_margin=>$top_margin, bottom_margin=>$bottom_margin, left_margin=>$left_margin, right_margin=>$right_margin, pdf=>$pdf, cols => $label_cols, rows => $label_rows });
 
@@ -562,7 +562,7 @@ sub generate_label_code {
     $h->execute();
     my ($next_val) = $h->fetchrow_array();
 
-    print STDERR "nextval is $next_val\n";
+    $logger->debug("nextval is $next_val");
 
     my $encoded = Math::Base36::encode_base36($next_val, 7);
 

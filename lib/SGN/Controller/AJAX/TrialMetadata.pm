@@ -29,6 +29,8 @@ use POSIX qw | !qsort !bsearch |;
 use CXGN::Phenotypes::StorePhenotypes;
 use Statistics::Descriptive::Full;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -75,10 +77,10 @@ sub trial : Chained('/') PathPart('ajax/breeders/trial') CaptureArgs(1) {
             $param{experiment_type} = 'field_layout';
         }
         $c->stash->{trial_layout} = CXGN::Trial::TrialLayout->new(\%param);
-	# print STDERR "Trial Layout: ".Dumper($c->stash->{trial_layout})."\n";
+	# $logger->error("Trial Layout: ".Dumper($c->stash->{trial_layout})."");
     }
     catch {
-        print STDERR "Trial Layout for $trial_id does not exist. @_\n";
+        $logger->error("Trial Layout for $trial_id does not exist. @_");
     }
 
 }
@@ -217,11 +219,11 @@ sub trial_details_POST  {
       return;
     }
     else {
-    print STDERR "Here are the deets: " . Dumper($details) . "\n";
+    $logger->debug("Here are the deets: " . Dumper($details) . "");
     }
 
     #check privileges
-    print STDERR " curator status = ".$c->user()->check_roles('curator')." and submitter status = ".$c->user()->check_roles('submitter')."\n";
+    $logger->debug(" curator status = ".$c->user()->check_roles('curator')." and submitter status = ".$c->user()->check_roles('submitter')."");
     if (!($c->user()->check_roles('curator') || $c->user()->check_roles('submitter'))) {
       $c->stash->{rest} = { error => 'You do not have the required privileges to edit trial details, trial details can only be edited by accounts with submitter or curator privileges' };
       return;
@@ -238,7 +240,7 @@ sub trial_details_POST  {
     my %has_roles = ();
     map { $has_roles{$_} = 1; } @user_roles;
 
-    print STDERR "my user roles = @user_roles and trial breeding program = $breeding_program_name \n";
+    $logger->debug("my user roles = @user_roles and trial breeding program = $breeding_program_name ");
 
     # policy: curators can change without breeding program association
     # submitters can change if they are associated with the breeding program
@@ -252,7 +254,7 @@ sub trial_details_POST  {
     }
 
     # set each new detail that is defined
-    #print STDERR Dumper $details;
+    #$logger->error(Dumper($details));
     eval {
       if ($details->{name}) { $trial->set_name($details->{name}); }
       if ($details->{breeding_program}) { $trial->set_breeding_program($details->{breeding_program}); }
@@ -536,7 +538,7 @@ sub trial_tissue_sources : Chained('trial') PathPart('tissue_sources') Args(0) {
 
     my $trial = CXGN::Trial->new( { bcs_schema => $schema, trial_id => $c->stash->{trial_id} });
     my $data = $trial->get_tissue_sources();
-    #print STDERR Dumper $data;
+    #$logger->error(Dumper($data));
     $c->stash->{rest} = { tissue_sources => $data };
 }
 
@@ -609,7 +611,7 @@ sub trial_used_seedlots_upload : Chained('trial') PathPart('upload_used_seedlots
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialUsedSeedlotsXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -619,7 +621,7 @@ sub trial_used_seedlots_upload : Chained('trial') PathPart('upload_used_seedlots
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -655,7 +657,7 @@ sub trial_used_seedlots_upload : Chained('trial') PathPart('upload_used_seedlots
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial used seedlots. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial used seedlots. ($@).");
         $c->detach();
     }
 
@@ -726,7 +728,7 @@ sub trial_upload_plants : Chained('trial') PathPart('upload_plants') Args(0) {
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialPlantsXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -736,7 +738,7 @@ sub trial_upload_plants : Chained('trial') PathPart('upload_plants') Args(0) {
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -764,7 +766,7 @@ sub trial_upload_plants : Chained('trial') PathPart('upload_plants') Args(0) {
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial plants. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial plants. ($@).");
         $c->detach();
     }
 
@@ -835,7 +837,7 @@ sub trial_upload_plants_subplot : Chained('trial') PathPart('upload_plants_subpl
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialPlantsSubplotXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -845,7 +847,7 @@ sub trial_upload_plants_subplot : Chained('trial') PathPart('upload_plants_subpl
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -873,7 +875,7 @@ sub trial_upload_plants_subplot : Chained('trial') PathPart('upload_plants_subpl
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial plants. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial plants. ($@).");
         $c->detach();
     }
 
@@ -944,7 +946,7 @@ sub trial_upload_subplots : Chained('trial') PathPart('upload_subplots') Args(0)
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialSubplotsXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -954,7 +956,7 @@ sub trial_upload_subplots : Chained('trial') PathPart('upload_subplots') Args(0)
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -982,7 +984,7 @@ sub trial_upload_subplots : Chained('trial') PathPart('upload_subplots') Args(0)
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial subplots. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial subplots. ($@).");
         $c->detach();
     }
 
@@ -1053,7 +1055,7 @@ sub trial_upload_plants_with_index_number : Chained('trial') PathPart('upload_pl
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialPlantsWithPlantNumberXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1063,7 +1065,7 @@ sub trial_upload_plants_with_index_number : Chained('trial') PathPart('upload_pl
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1092,7 +1094,7 @@ sub trial_upload_plants_with_index_number : Chained('trial') PathPart('upload_pl
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial plants. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial plants. ($@).");
         $c->detach();
     }
 
@@ -1163,7 +1165,7 @@ sub trial_upload_plants_subplot_with_index_number : Chained('trial') PathPart('u
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialPlantsSubplotWithPlantNumberXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1173,7 +1175,7 @@ sub trial_upload_plants_subplot_with_index_number : Chained('trial') PathPart('u
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1202,7 +1204,7 @@ sub trial_upload_plants_subplot_with_index_number : Chained('trial') PathPart('u
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial plants. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial plants. ($@).");
         $c->detach();
     }
 
@@ -1273,7 +1275,7 @@ sub trial_upload_subplots_with_index_number : Chained('trial') PathPart('upload_
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialSubplotsWithSubplotNumberXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1283,7 +1285,7 @@ sub trial_upload_subplots_with_index_number : Chained('trial') PathPart('upload_
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1312,7 +1314,7 @@ sub trial_upload_subplots_with_index_number : Chained('trial') PathPart('upload_
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial subplots. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial subplots. ($@).");
         $c->detach();
     }
 
@@ -1383,7 +1385,7 @@ sub trial_upload_plants_with_number_of_plants : Chained('trial') PathPart('uploa
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialPlantsWithNumberOfPlantsXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1393,7 +1395,7 @@ sub trial_upload_plants_with_number_of_plants : Chained('trial') PathPart('uploa
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1422,7 +1424,7 @@ sub trial_upload_plants_with_number_of_plants : Chained('trial') PathPart('uploa
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial plants. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial plants. ($@).");
         $c->detach();
     }
 
@@ -1493,7 +1495,7 @@ sub trial_upload_plants_subplot_with_number_of_plants : Chained('trial') PathPar
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialPlantsSubplotWithNumberOfPlantsXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1503,7 +1505,7 @@ sub trial_upload_plants_subplot_with_number_of_plants : Chained('trial') PathPar
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1532,7 +1534,7 @@ sub trial_upload_plants_subplot_with_number_of_plants : Chained('trial') PathPar
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial plants. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial plants. ($@).");
         $c->detach();
     }
 
@@ -1603,7 +1605,7 @@ sub trial_upload_subplots_with_number_of_subplots : Chained('trial') PathPart('u
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialSubplotsWithNumberOfSubplotsXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1613,7 +1615,7 @@ sub trial_upload_subplots_with_number_of_subplots : Chained('trial') PathPart('u
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1642,7 +1644,7 @@ sub trial_upload_subplots_with_number_of_subplots : Chained('trial') PathPart('u
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial subplots. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial subplots. ($@).");
         $c->detach();
     }
 
@@ -1723,7 +1725,7 @@ sub trial_plot_gps_upload : Chained('trial') PathPart('upload_plot_gps') Args(0)
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialPlotGPSCoordinatesXLS');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1733,7 +1735,7 @@ sub trial_plot_gps_upload : Chained('trial') PathPart('upload_plot_gps') Args(0)
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1773,7 +1775,7 @@ sub trial_plot_gps_upload : Chained('trial') PathPart('upload_plot_gps') Args(0)
                 }
             };
             my $geno_json_string = encode_json $geo_json;
-            #print STDERR $geno_json_string."\n";
+            #$logger->error($geno_json_string."");
             my $previous_plot_gps_rs = $schema->resultset("Stock::Stockprop")->search({stock_id=>$plot->stock_id, type_id=>$stock_geo_json_cvterm->cvterm_id});
             $previous_plot_gps_rs->delete_all();
             $plot->create_stockprops({$stock_geo_json_cvterm->name() => $geno_json_string});
@@ -1786,7 +1788,7 @@ sub trial_plot_gps_upload : Chained('trial') PathPart('upload_plot_gps') Args(0)
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload trial plot GPS coordinates. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload trial plot GPS coordinates. ($@).");
         $c->detach();
     }
 
@@ -1838,7 +1840,7 @@ sub trial_change_plot_accessions_upload : Chained('trial') PathPart('change_plot
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('TrialChangePlotAccessionsCSV');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1848,7 +1850,7 @@ sub trial_change_plot_accessions_upload : Chained('trial') PathPart('change_plot
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1878,7 +1880,7 @@ sub trial_change_plot_accessions_upload : Chained('trial') PathPart('change_plot
 
     my $upload_change_plot_accessions_txn = sub {
         my @stock_names;
-        print STDERR Dumper $parsed_data;
+        $logger->error(Dumper($parsed_data));
         while (my ($key, $val) = each(%$parsed_data)){
             my $plot_name = $val->{plot_name};
             my $accession_name = $val->{accession_name};
@@ -1892,7 +1894,7 @@ sub trial_change_plot_accessions_upload : Chained('trial') PathPart('change_plot
         while (my $r = $stock_rs->next()){
             $stock_id_map{$r->uniquename} = $r->stock_id;
         }
-        print STDERR Dumper \%stock_id_map;
+        $logger->error(Dumper(\%stock_id_map));
         while (my ($key, $val) = each(%$parsed_data)){
             my $plot_id = $stock_id_map{$val->{plot_name}};
             my $accession_id = $stock_id_map{$val->{accession_name}};
@@ -1922,7 +1924,7 @@ sub trial_change_plot_accessions_upload : Chained('trial') PathPart('change_plot
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to change plot accessions. ($@).\n";
+        $logger->error("An error condition occurred, was not able to change plot accessions. ($@).");
         $c->detach();
     }
 
@@ -2042,7 +2044,7 @@ sub trial_plots : Chained('trial') PathPart('plots') Args(0) {
     my $trial = $c->stash->{trial};
 
     my @data = $trial->get_plots();
-#    print STDERR "PLOTS =".Dumper(\@data)."\n";
+#    $logger->error("PLOTS =".Dumper(\@data)."");
 
     $c->stash->{rest} = { plots => \@data };
 }
@@ -2299,7 +2301,7 @@ sub retrieve_trial_info_POST : Args(0) {
     my $trial_id = $c->req->param('trial_id');
     my $layout = CXGN::Trial::TrialLayout->new({schema => $schema, trial_id => $trial_id, experiment_type=>'field_layout'});
   	my $design = $layout-> get_design();
-    #print STDERR Dumper($design);
+    #$logger->error(Dumper($design));
 
     my @layout_info;
   	foreach my $plot_number (keys %{$design}) {
@@ -2317,7 +2319,7 @@ sub retrieve_trial_info_POST : Args(0) {
         @layout_info = sort { $a->{plot_number} <=> $b->{plot_number} } @layout_info;
   	}
 
-    #print STDERR Dumper(@layout_info);
+    #$logger->error(Dumper(@layout_info));
     $c->stash->{rest} = {trial_info => \@layout_info};
     #$c->stash->{layout_info} = \@layout_info;
 }
@@ -2835,7 +2837,7 @@ sub upload_trial_coordinates : Path('/ajax/breeders/trial/coordsupload') Args(0)
     my %upload_metadata;
 
     # Store uploaded temporary file in archive
-    print STDERR "TEMP FILE: $upload_tempfile\n";
+    $logger->debug("TEMP FILE: $upload_tempfile");
     my $uploader = CXGN::UploadFile->new({
         tempfile => $upload_tempfile,
         subdirectory => $subdirectory,
@@ -2867,11 +2869,11 @@ sub upload_trial_coordinates : Path('/ajax/breeders/trial/coordsupload') Args(0)
     	my $rs = $schema->resultset("Stock::Stock")->search({uniquename=> $plot });
     	if ($rs->count()== 1) {
       	my $r =  $rs->first();
-      	print STDERR "The plots $plot was found.\n Loading row $row col $col\n";
+      	$logger->debug("The plots $plot was found.\n Loading row $row col $col");
       	$r->create_stockprops({row_number => $row, col_number => $col});
       }
       else {
-      	print STDERR "WARNING! $plot was not found in the database.\n";
+      	$logger->debug("WARNING! $plot was not found in the database.");
         $error_string .= "WARNING! $plot was not found in the database.";
       }
     }
@@ -3031,7 +3033,7 @@ sub get_crosses : Chained('trial') PathPart('get_crosses') Args(0) {
 
     my $result = $trial->get_crosses_in_crossing_experiment();
     my @data = @$result;
-#    print STDERR "CROSSES =".Dumper(\@data)."\n";
+#    $logger->error("CROSSES =".Dumper(\@data)."");
 
     $c->stash->{rest} = { crosses => \@data };
 }
@@ -3047,7 +3049,7 @@ sub get_female_accessions : Chained('trial') PathPart('get_female_accessions') A
 
     my $result = $trial->get_female_accessions_in_crossing_experiment();
     my @data = @$result;
-#    print STDERR "FEMALE ACCESSIONS =".Dumper(\@data)."\n";
+#    $logger->error("FEMALE ACCESSIONS =".Dumper(\@data)."");
 
     $c->stash->{rest} = { female_accessions => \@data };
 }
@@ -3108,7 +3110,7 @@ sub get_female_plants : Chained('trial') PathPart('get_female_plants') Args(0) {
 
     my $result = $trial->get_female_plants_in_crossing_experiment();
     my @data = @$result;
-#    print STDERR "FEMALE PLANTS =".Dumper(\@data)."\n";
+#    $logger->error("FEMALE PLANTS =".Dumper(\@data)."");
 
     $c->stash->{rest} = { female_plants => \@data };
 }
@@ -3152,7 +3154,7 @@ sub delete_all_crosses_in_crossingtrial : Chained('trial') PathPart('delete_all_
         my ($cross_stock_id, $cross_name) =@$r;
         my $cross = CXGN::Cross->new( { schema => $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado'), cross_stock_id => $cross_stock_id });
         my $error = $cross->delete();
-        print STDERR "ERROR = $error\n";
+        $logger->error("ERROR = $error");
 
         if ($error) {
             $c->stash->{rest} = { error => "An error occurred attempting to delete a cross. ($@)" };
@@ -3172,7 +3174,7 @@ sub cross_additional_info_trial : Chained('trial') PathPart('cross_additional_in
     my $trial_id = $c->stash->{trial_id};
     my $trial = CXGN::Cross->new({ schema => $schema, trial_id => $trial_id});
     my $result = $trial->get_cross_additional_info_trial();
-#    print STDERR "ADDITIONAL INFO =".Dumper($result)."\n";
+#    $logger->error("ADDITIONAL INFO =".Dumper($result)."");
 
     my $cross_additional_info_string = $c->config->{cross_additional_info};
     my @column_order = split ',', $cross_additional_info_string;
@@ -3201,7 +3203,7 @@ sub phenotype_heatmap : Chained('trial') PathPart('heatmap') Args(0) {
     my $trait_id = $c->req->param("selected");
 
     my @items = map {@{$_}[0]} @{$c->stash->{trial}->get_plots()};
-    #print STDERR Dumper(\@items);
+    #$logger->error(Dumper(\@items));
     my @trait_ids = ($trait_id);
 
     my $layout = $c->stash->{trial_layout};
@@ -3292,7 +3294,7 @@ sub phenotype_heatmap : Chained('trial') PathPart('heatmap') Args(0) {
 	foreach my $cntrl (@{$data_check}) {
 		push @control_name, $cntrl->{'accession_name'};
 	}
-    #print STDERR Dumper($result);
+    #$logger->error(Dumper($result));
     $c->stash->{rest} = { #phenotypes => $phenotype,
                             col => \@col_No,
                             row => \@row_No,
@@ -3351,7 +3353,7 @@ sub delete_single_assayed_trait : Chained('trial') PathPart('delete_single_trait
     my $trial = $c->stash->{trial};
 
     if (!$c->user()) {
-        print STDERR "User not logged in... not deleting trait.\n";
+        $logger->debug("User not logged in... not deleting trait.");
         $c->stash->{rest} = {error => "You need to be logged in to delete trait." };
         return;
     }
@@ -3388,7 +3390,7 @@ sub retrieve_plot_image : Chained('trial') PathPart('retrieve_plot_images') Args
   my $images = $stockref->{image_ids};
   $dbh = $stockref->{dbh};
 
-  #print STDERR Dumper($stockref);
+  #$logger->error(Dumper($stockref));
   print "$plot_name and $plot_id and $image_ids\n";
 
   my $image_html     = "";
@@ -3580,7 +3582,7 @@ sub trial_correlate_traits : Chained('trial') PathPart('correlate_traits') Args(
     res <- cor(mat, method=\''.$correlation_type.'\', use = \'complete.obs\')
     res_rounded <- round(res, 2)
     write.table(res_rounded, file=\''.$stats_out_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -3588,7 +3590,7 @@ sub trial_correlate_traits : Chained('trial') PathPart('correlate_traits') Args(
     open(my $fh, '<', $stats_out_tempfile)
         or die "Could not open file '$stats_out_tempfile' $!";
 
-        print STDERR "Opened $stats_out_tempfile\n";
+        $logger->debug("Opened $stats_out_tempfile");
         my $header = <$fh>;
         my @header_cols;
         if ($csv->parse($header)) {
@@ -3815,7 +3817,7 @@ sub trial_plot_time_series_accessions : Chained('trial') PathPart('plot_time_ser
     }
     $cmd .= 'ggsave(\''.$pheno_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
     dev.off();"';
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $c->stash->{rest} = {success => 1, figure => $pheno_figure_tempfile_string, data_file => $pheno_data_tempfile_string, cmd => $cmd};
@@ -3881,7 +3883,7 @@ sub trial_accessions_rank : Chained('trial') PathPart('accessions_rank') Args(0)
     foreach (@$trait_weights) {
         $trait_weight_map{$_->[0]} = $_->[1];
     }
-    print STDERR Dumper \%trait_weight_map;
+    $logger->error(Dumper(\%trait_weight_map));
 
     my %phenotype_data;
     my %trait_hash;
@@ -3919,7 +3921,7 @@ sub trial_accessions_rank : Chained('trial') PathPart('accessions_rank') Args(0)
 sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison') Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $people_schema = $c->dbic_schema("CXGN::People::Schema");
     my $trait_ids = decode_json $c->req->param('trait_ids');
@@ -3981,7 +3983,7 @@ sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison')
     foreach (@$trait_weights) {
         $trait_weight_map{$_->[0]} = $_->[1];
     }
-    # print STDERR Dumper \%trait_weight_map;
+    # $logger->error(Dumper(\%trait_weight_map));
 
     my %phenotype_data;
     my %trait_hash;
@@ -4015,7 +4017,7 @@ sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison')
     my @sorted_accessions = sort { $accession_sum{$b} <=> $accession_sum{$a} } keys(%accession_sum);
     my @sorted_values = @accession_sum{@sorted_accessions};
     my $sort_increment = ceil(scalar(@sorted_accessions)/10)+0;
-    # print STDERR Dumper $sort_increment;
+    # $logger->error(Dumper($sort_increment));
 
     my $percentile_inc = $sort_increment/scalar(@sorted_accessions);
 
@@ -4025,7 +4027,7 @@ sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison')
     my %rank_lookup;
     my %rank_percentile;
     foreach (@sorted_accessions) {
-        print STDERR Dumper $acc_counter;
+        $logger->error(Dumper($acc_counter));
         if ($acc_counter >= $sort_increment) {
             $rank_counter++;
             $acc_counter = 0;
@@ -4044,8 +4046,8 @@ sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison')
         push @sorted_rank_groups, $rank_lookup{$stock_id};
     }
     my @sorted_ranks = (1..scalar(@sorted_accessions));
-    # print STDERR Dumper \%rank_hash;
-    # print STDERR Dumper \%rank_lookup;
+    # $logger->error(Dumper(\%rank_hash));
+    # $logger->error(Dumper(\%rank_lookup));
 
     my $geno = CXGN::Genotype::DownloadFactory->instantiate(
         'DosageMatrix',    #can be either 'VCF' or 'DosageMatrix'
@@ -4079,7 +4081,7 @@ sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison')
     open my $geno_fh, "<&", $file_handle or die "Can't open output file: $!";
         my $header = <$geno_fh>;
         chomp($header);
-        # print STDERR Dumper $header;
+        # $logger->error(Dumper($header));
         my @header = split "\t", $header;
         my $header_dummy = shift @header;
 
@@ -4087,7 +4089,7 @@ sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison')
         while (my $row = <$geno_fh>) {
             chomp($row);
             if ($row) {
-                # print STDERR Dumper $row;
+                # $logger->error(Dumper($row));
                 my @line = split "\t", $row;
                 my $marker_name = shift @line;
                 push @marker_names, $marker_name;
@@ -4106,7 +4108,7 @@ sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison')
             }
         }
     close($geno_fh);
-    # print STDERR Dumper \%geno_rank_counter;
+    # $logger->error(Dumper(\%geno_rank_counter));
     my @sorted_seen_scores = sort keys %geno_rank_seen_scores;
 
     my $shared_cluster_dir_config = $c->config->{cluster_shared_tempdir};
@@ -4153,7 +4155,7 @@ sub trial_genotype_comparison : Chained('trial') PathPart('genotype_comparison')
     sp <- sp + facet_grid(Rank ~ .);';
     $cmd .= 'ggsave(\''.$pheno_figure_tempfile.'\', sp, device=\'png\', width=12, height=12, units=\'in\');
     dev.off();"';
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $c->stash->{rest} = {success => 1, results => \%accession_sum, sorted_accessions => \@sorted_accessions, sorted_values => \@sorted_values, sorted_ranks => \@sorted_ranks, sorted_rank_groups => \@sorted_rank_groups, figure => $pheno_figure_tempfile_string};
@@ -4274,8 +4276,8 @@ sub trial_calculate_numerical_derivative : Chained('trial') PathPart('calculate_
     my $traits = SGN::Model::Cvterm->get_traits_from_component_categories($schema, \@allowed_composed_cvs, $composable_cvterm_delimiter, $composable_cvterm_format, $categories);
     my $existing_traits = $traits->{existing_traits};
     my $new_traits = $traits->{new_traits};
-    # print STDERR Dumper $new_traits;
-    # print STDERR Dumper $existing_traits;
+    # $logger->error(Dumper($new_traits));
+    # $logger->error(Dumper($existing_traits));
     my %new_trait_names;
     foreach (@$new_traits) {
         my $components = $_->[0];
@@ -4380,14 +4382,14 @@ sub trial_calculate_numerical_derivative : Chained('trial') PathPart('calculate_
                     push @derivs, ( (($val + $_)*7/8) - $_);
                 }
             }
-            # print STDERR Dumper \@derivs;
+            # $logger->error(Dumper(\@derivs));
             if (scalar(@derivs) > 0) {
                 my $d = sum(@derivs)/scalar(@derivs);
                 $derivative_results{$s}->{$trait} = [$d, $timestamp, $user_name, '', ''];
             }
         }
     }
-    # print STDERR Dumper \%derivative_results;
+    # $logger->error(Dumper(\%derivative_results));
 
     if (scalar(keys %derivative_results) != scalar(@sorted_plot_names)) {
         $c->stash->{rest} = { error => "Not all plots have rows and columns defined! Please make sure row and columns are saved for this field trial!"};

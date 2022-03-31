@@ -59,6 +59,8 @@ use Math::Round;
 use Time::Piece;
 use Time::Seconds;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -107,18 +109,18 @@ sub get_noaa_data {
     );
     my $server_endpoint = "https://www.ncdc.noaa.gov/cdo-web/api/v2/data?stationid=".$self->noaa_station_id."&limit=1000&datasetid=GHCND".$data_types_string."&startdate=".$start_date."&enddate=".$end_date;
 
-    print STDERR $server_endpoint."\n";
+    $logger->debug($server_endpoint."");
     my $resp = $ua->get($server_endpoint, "token"=>$self->noaa_ncdc_access_token);
 
     my $message_hash = {};
     if ($resp->is_success) {
         my $message = $resp->decoded_content;
         $message_hash = decode_json $message;
-        # print STDERR Dumper $message_hash;
+        # $logger->error(Dumper($message_hash));
     }
     else {
         my $message = $resp->decoded_content;
-        print STDERR Dumper $message;
+        $logger->error(Dumper($message));
         $message_hash = decode_json $message;
     }
     return $message_hash;
@@ -133,7 +135,7 @@ sub do_query_max_one_year {
     my $end_date_object = Time::Piece->strptime($end_date, "%Y-%m-%d");
     my $time_diff = $end_date_object - $start_date_object;
     my $time_diff_days = $time_diff->days;
-    print STDERR Dumper $time_diff_days;
+    $logger->error(Dumper($time_diff_days));
     my $end_date_epoch = $end_date_object->epoch;
 
     my @time_ranges;
@@ -168,7 +170,7 @@ sub do_query_max_one_year {
     else {
         push @time_ranges, [$start_date, $end_date];
     }
-    print STDERR Dumper \@time_ranges;
+    $logger->error(Dumper(\@time_ranges));
 
     my %weather_hash;
     foreach (@time_ranges) {
@@ -176,7 +178,7 @@ sub do_query_max_one_year {
         $self->start_date($_->[0]);
         $self->end_date($_->[1]);
         my $message_hash = $self->get_noaa_data();
-        # print STDERR Dumper $message_hash;
+        # $logger->error(Dumper($message_hash));
         if ($message_hash->{status} eq '400') {
             return {error => $message_hash->{message}};
         }

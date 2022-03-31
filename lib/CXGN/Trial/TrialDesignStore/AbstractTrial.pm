@@ -14,6 +14,8 @@ use Data::Dumper;
 use CXGN::Stock;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head1 ACCESSORS
 
 =head2 bcs_schema()
@@ -387,11 +389,10 @@ sub BUILD {
 }
 
 sub validate_design {
-    print STDERR "Implement validate_design in subclass\n";
+    $logger->debug("Implement validate_design in subclass");
 }
 
 sub store {
-    print STDERR "Saving design ".localtime()."\n";
     my $self = shift;
     my $chado_schema = $self->get_bcs_schema;
     my $design_type = $self->get_design_type;
@@ -407,7 +408,7 @@ sub store {
 
     my @source_stock_types = @{$self->get_source_stock_types()};
 
-    print STDERR "!!!!!! stock rel type id = $stock_rel_type_id, stock type_id = $stock_type_id\n";
+    $logger->debug("!!!!!! stock rel type id = $stock_rel_type_id, stock type_id = $stock_type_id");
 
     #$chado_schema->storage->debug(1);
     my $nd_experiment_id;
@@ -432,10 +433,10 @@ sub store {
             });
             $nd_experiment_project = $nd_experiment->find_or_create_related('nd_experiment_projects', {project_id => $self->get_trial_id} );
         } elsif ($nd_experiment_project_rs->count > 1) {
-            print STDERR "ERROR: More than one nd_experiment of type=$nd_experiment_type_id for project=$trial_id\n";
+            $logger->error("ERROR: More than one nd_experiment of type=$nd_experiment_type_id for project=$trial_id");
             $nd_experiment_project = $nd_experiment_project_rs->first;
         } elsif ($nd_experiment_project_rs->count == 1) {
-            print STDERR "OKAY: NdExperimentProject type=$nd_experiment_type_id for project$trial_id\n";
+            $logger->debug("OKAY: NdExperimentProject type=$nd_experiment_type_id for project$trial_id");
             $nd_experiment_project = $nd_experiment_project_rs->first;
         }
         if ($nd_experiment_project){
@@ -486,7 +487,7 @@ sub store {
 
     my $coderef = sub {
 
-        #print STDERR Dumper \%design;
+        #$logger->error(Dumper(\%design));
         my %new_stock_ids_hash;
         my $stock_rs = $chado_schema->resultset("Stock::Stock");
 
@@ -760,7 +761,7 @@ sub store {
                     { nd_experiment_id => $nd_experiment_id, type_id => $self->get_nd_experiment_type_id }
                 );
 
-		#print STDERR "STOCK TYPE ID NOW: $stock_type_id\n";
+		#$logger->error("STOCK TYPE ID NOW: $stock_type_id");
                 my $plot_params = {
                     organism_id => $organism_id_checked,
                     name       => $plot_name,
@@ -924,7 +925,7 @@ sub store {
         }
 
         if (exists($design{'treatments'})){
-            print STDERR "Saving treatments\n";
+            $logger->debug("Saving treatments");
             my %treatments_hash = %{$design{'treatments'}};
 
             foreach my $treatment_name(keys %treatments_hash){
@@ -944,7 +945,7 @@ sub store {
                 } else {
                     $stock_names = $treatments_hash{$treatment_name};
                 }
-#                print STDERR "STOCK NAMES =".Dumper($stock_names)."\n";
+#                $logger->error("STOCK NAMES =".Dumper($stock_names)."");
                 my @treatment_nd_experiment_stocks;
                 foreach (@$stock_names){
                     my $stock_id;
@@ -1021,7 +1022,7 @@ sub store {
             }
         }
 
-        print STDERR "Design Stored ".localtime."\n";
+        $logger->debug("Design Stored ".localtime."");
     };
 
     my $transaction_error;
@@ -1030,7 +1031,7 @@ sub store {
         $chado_schema->txn_do($coderef);
     }
     catch {
-        print STDERR "Transaction Error: $_\n";
+        $logger->error("Transaction Error: $_");
         $transaction_error =  $_;
     };
     return $transaction_error;

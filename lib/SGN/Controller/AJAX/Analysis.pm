@@ -12,6 +12,8 @@ use URI::FromHash 'uri';
 use JSON;
 use CXGN::BreederSearch;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' };
 
 __PACKAGE__->config(
@@ -36,7 +38,7 @@ sub store_analysis_json_POST {
     my $self = shift;
     my $c = shift;
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $analysis_to_save_boolean = $c->req->param("analysis_to_save_boolean");
     my $analysis_name = $c->req->param("analysis_name");
     my $analysis_description = $c->req->param("analysis_description");
@@ -94,7 +96,7 @@ sub store_analysis_spreadsheet_POST {
     my $self = shift;
     my $c = shift;
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $analysis_to_save_boolean = "yes";
     my $analysis_name = $c->req->param("upload_new_analysis_name");
     my $analysis_description = $c->req->param("upload_new_analysis_description");
@@ -325,7 +327,7 @@ sub store_analysis_spreadsheet_POST {
         $c->detach();
     }
     unlink $upload_tempfile;
-    #print STDERR "Archived Phenotype File: $archived_filename_with_path\n";
+    #$logger->error("Archived Phenotype File: $archived_filename_with_path");
 
     my $validate_type = 'analysis phenotype spreadsheet csv';
     my $parser = CXGN::Phenotypes::ParseUpload->new();
@@ -517,7 +519,7 @@ sub list_analyses_by_user_table :Path('/ajax/analyses/by_user') Args(0) {
         ];
     }
 
-    #print STDERR Dumper(\@table);
+    #$logger->error(Dumper(\@table));
     $c->stash->{rest} = { data => \@table };
 }
 
@@ -533,7 +535,7 @@ sub list_analyses_models_by_user_table :Path('/ajax/analyses/models/by_user') Ar
     my $analysis_model_type = $c->req->param('analysis_model_type');
 
     my $analysis_models_by_user = CXGN::AnalysisModel::GetModel::get_models_by_user($schema, $user_id, $analysis_model_type);
-    #print STDERR Dumper $analysis_models_by_user;
+    #$logger->error(Dumper($analysis_models_by_user));
 
     my @table;
     foreach my $saved_model (values %$analysis_models_by_user) {
@@ -551,7 +553,7 @@ sub list_analyses_models_by_user_table :Path('/ajax/analyses/models/by_user') Ar
             $model_language,
         ];
     }
-    #print STDERR Dumper(\@table);
+    #$logger->error(Dumper(\@table));
     $c->stash->{rest} = { data => \@table };
 }
 
@@ -567,7 +569,7 @@ sub list_analyses_by_model_table :Path('/ajax/analyses/by_model') Args(0) {
 
     my $model_id = $c->req->param('model_id');
     my $analysis_by_model = CXGN::AnalysisModel::GetModel::get_analyses_by_model($schema, $model_id);
-    print STDERR Dumper $analysis_by_model;
+    $logger->error(Dumper($analysis_by_model));
 
     my @table;
     foreach my $a (@$analysis_by_model) {
@@ -576,7 +578,7 @@ sub list_analyses_by_model_table :Path('/ajax/analyses/by_model') Args(0) {
             $a->{description},
         ];
     }
-    #print STDERR Dumper(\@table);
+    #$logger->error(Dumper(\@table));
     $c->stash->{rest} = { data => \@table };
 }
 
@@ -621,7 +623,7 @@ sub retrieve_analysis_data :Chained("ajax_analysis") PathPart('retrieve') :Args(
     }
 
     my $matrix = $a->get_phenotype_matrix();
-    # print STDERR "Matrix: ".Dumper($matrix);
+    # $logger->error("Matrix: ".Dumper($matrix));
     my $dataref = [];
 
     # format table body with links but exclude header
@@ -630,7 +632,7 @@ sub retrieve_analysis_data :Chained("ajax_analysis") PathPart('retrieve') :Args(
 
     foreach my $row (@$matrix) {
         my ($stock_id, $stock_name, @values) =  @$row[17,18,39..scalar(@$row)-1];
-        # print STDERR "NEW ROW: $stock_id, $stock_name, ".join(",", @values)."\n";
+        # $logger->error("NEW ROW: $stock_id, $stock_name, ".join(",", @values)."");
         push @$dataref, [
             "<a href=\"/stock/$stock_id/view\">$stock_name</a>",
             @values
@@ -639,7 +641,7 @@ sub retrieve_analysis_data :Chained("ajax_analysis") PathPart('retrieve') :Args(
 
     unshift @$dataref, $header;
 
-    # print STDERR "TRAITS : ".Dumper($a->traits());
+    # $logger->error("TRAITS : ".Dumper($a->traits()));
 
     my $resultref = {
         analysis_name => $a->name(),

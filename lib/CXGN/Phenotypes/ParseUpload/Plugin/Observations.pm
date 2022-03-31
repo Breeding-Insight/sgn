@@ -27,6 +27,8 @@ use List::MoreUtils qw(uniq);
 use Data::Dumper;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "brapi observations";
 }
@@ -52,7 +54,7 @@ sub check_unique_var_unit_time {
     $h->execute($variable_id, $unit, $timestamp);
     my ($id, $value) = $h->fetchrow_array();
     if ($id) {
-        #print STDERR "Found id $id and value $value\n";
+        #$logger->error("Found id $id and value $value");
         $check_result{'error'} = "The combination of observationVariableDbId $variable_id with observationUnitDbId $unit at observationTimeStamp $timestamp already exists in the database with value $value and observationDbId $id. To update this measurement includes its observationDbId in your request";
         return \%check_result;
 	}
@@ -171,7 +173,7 @@ sub parse {
         push @{$data{$obsunit_db_id}->{$trait_name}}, [$value, $timestamp, $collector, $obs_db_id, undef, $additional_info];
 
     }
-    #print STDERR "Data is ".Dumper(%data)."\n";
+    #$logger->error("Data is ".Dumper(%data)."");
     @observations = uniq @observations;
     @unit_dbids = uniq @unit_dbids;
     @variables = uniq @variables;
@@ -186,7 +188,7 @@ sub parse {
         my @observations_missing = @{$validated_observations->{'missing'}};
         if (scalar @observations_missing) {
             $parse_result{'error'} = "The following observations do not exist in the database: ".@observations_missing;
-            #print STDERR "Invalid observations: @observations_missing\n";
+            #$logger->error("Invalid observations: @observations_missing");
             return \%parse_result;
         }
     }
@@ -220,14 +222,14 @@ sub parse {
     my @variables_missing = @{$validated_variables ->{'missing'}};
     if (scalar @variables_missing) {
         $parse_result{'error'} = "The following observationVariableDbIds do not exist in the database: @variables_missing";
-        #print STDERR "Invalid observationVariableDbIds: @variables_missing\n";
+        #$logger->error("Invalid observationVariableDbIds: @variables_missing");
         return \%parse_result;
     }
 
     foreach my $value (@values) {
         if ($value eq '.' || ($value =~ m/[^a-zA-Z0-9,.\-\/\_:;\s]/ && $value ne '.')) {
             $parse_result{'error'} = "Value $value is not valid. Trait values must be alphanumeric.";
-            print STDERR "Invalid value: $value\n";
+            $logger->error("Invalid value: $value");
             return \%parse_result;
         }
     }
@@ -235,7 +237,7 @@ sub parse {
     foreach my $timestamp (@timestamps) {
         if (!$timestamp =~ m/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\S)(\d{4})/) {
             $parse_result{'error'} = "Timestamp $timestamp is not of form YYYY-MM-DD HH:MM:SS-0000 or YYYY-MM-DD HH:MM:SS+0000";
-            print STDERR "Invalid Timestamp: $timestamp\n";
+            $logger->error("Invalid Timestamp: $timestamp");
             return \%parse_result;
         }
     }

@@ -6,6 +6,8 @@ use Data::Dumper;
 
 extends 'CXGN::JSONProp';
 
+my $logger = Log::Log4perl->get_logger();
+
 # a general human readable description of the stock
 has 'description' => ( isa => 'Str', is => 'rw' );
 
@@ -70,7 +72,7 @@ sub get_catalog_items {
         }
         push @catalog_list, [@each_row];
     }
-#    print STDERR "CATALOG LIST =".Dumper(\@catalog_list)."\n";
+#    $logger->error("CATALOG LIST =".Dumper(\@catalog_list)."");
 
     return \@catalog_list;
 }
@@ -92,7 +94,7 @@ sub get_item_details {
     foreach my $field (@fields){
         push @item_details, $detail_hash->{$field};
     }
-#    print STDERR "ITEM DETAILS =".Dumper(\@item_details)."\n";
+#    $logger->error("ITEM DETAILS =".Dumper(\@item_details)."");
 
     return \@item_details;
 }

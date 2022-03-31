@@ -10,6 +10,8 @@ use DateTime;
 use CXGN::People::Person;
 use CXGN::Contact;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -30,10 +32,10 @@ sub submit_order_POST : Args(0) {
     my $list_id = $c->req->param('list_id');
     my $time = DateTime->now();
     my $timestamp = $time->ymd()."_".$time->hms();
-#    print STDERR "LIST ID =".Dumper($list_id)."\n";
+#    $logger->error("LIST ID =".Dumper($list_id)."");
 
     if (!$c->user()) {
-        print STDERR "User not logged in... not adding a catalog item.\n";
+        $logger->debug("User not logged in... not adding a catalog item.");
         $c->stash->{rest} = {error_string => "You must be logged in to add a catalog item." };
         return;
     }
@@ -43,7 +45,7 @@ sub submit_order_POST : Args(0) {
 
     my $list = CXGN::List->new( { dbh=>$dbh, list_id=>$list_id });
     my $items = $list->elements();
-#    print STDERR "ITEMS =".Dumper($items)."\n";
+#    $logger->error("ITEMS =".Dumper($items)."");
     my $catalog_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'stock_catalog_json', 'stock_property')->cvterm_id();
     my $contact_person_id;
     my %group_by_contact_id;
@@ -51,10 +53,10 @@ sub submit_order_POST : Args(0) {
     foreach my $ordered_item (@all_items) {
         my @ordered_item_split = split / /, $ordered_item;
         my $item_name = $ordered_item_split[0];
-        print STDERR "ITEM NAME =".Dumper($item_name)."\n";
+        $logger->debug("ITEM NAME =".Dumper($item_name)."");
         my $item_rs = $schema->resultset("Stock::Stock")->find( { uniquename => $item_name });
         my $item_id = $item_rs->stock_id();
-#        print STDERR "ITEM ID =".Dumper($item_id)."\n";
+#        $logger->error("ITEM ID =".Dumper($item_id)."");
         my $item_info_rs = $schema->resultset("Stock::Stockprop")->find({stock_id => $item_id, type_id => $catalog_cvterm_id});
         my $item_info_string = $item_info_rs->value();
         my $item_info_hash = decode_json $item_info_string;
@@ -69,14 +71,14 @@ sub submit_order_POST : Args(0) {
         my $history_info = {};
         my $item_ref = $group_by_contact_id{$contact_id};
         my $order_list = encode_json $item_ref;
-#        print STDERR "ORDER LIST =".Dumper($order_list)."\n";
+#        $logger->error("ORDER LIST =".Dumper($order_list)."");
         my $new_order = CXGN::Stock::Order->new( { people_schema => $people_schema, dbh => $dbh});
         $new_order->order_from_id($user_id);
         $new_order->order_to_id($contact_id);
         $new_order->order_status("submitted");
         $new_order->create_date($timestamp);
         my $order_id = $new_order->store();
-#        print STDERR "ORDER ID =".($order_id)."\n";
+#        $logger->error("ORDER ID =".($order_id)."");
         if (!$order_id){
             $c->stash->{rest} = {error_string => "Error saving your order",};
             return;
@@ -90,7 +92,7 @@ sub submit_order_POST : Args(0) {
         $order_prop->parent_id($order_id);
         $order_prop->history(\@history);
     	my $order_prop_id = $order_prop->store_sp_orderprop();
-#        print STDERR "ORDER PROP ID =".($order_prop_id)."\n";
+#        $logger->error("ORDER PROP ID =".($order_prop_id)."");
 
         if (!$order_prop_id){
             $c->stash->{rest} = {error_string => "Error saving your order",};
@@ -101,7 +103,7 @@ sub submit_order_POST : Args(0) {
         my $contact_email = $contact_person->get_contact_email();
         push @contact_email_list, $contact_email;
     }
-#    print STDERR "EMAIL LIST =".Dumper(\@contact_email_list)."\n";
+#    $logger->error("EMAIL LIST =".Dumper(\@contact_email_list)."");
 
     my $host = $c->config->{main_production_site_url};
     my $project_name = $c->config->{project_name};
@@ -282,7 +284,7 @@ sub update_order :Path('/ajax/order/update') :Args(0) {
     }
 
     my $updated_order = $order_obj->store();
-#    print STDERR "UPDATED ORDER ID =".Dumper($updated_order)."\n";
+#    $logger->error("UPDATED ORDER ID =".Dumper($updated_order)."");
     if (!$updated_order){
         $c->stash->{rest} = {error_string => "Error updating the order",};
         return;
@@ -291,7 +293,7 @@ sub update_order :Path('/ajax/order/update') :Args(0) {
     my $orderprop_rs = $people_schema->resultset('SpOrderprop')->find( { sp_order_id => $order_id } );
     my $orderprop_id = $orderprop_rs->sp_orderprop_id();
     my $details_json = $orderprop_rs->value();
-    print STDERR "ORDER PROP ID =".Dumper($orderprop_id)."\n";
+    $logger->debug("ORDER PROP ID =".Dumper($orderprop_id)."");
     my $detail_hash = JSON::Any->jsonToObj($details_json);
 
     my $order_history_ref = $detail_hash->{'history'};

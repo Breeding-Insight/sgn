@@ -11,6 +11,8 @@ use CXGN::BrAPI::v2::Scales;
 use CXGN::BrAPI::Exceptions::ConflictException;
 use CXGN::BrAPI::Exceptions::ServerException;
 
+my $logger = Log::Log4perl->get_logger();
+
 ## to do: add concept of trait short name; provide alternate constructors for term, shortname, and synonyms etc.
 
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
@@ -45,7 +47,7 @@ has 'display_name' => (isa => 'Str',
 			   my $db = $self->db();
 			   my $name = $self->name();
 			   my $accession = $self->accession();
-			   #print STDERR $db." ".$name." ".$accession."\n";
+			   #$logger->error($db." ".$name." ".$accession."");
 			   if ($db && $name && $accession ) { 
 			       return $name ."|".$db.":".$accession;
 			   }
@@ -92,7 +94,7 @@ has 'db'   => ( isa => 'Str',
 		    my $rs = $self->bcs_schema()->resultset("Cv::Cvterm")->search( { cvterm_id => $self->cvterm_id()})->search_related("dbxref")->search_related("db");
 		    if ($rs->count() == 1) { 
 			my $db_name =  $rs->first()->get_column("name");
-			#print STDERR "DBNAME = $db_name\n";
+			#$logger->error("DBNAME = $db_name");
 			return $db_name;
 		    }
 		    return "";
@@ -110,7 +112,7 @@ has 'db_id'   => (
 			my $rs = $self->cvterm->search_related("dbxref");
 			if ($rs->count() == 1) {
 				my $db_id =  $rs->first()->get_column("db_id");
-				#print STDERR "DBID = $db_id\n";
+				#$logger->error("DBID = $db_id");
 				return $db_id;
 			}
 		}
@@ -416,7 +418,7 @@ has 'trait_attribute_id' => (
 );
 
 sub BUILD { 
-    #print STDERR "BUILDING...\n";
+    #$logger->error("BUILDING...");
     my $self = shift;
     my $cvterm;
 

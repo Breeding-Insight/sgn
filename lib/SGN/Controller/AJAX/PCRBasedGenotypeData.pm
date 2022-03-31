@@ -30,6 +30,8 @@ use CXGN::Genotype::Protocol;
 use CXGN::Genotype::StorePCRMarkerInfo;
 use File::Basename qw | basename dirname|;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -132,9 +134,9 @@ sub upload_ssr_protocol_POST : Args(0) {
     }
     my $organism_id = $found_organisms[0];
 
- #   print STDERR "PROTOCOL NAME =".Dumper($protocol_name)."\n";
-#    print STDERR "PROTOCOL DESCRIPTION =".Dumper($protocol_description)."\n";
-#    print STDERR "SPECIES NAME =".Dumper($species_name)."\n";
+ #   $logger->error("PROTOCOL NAME =".Dumper($protocol_name)."");
+#    $logger->error("PROTOCOL DESCRIPTION =".Dumper($protocol_description)."");
+#    $logger->error("SPECIES NAME =".Dumper($species_name)."");
 
     $upload_metadata{'archived_file'} = $archived_filename_with_path;
     $upload_metadata{'archived_file_type'}="ssr upload file";
@@ -145,7 +147,7 @@ sub upload_ssr_protocol_POST : Args(0) {
     $parser = CXGN::Genotype::ParseUpload->new(chado_schema => $chado_schema, filename => $archived_filename_with_path, observation_unit_type_name => $sample_type);
     $parser->load_plugin($upload_type);
     $parsed_data = $parser->parse();
-#    print STDERR "PARSED DATA =". Dumper($parsed_data)."\n";
+#    $logger->error("PARSED DATA =". Dumper($parsed_data)."");
 
     if (!$parsed_data){
         my $return_error = '';
@@ -154,7 +156,7 @@ sub upload_ssr_protocol_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -175,7 +177,7 @@ sub upload_ssr_protocol_POST : Args(0) {
     });
 
     my $protocol_id = $pcr_markers->store_pcr_marker_info();
-#    print STDERR "PROTOCOL ID =".Dumper($protocol_id)."\n";
+#    $logger->error("PROTOCOL ID =".Dumper($protocol_id)."");
 
     if (!$protocol_id) {
         $c->stash->{rest} = {error_string => "Error saving PCR marker info",};

@@ -13,6 +13,8 @@ use CXGN::Trial::Download;
 use CXGN::BreederSearch;
 use POSIX qw(strftime);
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST'; };
 
 __PACKAGE__->config(
@@ -50,8 +52,8 @@ sub analyze_trial_phenotypes : Path('/analyze/phenotypes/trials') Args(0) {
     my $trial_id_hash = $t->transform($schema, $trial_t, \@trial_list);
     @trial_ids = @{$trial_id_hash->{transform}};
 
-    print STDERR "trial_ids = " . @trial_ids ."\n";
-    print STDERR "trial_id_hash =" . Dumper($trial_id_hash);
+    $logger->debug("trial_ids = " . @trial_ids ."");
+    $logger->error("trial_id_hash =" . Dumper($trial_id_hash));
   }
   else {
     die "Unable to determine paramter format \n";
@@ -67,7 +69,7 @@ sub analyze_trial_phenotypes : Path('/analyze/phenotypes/trials') Args(0) {
 
   my $csv = $self->retrieve_phenotypes_csv($c, '', '', '', '', \@data);
 
-  print STDERR "path to temp file that R will analyze is: $csv \n";
+  $logger->debug("path to temp file that R will analyze is: $csv ");
 
   my $time_stamp = strftime "%Y-%m-%dT%H%M%S", localtime();
   my $dir = $c->tempfiles_subdir('analyze'); # make sure analyze dir exists
@@ -75,7 +77,7 @@ sub analyze_trial_phenotypes : Path('/analyze/phenotypes/trials') Args(0) {
   my $relative_path = $c->tempfile( TEMPLATE => "analyze/$file_name");
   my $output_path = $c->config->{basepath}.$relative_path;
 
-  print STDERR "path to R output is: $output_path \n";
+  $logger->debug("path to R output is: $output_path ");
 
   # run different R scripts based on supplied analysis and design types
   #if ($analysis_type eq 'Anova') {

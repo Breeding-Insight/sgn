@@ -8,6 +8,8 @@ use Data::Dumper;
 use CXGN::List::Validate;
 use CXGN::People::Person;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub _validate_with_plugin {
     my $self = shift;
     my $filename = $self->get_filename();
@@ -328,7 +330,7 @@ sub _parse_with_plugin {
             'contact_person_id' => $contact_person_id,
         }
     }
-    print STDERR "PLUGIN PARSED RESULT =".Dumper(\%parsed_result)."\n";
+    $logger->debug("PLUGIN PARSED RESULT =".Dumper(\%parsed_result)."");
 
     $self->_set_parsed_data(\%parsed_result);
 

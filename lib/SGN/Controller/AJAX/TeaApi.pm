@@ -3,6 +3,8 @@ package SGN::Controller::AJAX::TeaApi;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -26,7 +28,7 @@ __PACKAGE__->config(
 #     # get variables from catalyst object
 #     my $gene_name = $c->req->param("gene_name");
 #
-# 	print STDERR "genes: $gene_name\n";
+# 	$logger->error("genes: $gene_name");
 #
 # 	if ($gene_name =~ /\,/) {
 # 		@gene_array = split(/,/, $gene_name);

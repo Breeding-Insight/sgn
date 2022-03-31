@@ -48,6 +48,8 @@ use CXGN::BreedersToolbox::Accessions;
 use CXGN::BreederSearch;
 use YAML;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -479,7 +481,7 @@ sub save_experimental_design_POST : Args(0) {
     my $dbh = $c->dbc->dbh;
     my $save;
 
-    print STDERR "Saving trial... :-)\n";
+    $logger->debug("Saving trial... :-)");
 
     if (!$c->user()) {
         $c->stash->{rest} = {error => "You need to be logged in to add a trial" };
@@ -495,11 +497,11 @@ sub save_experimental_design_POST : Args(0) {
     my $error;
 
     my $design = _parse_design_from_json($c->req->param('design_json'));
-    #print STDERR "\nDesign: " . Dumper $design;
+    #$logger->error("\nDesign: " . Dumper($design));
 
     my @locations;
     my $multi_location;
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
     my $locations = $c->req->param('trial_location');
     my $trial_name = $c->req->param('project_name');
     my $trial_type = $c->req->param('trial_type');
@@ -632,7 +634,7 @@ sub save_experimental_design_POST : Args(0) {
                 });
                 my $delete_folder = $folder->delete_folder();
             }
-            print STDERR "Error saving trial: ".$save->{'error'};
+            $logger->error("Error saving trial: ".$save->{'error'});
             $c->stash->{rest} = {error => $save->{'error'}};
             return;
         } elsif ($save->{'trial_id'}) {
@@ -838,10 +840,10 @@ sub upload_trial_file_POST : Args(0) {
     select(STDERR);
     $| = 1;
 
-    print STDERR "Check 1: ".localtime()."\n";
+    $logger->debug("Check 1: ".localtime()."");
 
 
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
     my $chado_schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -885,16 +887,16 @@ sub upload_trial_file_POST : Args(0) {
     my $error;
     my $save;
 
-    print STDERR "Check 2: ".localtime()."\n";
+    $logger->debug("Check 2: ".localtime()."");
 
     if ($upload_original_name =~ /\s/ || $upload_original_name =~ /\// || $upload_original_name =~ /\\/ ) {
-        print STDERR "File name must not have spaces or slashes.\n";
+        $logger->error("File name must not have spaces or slashes.");
         $c->stash->{rest} = {error => "Uploaded file name must not contain spaces or slashes." };
         return;
     }
 
     if (!$c->user()) {
-        print STDERR "User not logged in... not uploading a trial.\n";
+        $logger->debug("User not logged in... not uploading a trial.");
         $c->stash->{rest} = {error => "You need to be logged in to upload a trial." };
         return;
     }
@@ -924,7 +926,7 @@ sub upload_trial_file_POST : Args(0) {
     }
     unlink $upload_tempfile;
 
-    print STDERR "Check 3: ".localtime()."\n";
+    $logger->debug("Check 3: ".localtime()."");
 
     $upload_metadata{'archived_file'} = $archived_filename_with_path;
     $upload_metadata{'archived_file_type'}="trial upload file";
@@ -945,7 +947,7 @@ sub upload_trial_file_POST : Args(0) {
         }
         else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error=$return_error.$error_string."<br>";
@@ -964,9 +966,9 @@ sub upload_trial_file_POST : Args(0) {
         }
     }
 
-    print STDERR "Check 4: ".localtime()."\n";
+    $logger->debug("Check 4: ".localtime()."");
 
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     my $coderef = sub {
 
@@ -993,7 +995,7 @@ sub upload_trial_file_POST : Args(0) {
             trial_stock_type => $trial_stock_type
         );
 
-        print STDERR "Trial type is ".$trial_info_hash{'trial_type'}."\n";
+        $logger->debug("Trial type is ".$trial_info_hash{'trial_type'}."");
 
         if ($field_size){
             $trial_info_hash{field_size} = $field_size;
@@ -1016,13 +1018,13 @@ sub upload_trial_file_POST : Args(0) {
     try {
         $chado_schema->txn_do($coderef);
     } catch {
-        print STDERR "Transaction Error: $_\n";
+        $logger->error("Transaction Error: $_");
         $save->{'error'} = $_;
     };
 
-    #print STDERR "Check 5: ".localtime()."\n";
+    #$logger->error("Check 5: ".localtime()."");
     if ($save->{'error'}) {
-        print STDERR "Error saving trial: ".$save->{'error'};
+        $logger->error("Error saving trial: ".$save->{'error'});
         $c->stash->{rest} = {warnings => $return_warnings, error => $save->{'error'}};
         return;
     } elsif ($save->{'trial_id'}) {
@@ -1042,9 +1044,9 @@ sub upload_multiple_trial_designs_file : Path('/ajax/trial/upload_multiple_trial
 sub upload_multiple_trial_designs_file_POST : Args(0) {
     my ($self, $c) = @_;
 
-    # print STDERR "Check 1: ".localtime()."\n";
+    # $logger->error("Check 1: ".localtime()."");
 
-    # print STDERR Dumper $c->req->params();
+    # $logger->error(Dumper($c->req->params()));
     my $chado_schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -1069,16 +1071,16 @@ sub upload_multiple_trial_designs_file_POST : Args(0) {
     my $user_name;
     my $error;
 
-    # print STDERR "Check 2: ".localtime()."\n";
-    print STDERR "Ignore warnings is $ignore_warnings\n";
+    # $logger->error("Check 2: ".localtime()."");
+    $logger->debug("Ignore warnings is $ignore_warnings");
     if ($upload_original_name =~ /\s/ || $upload_original_name =~ /\// || $upload_original_name =~ /\\/ ) {
-        print STDERR "File name must not have spaces or slashes.\n";
+        $logger->error("File name must not have spaces or slashes.");
         $c->stash->{rest} = {errors => "Uploaded file name must not contain spaces or slashes." };
         return;
     }
 
     if (!$c->user()) {
-        print STDERR "User not logged in... not uploading a trial.\n";
+        $logger->debug("User not logged in... not uploading a trial.");
         $c->stash->{rest} = {errors => "You need to be logged in to upload a trial." };
         return;
     }
@@ -1108,7 +1110,7 @@ sub upload_multiple_trial_designs_file_POST : Args(0) {
     }
     unlink $upload_tempfile;
 
-    # print STDERR "Check 3: ".localtime()."\n";
+    # $logger->error("Check 3: ".localtime()."");
     $upload_metadata{'archived_file'} = $archived_filename_with_path;
     $upload_metadata{'archived_file_type'}="trial upload file";
     $upload_metadata{'user_id'}=$user_id;
@@ -1128,8 +1130,8 @@ sub upload_multiple_trial_designs_file_POST : Args(0) {
             return;
         }
         else {
-            print STDERR "Parse errors are:\n";
-            print STDERR Dumper $parse_errors;
+            $logger->error("Parse errors are:");
+            $logger->error(Dumper $parse_errors);
             $parse_errors = $parser->get_parse_errors();
             $c->stash->{rest} = {errors => $parse_errors->{'error_messages'}};
             return;
@@ -1144,7 +1146,7 @@ sub upload_multiple_trial_designs_file_POST : Args(0) {
         }
     }
 
-    # print STDERR "Check 4: ".localtime()."\n";
+    # $logger->error("Check 4: ".localtime()."");
     my %all_designs = %{$parsed_data};
     my %save;
     $save{'errors'} = [];
@@ -1153,7 +1155,7 @@ sub upload_multiple_trial_designs_file_POST : Args(0) {
 
       for my $trial_name ( keys %all_designs ) {
         my $trial_design = $all_designs{$trial_name};
-        # print STDERR "\nSaving trial $trial_name:\n";
+        # $logger->error("\nSaving trial $trial_name:");
         my %trial_info_hash = (
             chado_schema => $chado_schema,
             dbh => $dbh,
@@ -1203,13 +1205,13 @@ sub upload_multiple_trial_designs_file_POST : Args(0) {
     try {
         $chado_schema->txn_do($coderef);
     } catch {
-        print STDERR "Transaction Error: $_\n";
+        $logger->error("Transaction Error: $_");
         push @{$save{'errors'}}, $_;
     };
 
-    #print STDERR "Check 5: ".localtime()."\n";
+    #$logger->error("Check 5: ".localtime()."");
     if (scalar @{$save{'errors'}} > 0) {
-        print STDERR "Errors saving trials: ".@{$save{'errors'}};
+        $logger->error( "Errors saving trials: ".@{$save{'errors'}});
         $c->stash->{rest} = {errors => $save{'errors'}};
         return;
     # } elsif ($save->{'trial_id'}) {

@@ -25,6 +25,8 @@ use CXGN::Chado::Cvterm;
 use Data::Dumper;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -165,7 +167,7 @@ sub get_synonyms : Path('/ajax/cvterm/get_synonyms') Args(0) {
   my $self = shift;
   my $c = shift;
   my @trait_ids = $c->req->param('trait_ids[]');
-  print STDERR "Trait ids = @trait_ids\n";
+  $logger->debug("Trait ids = @trait_ids");
   my $dbh = $c->dbc->dbh();
   my $synonyms = {};
 

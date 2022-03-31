@@ -22,13 +22,15 @@ use CXGN::Bulk::ArraySpotUnigene;
 use CXGN::Bulk::UnigeneMemberInfo;
 use CXGN::Bulk::Converter;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub download : Path('/tools/bulk/download') Args(0) { 
     my $self = shift;
     my $c = shift;
 
     my $params = $c->req->params();
 
-    print STDERR "PARAMS: ".Data::Dumper::Dumper($params);
+    $logger->error("PARAMS: ".Data::Dumper::Dumper($params));
     
     _invalid_params($c) unless $params->{idType};
 
@@ -79,11 +81,11 @@ sub download : Path('/tools/bulk/download') Args(0) {
 	$params->{solyc_conversion_files} = \@files;
 	
 	if ($params->{converter_type} eq "unigene_solyc_converter") { 
-	    print STDERR "CREATING UnigeneConverter object\n";
+	    $logger->debug("CREATING UnigeneConverter object");
 	    $bulk = CXGN::Bulk::Converter->new($params);
 	}
 	elsif ($params->{converter_type} eq "unigene_version_converter") { 
-	    print STDERR "CREATING Converter object\n";
+	    $logger->debug("CREATING Converter object");
 	    $bulk = CXGN::Bulk::UnigeneConverter->new($params);
 	    
 	}

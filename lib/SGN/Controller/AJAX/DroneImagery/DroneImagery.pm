@@ -57,6 +57,8 @@ use Spreadsheet::WriteExcel;
 use CXGN::Location;
 #use Inline::Python;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -84,7 +86,7 @@ sub raw_drone_imagery_plot_image_count_GET : Args(0) {
         JOIN metadata.md_image AS image ON(image.image_id=project_image.image_id)
         WHERE project_image.type_id in ($sql) AND image.obsolete='f';";
 
-    #print STDERR Dumper $q;
+    #$logger->error(Dumper($q));
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute();
 
@@ -93,7 +95,7 @@ sub raw_drone_imagery_plot_image_count_GET : Args(0) {
         $unique_drone_runs{$drone_run_project_id}->{$project_image_type_id_hash->{$project_image_type_id}->{display_name}}++;
         $unique_drone_runs{$drone_run_project_id}->{total_plot_image_count}++;
     }
-    #print STDERR Dumper \%unique_drone_runs;
+    #$logger->error(Dumper(\%unique_drone_runs));
 
     $c->stash->{rest} = { data => \%unique_drone_runs };
 }
@@ -138,14 +140,14 @@ sub drone_imagery_analysis_query_POST : Args(0) {
         }
     }
 
-    print STDERR Dumper \@drone_run_band_project_id_list;
+    $logger->error(Dumper(\@drone_run_band_project_id_list));
     my $images_search = CXGN::DroneImagery::ImagesSearch->new({
         bcs_schema=>$schema,
         drone_run_band_project_id_list=>\@drone_run_band_project_id_list,
         project_image_type_id_list=>$project_image_type_id_list
     });
     my ($result, $total_count) = $images_search->search();
-    print STDERR "Query found ".scalar(@$result)." Images\n";
+    $logger->debug("Query found ".scalar(@$result)." Images");
 
     my %image_data_hash;
     my %project_image_type_names;
@@ -183,7 +185,7 @@ sub drone_imagery_analysis_query_POST : Args(0) {
             push @{$data_hash{$stock_id}}, $image_string;
         }
     }
-    #print STDERR Dumper \%data_hash;
+    #$logger->error(Dumper(\%data_hash));
     my @data_array = values %data_hash;
     my @data_total = (\@total_phenotype_header, @data_array);
 
@@ -514,7 +516,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     if (defined($phenotype_data{$obsunit_stock_uniquename}->{$t})) {
                         push @row, $phenotype_data{$obsunit_stock_uniquename}->{$t} + 0;
                     } else {
-                        print STDERR $obsunit_stock_uniquename." : $t : $germplasm_name : NA \n";
+                        $logger->debug($obsunit_stock_uniquename." : $t : $germplasm_name : NA ");
                         push @row, 'NA';
                     }
                 }
@@ -723,7 +725,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                             push @row, $phenotype_data{$obsunit_stock_uniquename}->{$t} + 0;
                         }
                     } else {
-                        print STDERR $obsunit_stock_uniquename." : $t : $germplasm_name : NA \n";
+                        $logger->debug($obsunit_stock_uniquename." : $t : $germplasm_name : NA ");
                         push @row, 'NA';
                     }
                     $current_trait_index++;
@@ -863,7 +865,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             @sorted_trait_names = sort {$a <=> $b} keys %seen_times;
             @unique_plot_names = sort keys %seen_plot_names;
             @sorted_trait_names_original = sort {$a <=> $b} keys %seen_times;
-            # print STDERR Dumper \@sorted_trait_names;
+            # $logger->error(Dumper(\@sorted_trait_names));
 
             my $trait_name_encoded = 1;
             foreach my $trait_name (@sorted_trait_names) {
@@ -889,7 +891,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     $time_max = $_;
                 }
             }
-            print STDERR Dumper [$time_min, $time_max];
+            $logger->error(Dumper([$time_min, $time_max]));
 
             if ($legendre_order_number >= scalar(@sorted_trait_names)) {
                 $legendre_order_number = scalar(@sorted_trait_names) - 1;
@@ -900,7 +902,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             foreach (@sorted_trait_names) {
                 # my $scaled_time = 2*(($_ - $time_min)/($time_max - $time_min)) - 1;
                 my $scaled_time = ($_ - $time_min)/($time_max - $time_min);
-                print STDERR Dumper $scaled_time;
+                $logger->error(Dumper($scaled_time));
                 push @sorted_trait_names_scaled, $scaled_time;
                 if ($leg_pos_counter < $legendre_order_number+1) {
                     push @sorted_scaled_ln_times, log($scaled_time+0.0001);
@@ -919,7 +921,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh, '<', $stats_out_tempfile)
                 or die "Could not open file '$stats_out_tempfile' $!";
 
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -957,7 +959,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             mat\$accession_id_factor <- as.numeric(as.factor(mat\$accession_id));
             mat\$plot_id_factor <- as.numeric(as.factor(mat\$plot_id));
             write.table(mat, file=\''.$stats_prep_factor_tempfile.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');"';
-            print STDERR Dumper $cmd_factor;
+            $logger->error(Dumper($cmd_factor));
             my $status_factor = system($cmd_factor);
 
             my %plot_factor_map;
@@ -969,7 +971,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh_factor, '<', $stats_prep_factor_tempfile)
                 or die "Could not open file '$stats_prep_factor_tempfile' $!";
 
-                print STDERR "Opened $stats_prep_factor_tempfile\n";
+                $logger->debug("Opened $stats_prep_factor_tempfile");
                 $header = <$fh_factor>;
                 if ($csv->parse($header)) {
                     @header_cols = $csv->fields();
@@ -1013,7 +1015,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     $line_factor_count++;
                 }
             close($fh_factor);
-            # print STDERR Dumper \%plot_factor_map;
+            # $logger->error(Dumper(\%plot_factor_map));
             @rep_time_factors = sort keys %seen_rep_times;
             @ind_rep_factors = sort keys %seen_ind_reps;
 
@@ -1084,7 +1086,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                             push @data_matrix_phenotypes_row, $phenotype_data{$obsunit_stock_uniquename}->{$t} + 0;
                         }
                     } else {
-                        print STDERR $obsunit_stock_uniquename." : $t : $germplasm_name : NA \n";
+                        $logger->debug($obsunit_stock_uniquename." : $t : $germplasm_name : NA ");
                         push @row, '';
                         push @data_matrix_phenotypes_row, 'NA';
                     }
@@ -1095,7 +1097,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     $current_trait_index++;
                 }
             }
-            # print STDERR Dumper \@data_matrix;
+            # $logger->error(Dumper(\@data_matrix));
             my @legs_header;
             for (0..$legendre_order_number) {
                 push @legs_header, "legendre$_";
@@ -1255,7 +1257,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 range01 <- function(x){(x-min(x))/(max(x)-min(x))};
                 cor_mat <- range01(cor_mat);
                 write.table(cor_mat, file=\''.$stats_out_pe_pheno_rel_tempfile2.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                # print STDERR Dumper $pe_rel_cmd;
+                # $logger->error(Dumper($pe_rel_cmd));
                 my $status_pe_rel = system($pe_rel_cmd);
 
                 my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -1263,7 +1265,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 open(my $pe_rel_res, '<', $stats_out_pe_pheno_rel_tempfile2)
                     or die "Could not open file '$stats_out_pe_pheno_rel_tempfile2' $!";
 
-                    print STDERR "Opened $stats_out_pe_pheno_rel_tempfile2\n";
+                    $logger->debug("Opened $stats_out_pe_pheno_rel_tempfile2");
                     my $header_row = <$pe_rel_res>;
                     my @header;
                     if ($csv->parse($header_row)) {
@@ -1357,7 +1359,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                         $c->config->{'web_cluster_queue'},
                         $c->config->{basepath}
                     );
-                    # print STDERR Dumper $parent_hash;
+                    # $logger->error(Dumper($parent_hash));
 
                     my $female_geno = CXGN::Genotype::GRM->new({
                         bcs_schema=>$schema,
@@ -1386,7 +1388,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                         my @l = split '\t', $_;
                         $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                     }
-                    # print STDERR Dumper \%female_parent_grm;
+                    # $logger->error(Dumper(\%female_parent_grm));
 
                     my $male_geno = CXGN::Genotype::GRM->new({
                         bcs_schema=>$schema,
@@ -1415,7 +1417,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                         my @l = split '\t', $_;
                         $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                     }
-                    # print STDERR Dumper \%male_parent_grm;
+                    # $logger->error(Dumper(\%male_parent_grm));
 
                     my %rel_result_hash;
                     foreach my $a1 (@accession_ids) {
@@ -1446,13 +1448,13 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                             elsif ($a1 == $a2) {
                                 $male_rel = 1;
                             }
-                            # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                            # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                             my $rel = 0.5*($female_rel + $male_rel);
                             $rel_result_hash{$a1}->{$a2} = $rel;
                         }
                     }
-                    # print STDERR Dumper \%rel_result_hash;
+                    # $logger->error(Dumper(\%rel_result_hash));
 
                     my $data = '';
                     my %result_hash;
@@ -1468,7 +1470,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                         }
                     }
 
-                    # print STDERR Dumper $data;
+                    # $logger->error(Dumper($data));
                     open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                         print $F2 $data;
                     close($F2);
@@ -1502,7 +1504,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                     A_threecol\$variable <- substring(A_threecol\$variable, 2);
                     write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                    print STDERR $cmd."\n";
+                    $logger->debug($cmd."");
                     my $status = system($cmd);
 
                     my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -1511,7 +1513,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     open(my $F3, '<', $grm_out_tempfile)
                         or die "Could not open file '$grm_out_tempfile' $!";
 
-                        print STDERR "Opened $grm_out_tempfile\n";
+                        $logger->debug("Opened $grm_out_tempfile");
 
                         while (my $row = <$F3>) {
                             my @columns;
@@ -1595,7 +1597,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                         $c->config->{'web_cluster_queue'},
                         $c->config->{basepath}
                     );
-                    # print STDERR Dumper $parent_hash;
+                    # $logger->error(Dumper($parent_hash));
 
                     my $female_geno = CXGN::Genotype::GRM->new({
                         bcs_schema=>$schema,
@@ -1624,7 +1626,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                         my @l = split '\t', $_;
                         $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                     }
-                    # print STDERR Dumper \%female_parent_grm;
+                    # $logger->error(Dumper(\%female_parent_grm));
 
                     my $male_geno = CXGN::Genotype::GRM->new({
                         bcs_schema=>$schema,
@@ -1653,7 +1655,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                         my @l = split '\t', $_;
                         $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                     }
-                    # print STDERR Dumper \%male_parent_grm;
+                    # $logger->error(Dumper(\%male_parent_grm));
 
                     my %rel_result_hash;
                     foreach my $a1 (@accession_ids) {
@@ -1678,13 +1680,13 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                             elsif ($a1 == $a2) {
                                 $male_rel = 1;
                             }
-                            # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                            # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                             my $rel = 0.5*($female_rel + $male_rel);
                             $rel_result_hash{$a1}->{$a2} = $rel;
                         }
                     }
-                    # print STDERR Dumper \%rel_result_hash;
+                    # $logger->error(Dumper(\%rel_result_hash));
 
                     my $data = '';
                     my %result_hash;
@@ -1700,7 +1702,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                         }
                     }
 
-                    # print STDERR Dumper $data;
+                    # $logger->error(Dumper($data));
                     open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                         print $F2 $data;
                     close($F2);
@@ -1734,7 +1736,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                     A_threecol\$variable <- substring(A_threecol\$variable, 2);
                     write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                    print STDERR $cmd."\n";
+                    $logger->debug($cmd."");
                     my $status = system($cmd);
 
                     my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -1743,7 +1745,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     open(my $F3, '<', $grm_out_tempfile)
                         or die "Could not open file '$grm_out_tempfile' $!";
 
-                        print STDERR "Opened $grm_out_tempfile\n";
+                        $logger->debug("Opened $grm_out_tempfile");
 
                         while (my $row = <$F3>) {
                             my @columns;
@@ -2018,7 +2020,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     range01 <- function(x){(x-min(x))/(max(x)-min(x))};
                     cor_mat <- range01(cor_mat);
                     write.table(cor_mat, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                    print STDERR Dumper $htp_cmd;
+                    $logger->error(Dumper($htp_cmd));
                     my $status = system($htp_cmd);
                 }
                 elsif ($compute_relationship_matrix_from_htp_phenotypes_type eq 'blues') {
@@ -2046,7 +2048,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     rownames(rel) <- blues[,2];
                     colnames(rel) <- blues[,2];
                     write.table(rel, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                    print STDERR Dumper $htp_cmd;
+                    $logger->error(Dumper($htp_cmd));
                     my $status = system($htp_cmd);
                 }
                 else {
@@ -2059,7 +2061,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 open(my $htp_rel_res, '<', $stats_out_htp_rel_tempfile)
                     or die "Could not open file '$stats_out_htp_rel_tempfile' $!";
 
-                    print STDERR "Opened $stats_out_htp_rel_tempfile\n";
+                    $logger->debug("Opened $stats_out_htp_rel_tempfile");
                     my $header_row = <$htp_rel_res>;
                     my @header;
                     if ($csv->parse($header_row)) {
@@ -2148,7 +2150,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 open(my $fh, '<', $stats_out_tempfile)
                     or die "Could not open file '$stats_out_tempfile' $!";
 
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -2189,7 +2191,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             mix <- mmer('.$cbind_string.'~1 + replicate, random=~vs(id, Gu=geno_mat, Gtc=unsm('.$number_traits.')), rcov=~vs(units, Gtc=unsm('.$number_traits.')), data=mat, tolparinv='.$tolparinv.');
             write.table(mix\$U\$\`u:id\`, file=\''.$stats_out_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');
             "';
-            print STDERR Dumper $cmd;
+            $logger->error(Dumper($cmd));
             my $status = system($cmd);
 
             my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -2198,7 +2200,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh, '<', $stats_out_tempfile)
                 or die "Could not open file '$stats_out_tempfile' $!";
 
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -2265,7 +2267,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             }
             $cmd .= 'write.table(spatial_blup_results, file=\''.$stats_out_tempfile_2dspl.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');
             "';
-            print STDERR Dumper $cmd;
+            $logger->error(Dumper($cmd));
             my $status = system($cmd);
 
             my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -2274,7 +2276,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh, '<', $stats_out_tempfile)
                 or die "Could not open file '$stats_out_tempfile' $!";
 
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -2306,7 +2308,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh_row, '<', $stats_out_tempfile_row)
                 or die "Could not open file '$stats_out_tempfile_row' $!";
 
-                print STDERR "Opened $stats_out_tempfile_row\n";
+                $logger->debug("Opened $stats_out_tempfile_row");
                 my $header_row = <$fh_row>;
                 my @header_cols_row;
                 if ($csv->parse($header_row)) {
@@ -2335,7 +2337,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh_col, '<', $stats_out_tempfile_col)
                 or die "Could not open file '$stats_out_tempfile_col' $!";
 
-                print STDERR "Opened $stats_out_tempfile_col\n";
+                $logger->debug("Opened $stats_out_tempfile_col");
                 my $header_col = <$fh_col>;
                 my @header_cols_col;
                 if ($csv->parse($header_col)) {
@@ -2362,7 +2364,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl)
                 or die "Could not open file '$stats_out_tempfile_2dspl' $!";
 
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
                 if ($csv->parse($header_2dspl)) {
@@ -2443,7 +2445,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             $cmd .= 'write.table(genetic_coeff, file=\''.$stats_out_tempfile_genetic.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');
                 write.table(pe_coeff, file=\''.$stats_out_tempfile_permanent_environment.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');"
             ';
-            print STDERR Dumper $cmd;
+            $logger->error(Dumper($cmd));
             my $status = system($cmd);
 
             my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -2458,7 +2460,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh_genetic, '<', $stats_out_tempfile_genetic)
                 or die "Could not open file '$stats_out_tempfile_genetic' $!";
 
-                print STDERR "Opened $stats_out_tempfile_genetic\n";
+                $logger->debug("Opened $stats_out_tempfile_genetic");
                 my $header = <$fh_genetic>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -2487,7 +2489,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh, '<', $stats_out_tempfile_permanent_environment)
                 or die "Could not open file '$stats_out_tempfile_permanent_environment' $!";
 
-                print STDERR "Opened $stats_out_tempfile_permanent_environment\n";
+                $logger->debug("Opened $stats_out_tempfile_permanent_environment");
                 $header = <$fh>;
                 if ($csv->parse($header)) {
                     @header_cols = $csv->fields();
@@ -2514,13 +2516,13 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 }
             close($fh);
 
-            # print STDERR Dumper \%sommer_rr_genetic_coeff;
-            # print STDERR Dumper \%sommer_rr_temporal_coeff;
+            # $logger->error(Dumper(\%sommer_rr_genetic_coeff));
+            # $logger->error(Dumper(\%sommer_rr_temporal_coeff));
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual)
                 or die "Could not open file '$stats_out_tempfile_residual' $!";
 
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -2553,7 +2555,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     $time_max = $_;
                 }
             }
-            print STDERR Dumper [$time_min, $time_max];
+            $logger->error(Dumper([$time_min, $time_max]));
 
             my $q_time = "SELECT t.cvterm_id FROM cvterm as t JOIN cv ON(t.cv_id=cv.cv_id) WHERE t.name=? and cv.name=?;";
             my $h_time = $schema->storage->dbh()->prepare($q_time);
@@ -2575,7 +2577,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     my $coeff_counter = 0;
                     foreach my $b (@$coeffs) {
                         my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                        # print STDERR Dumper [$eval_string, $b, $time];
+                        # $logger->error(Dumper([$eval_string, $b, $time]));
                         $value += eval $eval_string;
                         $coeff_counter++;
                     }
@@ -2620,7 +2622,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     my $coeff_counter = 0;
                     foreach my $b (@$coeffs) {
                         my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                        # print STDERR Dumper [$eval_string, $b, $time];
+                        # $logger->error(Dumper([$eval_string, $b, $time]));
                         $value += eval $eval_string;
                         $coeff_counter++;
                     }
@@ -2690,7 +2692,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             }
             $cmd .= 'write.table(genetic_coeff, file=\''.$stats_out_tempfile_genetic.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');"
             ';
-            print STDERR Dumper $cmd;
+            $logger->error(Dumper($cmd));
             my $status = system($cmd);
 
             my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -2704,7 +2706,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh_genetic, '<', $stats_out_tempfile_genetic)
                 or die "Could not open file '$stats_out_tempfile_genetic' $!";
 
-                print STDERR "Opened $stats_out_tempfile_genetic\n";
+                $logger->debug("Opened $stats_out_tempfile_genetic");
                 my $header = <$fh_genetic>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -2730,12 +2732,12 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 }
             close($fh_genetic);
 
-            # print STDERR Dumper \%sommer_rr_genetic_coeff;
+            # $logger->error(Dumper(\%sommer_rr_genetic_coeff));
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual)
                 or die "Could not open file '$stats_out_tempfile_residual' $!";
 
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -2768,7 +2770,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     $time_max = $_;
                 }
             }
-            print STDERR Dumper [$time_min, $time_max];
+            $logger->error(Dumper([$time_min, $time_max]));
 
             my $q_time = "SELECT t.cvterm_id FROM cvterm as t JOIN cv ON(t.cv_id=cv.cv_id) WHERE t.name=? and cv.name=?;";
             my $h_time = $schema->storage->dbh()->prepare($q_time);
@@ -2790,7 +2792,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     my $coeff_counter = 0;
                     foreach my $b (@$coeffs) {
                         my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                        # print STDERR Dumper [$eval_string, $b, $time];
+                        # $logger->error(Dumper([$eval_string, $b, $time]));
                         $value += eval $eval_string;
                         $coeff_counter++;
                     }
@@ -2850,7 +2852,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 #diag(v) <- rep(1, '.$pheno_var_pos.');
                 write.table(v, file=\''.$stats_out_param_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');
             "';
-            print STDERR Dumper $cmd_r;
+            $logger->error(Dumper($cmd_r));
             my $status_r = system($cmd_r);
 
             my $csv = Text::CSV->new({ sep_char => "\t" });
@@ -2858,7 +2860,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             my @pheno_var;
             open(my $fh_r, '<', $stats_out_param_tempfile)
                 or die "Could not open file '$stats_out_param_tempfile' $!";
-                print STDERR "Opened $stats_out_param_tempfile\n";
+                $logger->debug("Opened $stats_out_param_tempfile");
 
                 while (my $row = <$fh_r>) {
                     my @columns;
@@ -2868,12 +2870,12 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     push @pheno_var, \@columns;
                 }
             close($fh_r);
-            # print STDERR Dumper \@pheno_var;
+            # $logger->error(Dumper(\@pheno_var));
 
             my @grm_old;
             open(my $fh_grm_old, '<', $grm_file)
                 or die "Could not open file '$grm_file' $!";
-                print STDERR "Opened $grm_file\n";
+                $logger->debug("Opened $grm_file");
 
                 while (my $row = <$fh_grm_old>) {
                     my @columns;
@@ -2899,7 +2901,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
 
             open(my $fh_grm_new, '>', $grm_rename_tempfile)
                 or die "Could not open file '$grm_rename_tempfile' $!";
-                print STDERR "Opened $grm_rename_tempfile\n";
+                $logger->debug("Opened $grm_rename_tempfile");
 
                 foreach my $i (sort keys %grm_hash_ordered) {
                     my $v = $grm_hash_ordered{$i};
@@ -3037,7 +3039,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             my $parameter_tempfile_basename = basename($parameter_tempfile);
             $stats_out_tempfile .= '.log';
             my $cmd = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd;
+            $logger->error(Dumper($cmd));
             my $status = system($cmd);
 
             $csv = Text::CSV->new({ sep_char => "\t" });
@@ -3045,9 +3047,9 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             open(my $fh_log, '<', $stats_out_tempfile)
                 or die "Could not open file '$stats_out_tempfile' $!";
 
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log);
 
@@ -3061,12 +3063,12 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res, '<', $yhat_residual_tempfile)
                 or die "Could not open file '$yhat_residual_tempfile' $!";
-                print STDERR "Opened $yhat_residual_tempfile\n";
+                $logger->debug("Opened $yhat_residual_tempfile");
 
                 my $pred_res_counter = 0;
                 my $trait_counter = 0;
                 while (my $row = <$fh_yhat_res>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -3091,10 +3093,10 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
             open(my $fh_sol, '<', $blupf90_solutions_tempfile)
                 or die "Could not open file '$blupf90_solutions_tempfile' $!";
-                print STDERR "Opened $blupf90_solutions_tempfile\n";
+                $logger->debug("Opened $blupf90_solutions_tempfile");
 
                 my $head = <$fh_sol>;
-                print STDERR $head;
+                $logger->error($head);
 
                 my $solution_file_counter = 0;
                 my $grm_sol_counter = 0;
@@ -3102,7 +3104,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 my $pe_sol_counter = 0;
                 my $pe_sol_trait_counter = 0;
                 while (my $row = <$fh_sol>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $level = $vals[2];
                     my $value = $vals[3];
@@ -3139,11 +3141,11 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 }
             close($fh_sol);
 
-            # print STDERR Dumper \%rr_genetic_coefficients;
-            # print STDERR Dumper \%rr_temporal_coefficients;
+            # $logger->error(Dumper(\%rr_genetic_coefficients));
+            # $logger->error(Dumper(\%rr_temporal_coefficients));
 
             open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
-            print STDERR "OPENED $coeff_genetic_tempfile\n";
+            $logger->debug("OPENED $coeff_genetic_tempfile");
 
             while ( my ($accession_name, $coeffs) = each %rr_genetic_coefficients) {
                 my @line = ($accession_name, @$coeffs);
@@ -3158,7 +3160,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     my $coeff_counter = 0;
                     foreach my $b (@$coeffs) {
                         my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                        # print STDERR Dumper [$eval_string, $b, $time];
+                        # $logger->error(Dumper([$eval_string, $b, $time]));
                         $value += eval $eval_string;
                         $coeff_counter++;
                     }
@@ -3195,7 +3197,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     my $coeff_counter = 0;
                     foreach my $b (@$coeffs) {
                         my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                        # print STDERR Dumper [$eval_string, $b, $time];
+                        # $logger->error(Dumper([$eval_string, $b, $time]));
                         $value += eval $eval_string;
                         $coeff_counter++;
                     }
@@ -3205,7 +3207,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             }
 
             open(my $Fpc, ">", $coeff_pe_tempfile) || die "Can't open file ".$coeff_pe_tempfile;
-            print STDERR "OPENED $coeff_pe_tempfile\n";
+            $logger->debug("OPENED $coeff_pe_tempfile");
 
             while ( my ($plot_name, $coeffs) = each %rr_temporal_coefficients) {
                 my @line = ($plot_name, @$coeffs);
@@ -3220,7 +3222,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     my $coeff_counter = 0;
                     foreach my $b (@$coeffs) {
                         my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                        # print STDERR Dumper [$eval_string, $b, $time];
+                        # $logger->error(Dumper([$eval_string, $b, $time]));
                         $value += eval $eval_string;
                         $coeff_counter++;
                     }
@@ -3257,7 +3259,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                     my $coeff_counter = 0;
                     foreach my $b (@$coeffs) {
                         my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                        # print STDERR Dumper [$eval_string, $b, $time];
+                        # $logger->error(Dumper([$eval_string, $b, $time]));
                         $value += eval $eval_string;
                         $coeff_counter++;
                     }
@@ -3266,9 +3268,9 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 }
             }
 
-            # print STDERR Dumper \%fixed_effects;
-            # print STDERR Dumper $result_blup_data;
-            # print STDERR Dumper $result_blup_pe_data;
+            # $logger->error(Dumper(\%fixed_effects));
+            # $logger->error(Dumper($result_blup_data));
+            # $logger->error(Dumper($result_blup_pe_data));
             @sorted_trait_names = sort keys %rr_unique_traits;
             @sorted_residual_trait_names = sort keys %rr_residual_unique_traits;
         }
@@ -3292,7 +3294,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             $c->stash->{rest} = { error => "There are no common accessions in the trials you have selected! If that is the case, please just select one at a time."};
             return;
         }
-        print STDERR scalar(@unique_accession_ids)." Common Accessions\n";
+        $logger->debug(scalar(@unique_accession_ids)." Common Accessions");
 
         my $marss_prediction_selection = $c->req->param('statistics_select_marss_options');
 
@@ -3352,7 +3354,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
                 if (defined($phenotype_data{$obsunit_name}->{$t})) {
                     $germplasm_pheno_hash{$germplasm_name}->{$t} = $phenotype_data{$obsunit_name}->{$t} + 0;
                 } else {
-                    print STDERR "Using NA for ".$obsunit_name." : $t : $germplasm_name :  \n";
+                    $logger->debug("Using NA for ".$obsunit_name." : $t : $germplasm_name :  ");
                 }
             }
         }
@@ -3370,8 +3372,8 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             push @phenotype_header, "$_";
         }
 
-        print STDERR Dumper \%data_matrix;
-        print STDERR Dumper \@phenotype_header;
+        $logger->error(Dumper(\%data_matrix));
+        $logger->error(Dumper(\@phenotype_header));
 
         foreach (keys %seen_germplasm_names) {
             my $germplasm_stock_id = $seen_germplasm_names{$_};
@@ -3445,7 +3447,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             $r_block->add_command('dev.off()');
             $r_block->run_block();
             my $result_matrix = R::YapRI::Data::Matrix->read_rbase($rbase,'r_block','result_matrix');
-            #print STDERR Dumper $result_matrix;
+            #$logger->error(Dumper($result_matrix));
 
             my $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
             my $md5checksum = $image->calculate_md5sum($temp_plot);
@@ -3461,7 +3463,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             my $plot_image_url;
             my $plot_image_id;
             if ($saved_image_id) {
-                print STDERR Dumper "Image $temp_plot has already been added to the database and will not be added again.";
+                $logger->error(Dumper("Image $temp_plot has already been added to the database and will not be added again."));
                 $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
                 $plot_image_fullpath = $image->get_filename('original_converted', 'full');
                 $plot_image_url = $image->get_image_url('original');
@@ -3604,7 +3606,7 @@ sub drone_imagery_calculate_statistics_POST : Args(0) {
             facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names).');
         ggsave(\''.$env_effects_figure_tempfile.'\', arrangeGrob(gg, gg_eff, nrow=2), device=\'png\', width=20, height=20, units=\'in\');
         "';
-        # print STDERR Dumper $cmd;
+        # $logger->error(Dumper($cmd));
         my $status_spatialfirst_plot = system($cmd_spatialfirst_plot);
     }
 
@@ -3669,8 +3671,8 @@ sub _drone_imagery_interactive_get_gps {
         $saved_micasense_stacks_rotated_full_separated = $saved_micasense_stacks_rotated_full;
         $saved_micasense_stacks_rotated = $saved_micasense_stacks_rotated_full->{$flight_pass_counter};
     }
-    # print STDERR Dumper $saved_micasense_stacks_rotated_full;
-    # print STDERR Dumper $saved_micasense_stacks_rotated;
+    # $logger->error(Dumper($saved_micasense_stacks_rotated_full));
+    # $logger->error(Dumper($saved_micasense_stacks_rotated));
 
     my $saved_image_stacks_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'drone_run_raw_images_saved_micasense_stacks_separated', 'project_property')->cvterm_id();
     my $saved_micasense_stacks_json = $schema->resultset("Project::Projectprop")->find({
@@ -3685,7 +3687,7 @@ sub _drone_imagery_interactive_get_gps {
         $saved_micasense_stacks_full_separated = $saved_micasense_stacks_full;
         $saved_micasense_stacks = $saved_micasense_stacks_full->{$flight_pass_counter};
     }
-    # print STDERR Dumper $saved_micasense_stacks;
+    # $logger->error(Dumper($saved_micasense_stacks));
 
     my $is_rotated;
     if ($saved_micasense_stacks_rotated) {
@@ -3739,7 +3741,7 @@ sub _drone_imagery_interactive_get_gps {
     my %latitude_rounded_map;
     my %longitude_rounded_map;
 
-    # print STDERR Dumper $saved_micasense_stacks;
+    # $logger->error(Dumper($saved_micasense_stacks));
 
     foreach (sort {$a <=> $b} keys %$saved_micasense_stacks) {
         my $image_ids_array = $saved_micasense_stacks->{$_};
@@ -3812,8 +3814,8 @@ sub _drone_imagery_interactive_get_gps {
             longitude => $longitude_raw
         };
     }
-    # print STDERR Dumper \%longitudes;
-    # print STDERR Dumper \%latitudes;
+    # $logger->error(Dumper(\%longitudes));
+    # $logger->error(Dumper(\%latitudes));
 
     my %latitude_rounded_map_ordinal;
     my %longitude_rounded_map_ordinal;
@@ -3922,7 +3924,7 @@ sub drone_imagery_separate_gps : Path('/api/drone_imagery/separate_drone_imagery
 sub drone_imagery_separate_gps_GET : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -3950,7 +3952,7 @@ sub drone_imagery_separate_gps_GET : Args(0) {
         $saved_micasense_stacks_separated = decode_json $saved_separated_micasense_stacks_json->value();
     }
 
-    # print STDERR Dumper $saved_micasense_stacks;
+    # $logger->error(Dumper($saved_micasense_stacks));
     my %pass_micasense_stacks;
     if (!$saved_micasense_stacks_separated) {
 
@@ -4014,7 +4016,7 @@ sub drone_imagery_get_gps : Path('/api/drone_imagery/get_drone_imagery_gps') : A
 sub drone_imagery_get_gps_GET : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -4048,7 +4050,7 @@ sub drone_imagery_update_gps_images_rotation : Path('/api/drone_imagery/update_g
 sub drone_imagery_update_gps_images_rotation_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -4069,7 +4071,7 @@ sub drone_imagery_update_gps_images_rotation_POST : Args(0) {
     my %rotated_saved_micasense_stacks_full;
     if ($is_rotated) {
         %rotated_saved_micasense_stacks_full = %{$return->{saved_micasense_stacks_full}};
-        print STDERR "ALREADY ROTATED\n";
+        $logger->debug("ALREADY ROTATED");
     } else {
 
         my $drone_run_rotate_process_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'drone_run_raw_images_rotation_occuring', 'project_property')->cvterm_id();
@@ -4090,11 +4092,11 @@ sub drone_imagery_update_gps_images_rotation_POST : Args(0) {
         foreach my $stack_key (sort {$a <=> $b} keys %$saved_micasense_stacks) {
             if (!$saved_micasense_stacks->{$stack_key}->[0]) {
                 delete $saved_micasense_stacks->{$stack_key};
-                print STDERR "REMOVING KEY $stack_key\n";
+                $logger->debug("REMOVING KEY $stack_key");
             }
         }
 
-        # print STDERR Dumper $saved_micasense_stacks;
+        # $logger->error(Dumper($saved_micasense_stacks));
         my @saved_micasense_stacks_values = values %$saved_micasense_stacks;
 
         my $first_image = SGN::Image->new( $schema->storage->dbh, $saved_micasense_stacks_values[0]->[3]->{image_id}, $c );
@@ -4108,7 +4110,7 @@ sub drone_imagery_update_gps_images_rotation_POST : Args(0) {
 
         my $number_system_cores = `getconf _NPROCESSORS_ONLN` or die "Could not get number of system cores!\n";
         chomp($number_system_cores);
-        print STDERR "NUMCORES $number_system_cores\n";
+        $logger->debug("NUMCORES $number_system_cores");
 
         my %gps_images;
         my $dir = $c->tempfiles_subdir('/drone_imagery_rotate');
@@ -4152,7 +4154,7 @@ sub drone_imagery_update_gps_images_rotation_POST : Args(0) {
         close($F);
 
         my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/RotateBulk.py --input_path \''.$bulk_input_temp_file.'\'';
-        print STDERR Dumper $cmd;
+        $logger->error(Dumper($cmd));
         my $status = system($cmd);
 
         my $linking_table_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'rotated_stitched_temporary_drone_imagery', 'project_md_image')->cvterm_id();
@@ -4177,7 +4179,7 @@ sub drone_imagery_update_gps_images_rotation_POST : Args(0) {
             my $rotated_image_id;
             my $rotated_image_url;
             if ($saved_image_id) {
-                print STDERR Dumper "Image $archive_rotate_temp_image has already been added to the database and will not be added again.";
+                $logger->error(Dumper("Image $archive_rotate_temp_image has already been added to the database and will not be added again."));
                 $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
                 $rotated_image_fullpath = $image->get_filename('original_converted', 'full');
                 $rotated_image_url = $image->get_image_url('original');
@@ -4237,7 +4239,7 @@ sub drone_imagery_update_gps_images_rotation_POST : Args(0) {
             };
         }
 
-        # print STDERR Dumper \%rotated_saved_micasense_stacks;
+        # $logger->error(Dumper(\%rotated_saved_micasense_stacks));
 
         my $saved_image_stacks_rotated_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'drone_run_raw_images_saved_micasense_stacks_rotated', 'project_property')->cvterm_id();
         my $saved_micasense_stacks_rotated_json = $schema->resultset("Project::Projectprop")->find({
@@ -4286,7 +4288,7 @@ sub drone_imagery_match_and_align_two_images : Path('/api/drone_imagery/match_an
 sub drone_imagery_match_and_align_two_images_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -4313,7 +4315,7 @@ sub drone_imagery_match_and_align_two_images_POST : Args(0) {
     my $align_match_temp_results_2 = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_align/imageXXXX');
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/MatchAndAlignImages.py --image_path1 \''.$image1_fullpath.'\' --image_path2 \''.$image2_fullpath.'\' --outfile_match_path \''.$match_temp_image.'\' --outfile_path \''.$align_temp_image.'\' --results_outfile_path_src \''.$align_match_temp_results.'\' --results_outfile_path_dst \''.$align_match_temp_results_2.'\' ';
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my @match_points_src;
@@ -4400,7 +4402,7 @@ sub _drone_imagery_match_and_align_images {
     my $align_match_temp_results_2 = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_align/imageXXXX');
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/MatchAndAlignImages.py --image_path1 \''.$image1_fullpath.'\' --image_path2 \''.$image2_fullpath.'\' --outfile_match_path \''.$match_temp_image.'\' --outfile_path \''.$align_temp_image.'\' --results_outfile_path_src \''.$align_match_temp_results.'\' --results_outfile_path_dst \''.$align_match_temp_results_2.'\' --max_features \''.$max_features.'\'';
-    # print STDERR Dumper $cmd;
+    # $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my @match_points_src;
@@ -4512,9 +4514,9 @@ sub _drone_imagery_match_and_align_images {
     my $p1_diff_sum = abs($diffx1) + abs($diffy1) + abs($diffx2) + abs($diffy2);
     my $p2_diff_sum = abs($diffx1) + abs($diffy1) + abs($diffx3) + abs($diffy3);
     my $p3_diff_sum = abs($diffx2) + abs($diffy2) + abs($diffx3) + abs($diffy3);
-    print STDERR "P1: ".$p1_diff_sum." P2: ".$p2_diff_sum." P3: ".$p3_diff_sum."\n";
+    $logger->debug("P1: ".$p1_diff_sum." P2: ".$p2_diff_sum." P3: ".$p3_diff_sum."");
     my $total_image_count_adjusted = $total_image_count-2;
-    print STDERR "Progress: $image_id1 $image_id2 : $image_counter / $total_image_count_adjusted (".$image_counter/$total_image_count_adjusted.") : $skipped_counter\n";
+    $logger->debug("Progress: $image_id1 $image_id2 : $image_counter / $total_image_count_adjusted (".$image_counter/$total_image_count_adjusted.") : $skipped_counter");
 
     my $smallest_diff;
     if ($p1_diff_sum <= $p2_diff_sum && $p1_diff_sum <= $p3_diff_sum) {
@@ -4675,7 +4677,7 @@ sub _perform_match_raw_images_sequential {
         my $align_temp_image = $match->{align_temp_image};
 
         # if ($gps_obj_src_lat_up_objects) {
-        #     print STDERR "LAT UP OBJS: ".scalar(@$gps_obj_src_lat_up_objects)."\n";
+        #     $logger->error("LAT UP OBJS: ".scalar(@$gps_obj_src_lat_up_objects)."");
         #     foreach (@$gps_obj_src_lat_up_objects) {
         #         my $gps_obj_src_lat_up_image_id = $_->{nir_image_id};
         #
@@ -4866,7 +4868,7 @@ sub drone_imagery_match_and_align_images_sequential : Path('/api/drone_imagery/m
 sub drone_imagery_match_and_align_images_sequential_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -4892,7 +4894,7 @@ sub drone_imagery_delete_gps_images : Path('/api/drone_imagery/delete_gps_images
 sub drone_imagery_delete_gps_images_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
 
@@ -4936,7 +4938,7 @@ sub drone_imagery_save_gps_images : Path('/api/drone_imagery/save_gps_images') :
 sub drone_imagery_save_gps_images_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    # print STDERR Dumper $c->req->params();
+    # $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $drone_run_project_id = $c->req->param('drone_run_project_id');
@@ -4975,7 +4977,7 @@ sub drone_imagery_calculate_statistics_store_analysis : Path('/api/drone_imagery
 sub drone_imagery_calculate_statistics_store_analysis_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $bcs_schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -5002,7 +5004,7 @@ sub drone_imagery_calculate_statistics_store_analysis_POST : Args(0) {
 
     my $model_string = '';
 
-    #print STDERR Dumper("STOCKS HERE: ".$stocks);
+    #$logger->error(Dumper("STOCKS HERE: ".$stocks));
     $a->accession_names($accession_names);
     $a->metadata()->traits($trait_names);
     #$a->metadata()->analysis_protocol($params->{analysis_protocol});
@@ -5010,7 +5012,7 @@ sub drone_imagery_calculate_statistics_store_analysis_POST : Args(0) {
 
     my ($verified_warning, $verified_error);
 
-    print STDERR "Storing the analysis...\n";
+    $logger->debug("Storing the analysis...");
     eval {
         ($verified_warning, $verified_error) = $a->create_and_store_analysis_design();
     };
@@ -5029,14 +5031,14 @@ sub drone_imagery_calculate_statistics_store_analysis_POST : Args(0) {
     }
 
     if (@errors) {
-        print STDERR "SORRY! Errors: ".join("\n", @errors);
+        $logger->error("SORRY! Errors: ".join(""), @errors);
         $c->stash->{rest} = { error => join "; ", @errors };
         return;
     }
 
-    print STDERR "Store analysis values...\n";
-    #print STDERR "value hash: ".Dumper($values);
-    print STDERR "traits: ".join(",",@$trait_names);
+    $logger->debug("Store analysis values...");
+    #$logger->error("value hash: ".Dumper($values));
+    $logger->error("traits: ".join(",",@$trait_names));
 
     my $plots;
     my $values;
@@ -5058,7 +5060,7 @@ sub drone_imagery_calculate_statistics_store_analysis_POST : Args(0) {
     };
 
     if ($@) {
-        print STDERR "An error occurred storing analysis values ($@).\n";
+        $logger->error("An error occurred storing analysis values ($@).");
         $c->stash->{rest} = {
             error => "An error occurred storing the values ($@).\n"
         };
@@ -5119,19 +5121,19 @@ sub _perform_image_rotate {
         $original_size = ' --original_size 1';
     }
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/Rotate.py --image_path \''.$image_fullpath.'\' --outfile_path \''.$archive_rotate_temp_image.'\' --angle '.$angle_rotation.$center.$original_size;
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     if ($check_resize) {
         my ($check_image_width, $check_image_height) = imgsize($archive_rotate_temp_image);
         if ($check_image_width > 16384) {
             my $cmd_resize = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/Resize.py --image_path \''.$archive_rotate_temp_image.'\' --outfile_path \''.$archive_rotate_temp_image.'\' --width 16384';
-            print STDERR Dumper $cmd_resize;
+            $logger->error(Dumper($cmd_resize));
             my $status_resize = system($cmd_resize);
         }
         elsif ($check_image_height > 16384) {
             my $cmd_resize = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/Resize.py --image_path \''.$archive_rotate_temp_image.'\' --outfile_path \''.$archive_rotate_temp_image.'\' --height 16384';
-            print STDERR Dumper $cmd_resize;
+            $logger->error(Dumper($cmd_resize));
             my $status_resize = system($cmd_resize);
         }
     }
@@ -5198,7 +5200,7 @@ sub _perform_image_rotate {
         my ($saved_image_id) = $h->fetchrow_array();
 
         if ($saved_image_id) {
-            print STDERR Dumper "Image $archive_rotate_temp_image has already been added to the database and will not be added again.";
+            $logger->error(Dumper("Image $archive_rotate_temp_image has already been added to the database and will not be added again."));
             $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
             $rotated_image_fullpath = $image->get_filename('original_converted', 'full');
             $rotated_image_url = $image->get_image_url('original');
@@ -5240,7 +5242,7 @@ sub drone_imagery_get_contours_GET : Args(0) {
     $archive_contours_temp_image .= '.png';
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageContours/GetContours.py --image_path \''.$image_fullpath.'\' --outfile_path \''.$archive_contours_temp_image.'\'';
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my @size = imgsize($archive_contours_temp_image);
@@ -5259,7 +5261,7 @@ sub drone_imagery_get_contours_GET : Args(0) {
     my ($saved_image_id) = $h->fetchrow_array();
 
     if ($saved_image_id) {
-        print STDERR Dumper "Image $archive_contours_temp_image has already been added to the database and will not be added again.";
+        $logger->error(Dumper("Image $archive_contours_temp_image has already been added to the database and will not be added again."));
         $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
         $contours_image_fullpath = $image->get_filename('original_converted', 'full');
         $contours_image_url = $image->get_image_url('original');
@@ -5338,16 +5340,16 @@ sub _perform_plot_polygon_assign {
     my $height_ratio = shift;
     my $cropping_type = shift || 'rectangular_square';
 
-    print STDERR "Plot Polygon Assign Type: $assign_plot_polygons_type \n";
+    $logger->debug("Plot Polygon Assign Type: $assign_plot_polygons_type ");
 
     my $number_system_cores = `getconf _NPROCESSORS_ONLN` or die "Could not get number of system cores!\n";
     chomp($number_system_cores);
-    print STDERR "NUMCORES $number_system_cores\n";
+    $logger->debug("NUMCORES $number_system_cores");
 
     my $polygon_objs = decode_json $stock_polygons;
     my %stock_ids;
 
-    # print STDERR Dumper $polygon_objs;
+    # $logger->error(Dumper($polygon_objs));
 
     foreach my $stock_name (keys %$polygon_objs) {
         my $polygon = $polygon_objs->{$stock_name};
@@ -5364,7 +5366,7 @@ sub _perform_plot_polygon_assign {
             my $last_point = pop @$polygon;
         }
         if (scalar(@$polygon) != 4){
-            # print STDERR Dumper $polygon;
+            # $logger->error(Dumper($polygon));
             $c->stash->{rest} = {error=>'Error: Polygon for '.$stock_name.' should be 4 long!'};
             $c->detach();
         }
@@ -5419,7 +5421,7 @@ sub _perform_plot_polygon_assign {
         my ($previous_result, $previous_total_count) = $previous_images_search->search();
 
         if (scalar(@$previous_result) == scalar(@found_stock_ids)) {
-            print STDERR "Plot polygon assignment for $assign_plot_polygons_type on project $drone_run_band_project_id has already occured. Skipping \n";
+            $logger->debug("Plot polygon assignment for $assign_plot_polygons_type on project $drone_run_band_project_id has already occured. Skipping ");
             return {warning => "Plot polygon assignment already occured for $assign_plot_polygons_type on project $drone_run_band_project_id."};
         }
     }
@@ -5465,7 +5467,7 @@ sub _perform_plot_polygon_assign {
     }
 
     my $cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageCropping/CropToPolygonBulk.py --inputfile_path '$bulk_input_temp_file'";
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $pm = Parallel::ForkManager->new(ceil($number_system_cores/4));
@@ -5492,7 +5494,7 @@ sub _perform_plot_polygon_assign {
         my ($image_id) = $h->fetchrow_array();
 
         if ($image_id) {
-            print STDERR Dumper "Image $archive_plot_polygons_temp_image has already been added to the database and will not be added again.";
+            $logger->error(Dumper("Image $archive_plot_polygons_temp_image has already been added to the database and will not be added again."));
             $image = SGN::Image->new( $schema->storage->dbh, $image_id, $c );
             $plot_polygon_image_fullpath = $image->get_filename('original_converted', 'full');
             $plot_polygon_image_url = $image->get_image_url('original');
@@ -5519,7 +5521,7 @@ sub drone_imagery_manual_assign_plot_polygon_save_partial_template : Path('/api/
 sub drone_imagery_manual_assign_plot_polygon_save_partial_template_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
@@ -5598,7 +5600,7 @@ sub drone_imagery_manual_assign_plot_polygon : Path('/api/drone_imagery/manual_a
 sub drone_imagery_manual_assign_plot_polygon_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
@@ -5657,7 +5659,7 @@ sub drone_imagery_manual_assign_plot_polygon_POST : Args(0) {
     while (my ($drone_run_band_id, $drone_run_band_type) = $h_drone_run_bands->fetchrow_array()) {
         $drone_run_bands_all{$drone_run_band_type} = $drone_run_band_id;
     }
-    print STDERR Dumper \%drone_run_bands_all;
+    $logger->error(Dumper(\%drone_run_bands_all));
 
     my $drone_image_types = CXGN::DroneImagery::ImageTypes::get_all_project_md_image_observation_unit_plot_polygon_types($schema);
     my @plot_polygon_type_ids = (
@@ -5755,7 +5757,7 @@ sub drone_imagery_save_plot_polygons_template_separated : Path('/api/drone_image
 sub drone_imagery_save_plot_polygons_template_separated_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $drone_run_band_project_id = $c->req->param('drone_run_band_project_id');
@@ -5797,7 +5799,7 @@ sub drone_imagery_save_plot_polygons_template_separated_POST : Args(0) {
     foreach my $stock_name (keys %$polygon_objs) {
         $save_stock_polygons->{$flight_pass_counter}->{$stock_name} = $polygon_objs->{$stock_name};
     }
-    # print STDERR Dumper $save_stock_polygons;
+    # $logger->error(Dumper($save_stock_polygons));
 
     my $drone_run_band_plot_polygons = $schema->resultset('Project::Projectprop')->update_or_create({
         type_id=>$drone_run_band_plot_polygons_type_id,
@@ -5847,7 +5849,7 @@ sub _perform_image_denoise {
     my $image_fullpath = $image->get_filename('original_converted', 'full');
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/Denoise.py --image_path \''.$image_fullpath.'\' --outfile_path \''.$archive_denoise_temp_image.'\'';
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $linking_table_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'denoised_stitched_drone_imagery', 'project_md_image')->cvterm_id();
@@ -5876,7 +5878,7 @@ sub _perform_image_denoise {
     my ($saved_image_id) = $h->fetchrow_array();
 
     if ($saved_image_id) {
-        print STDERR Dumper "Image $archive_denoise_temp_image has already been added to the database and will not be added again.";
+        $logger->error(Dumper("Image $archive_denoise_temp_image has already been added to the database and will not be added again."));
         $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
         $denoised_image_fullpath = $image->get_filename('original_converted', 'full');
         $denoised_image_url = $image->get_image_url('original');
@@ -5924,7 +5926,7 @@ sub drone_imagery_remove_background_display_POST : Args(0) {
     $archive_remove_background_temp_image .= '.png';
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/RemoveBackground.py --image_path \''.$image_fullpath.'\' --outfile_path \''.$archive_remove_background_temp_image.'\' --lower_threshold '.$lower_threshold.' --upper_threshold '.$upper_threshold;
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
@@ -5992,7 +5994,7 @@ sub _perform_image_background_remove_threshold {
     my $user_name = shift;
     my $user_role = shift;
     my $archive_remove_background_temp_image = shift;
-    print STDERR "Background Remove Threshold Image Type: $image_type\n";
+    $logger->debug("Background Remove Threshold Image Type: $image_type");
 
     my $linking_table_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, $image_type, 'project_md_image')->cvterm_id();
     my $drone_run_band_remove_background_threshold_type_id;
@@ -6010,7 +6012,7 @@ sub _perform_image_background_remove_threshold {
     my $image_fullpath = $image->get_filename('original_converted', 'full');
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/RemoveBackground.py --image_path \''.$image_fullpath.'\' --outfile_path \''.$archive_remove_background_temp_image.'\' --lower_threshold '.$lower_threshold.' --upper_threshold '.$upper_threshold;
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
@@ -6095,7 +6097,7 @@ sub _perform_image_background_remove_threshold_percentage {
     my $user_name = shift;
     my $user_role = shift;
     my $archive_remove_background_temp_image = shift;
-    print STDERR "Remove background threshold percentage $image_type\n";
+    $logger->debug("Remove background threshold percentage $image_type");
 
     my $image = SGN::Image->new( $schema->storage->dbh, $image_id, $c );
     my $image_url = $image->get_image_url("original");
@@ -6130,7 +6132,7 @@ sub _perform_image_background_remove_threshold_percentage {
     }
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/RemoveBackgroundPercentage.py --image_path \''.$image_fullpath.'\' --outfile_path \''.$archive_remove_background_temp_image.'\' --lower_percentage \''.$lower_threshold_percentage.'\' --upper_percentage \''.$upper_threshold_percentage.'\' '.$image_band_index_string;
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
@@ -6579,7 +6581,7 @@ sub get_drone_run_band_projects_GET : Args(0) {
     my $exclude_drone_run_band_project_id = $c->req->param('exclude_drone_run_band_project_id') || 0;
     my $select_all = $c->req->param('select_all') || 0;
     my $disable = $c->req->param('disable') || 0;
-    # print STDERR Dumper $c->req->params();
+    # $logger->error(Dumper($c->req->params()));
 
     my $project_start_date_type_id = SGN::Model::Cvterm->get_cvterm_row($bcs_schema, 'project_start_date', 'project_property')->cvterm_id();
     my $design_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($bcs_schema, 'design', 'project_property')->cvterm_id();
@@ -6711,7 +6713,7 @@ sub _perform_get_weeks_drone_run_after_planting {
     my $trial = CXGN::Trial->new( { bcs_schema => $schema, trial_id => $trial_id });
     my $planting_date = $trial->get_planting_date();
 
-    print STDERR $drone_date."\n";
+    $logger->debug($drone_date."");
     my $drone_date_time_object = Time::Piece->strptime($drone_date, "%Y-%B-%d %H:%M:%S");
     my $drone_date_full_calendar_datetime = $drone_date_time_object->strftime("%Y/%m/%d %H:%M:%S");
 
@@ -6719,8 +6721,8 @@ sub _perform_get_weeks_drone_run_after_planting {
         return { drone_run_date => $drone_date, drone_run_date_calendar => $drone_date_full_calendar_datetime, error => 'The planting date is not set on the field trial, so we could not get the time of this flight automaticaly'};
     }
 
-    print STDERR "$planting_date\n";
-    print STDERR "$drone_run_base_date\n";
+    $logger->debug("$planting_date");
+    $logger->debug("$drone_run_base_date");
     my $planting_date_time_object = Time::Piece->strptime($planting_date, "%Y-%B-%d");
     my $planting_date_full_calendar_datetime = $planting_date_time_object->strftime("%Y/%m/%d %H:%M:%S");
     my $time_diff;
@@ -6850,7 +6852,7 @@ sub standard_process_apply_POST : Args(0) {
             }
         );
     }
-    print STDERR Dumper \@apply_projects;
+    $logger->error(Dumper(\@apply_projects));
 
     foreach (@apply_projects) {
         my $drone_run_project_id_in = $_->{drone_run_project_id};
@@ -6993,8 +6995,8 @@ sub standard_process_apply_POST : Args(0) {
             }
         }
 
-        print STDERR Dumper \%selected_drone_run_band_types;
-        print STDERR Dumper \%vegetative_indices_hash;
+        $logger->error(Dumper(\%selected_drone_run_band_types));
+        $logger->error(Dumper(\%vegetative_indices_hash));
 
         _perform_minimal_vi_standard_process($c, $bcs_schema, $metadata_schema, \%vegetative_indices_hash, \%selected_drone_run_band_types, \%drone_run_band_info, $user_id, $user_name, $user_role, 'rectangular_square');
 
@@ -7092,7 +7094,7 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
             band_type => $drone_run_band_project_type
         };
     }
-    print STDERR Dumper \%apply_drone_run_band_project_ids_type_hash;
+    $logger->error(Dumper(\%apply_drone_run_band_project_ids_type_hash));
     my $drone_run_band_project_type_current = $apply_drone_run_band_project_ids_type_hash{$drone_run_band_project_id_input}->{band_type};
 
     my $gcp_drone_run_band_q = "SELECT project.project_id
@@ -7116,7 +7118,7 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
     $template_gcp_h->execute($gcp_drone_run_project_id_input);
     my ($template_gcp_points_json) = $template_gcp_h->fetchrow_array();
     my $template_gcp_points = decode_json $template_gcp_points_json;
-    # print STDERR Dumper $template_gcp_points;
+    # $logger->error(Dumper($template_gcp_points));
     if (scalar(keys %$template_gcp_points)<3) {
         $c->stash->{rest} = { error => "Not enough GCP points defined in the template drone run!" };
         $c->detach();
@@ -7130,7 +7132,7 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
     $current_gcp_h->execute($drone_run_project_id_input);
     my ($current_gcp_points_json) = $current_gcp_h->fetchrow_array();
     my $current_gcp_points = decode_json $current_gcp_points_json;
-    # print STDERR Dumper $current_gcp_points;
+    # $logger->error(Dumper($current_gcp_points));
     if (scalar(keys %$current_gcp_points)<3) {
         $c->stash->{rest} = { error => "Not enough GCP points defined in the current drone run!" };
         $c->detach();
@@ -7184,7 +7186,7 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
             }
         }
     }
-    print STDERR Dumper \@gcp_names_template;
+    $logger->error(Dumper(\@gcp_names_template));
 
     my $template_central_x = sum(@template_x_vals)/scalar(@template_x_vals);
     my $template_central_y = sum(@template_y_vals)/scalar(@template_y_vals);
@@ -7247,23 +7249,23 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
             push @angle_rad_currents, undef;
         }
     }
-    # print STDERR Dumper \@angle_rad_templates;
-    # print STDERR Dumper \@angle_rad_currents;
+    # $logger->error(Dumper(\@angle_rad_templates));
+    # $logger->error(Dumper(\@angle_rad_currents));
 
     my $counter = 0;
     my @angle_diffs;
     foreach (@angle_rad_templates) {
         if ($_ && $angle_rad_currents[$counter]) {
             my $diff = $_ - $angle_rad_currents[$counter];
-            # print STDERR "DIFF:". $diff."\n";
+            # $logger->error("DIFF:". $diff."");
             push @angle_diffs, $diff;
         }
         $counter++;
     }
-    print STDERR Dumper \@angle_diffs;
+    $logger->error(Dumper(\@angle_diffs));
 
     my $rotate_rad_gcp = sum(@angle_diffs)/scalar(@angle_diffs);
-    print STDERR "AVG ROTATION: $rotate_rad_gcp\n";
+    $logger->debug("AVG ROTATION: $rotate_rad_gcp");
 
     my $q2 = "SELECT project_md_image.image_id, drone_run_band_type.value
         FROM project AS drone_run_band
@@ -7312,7 +7314,7 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
             $min_o_rot_y = $_;
         }
     }
-    print STDERR Dumper [$min_o_rot_x, $min_o_rot_y];
+    $logger->error(Dumper([$min_o_rot_x, $min_o_rot_y]));
 
     my @rotated_current_points;
     foreach (@gcp_points_current) {
@@ -7374,13 +7376,13 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
     my $rotate_check_target_image_url = $rotate_check_target_image->get_image_url("original");
     my $rotate_check_target_image_fullpath = $rotate_check_target_image->get_filename('original_converted', 'full');
     my ($rotate_check_target_image_width, $rotate_check_target_image_height) = imgsize($rotate_check_target_image_fullpath);
-    print STDERR "Target Rotation: $rotate_check_target_image_width $rotate_check_target_image_height \n";
+    $logger->debug("Target Rotation: $rotate_check_target_image_width $rotate_check_target_image_height ");
 
     my $rotate_check_image = SGN::Image->new( $bcs_schema->storage->dbh, $rotate_check_image_id, $c );
     my $rotate_check_image_url = $rotate_check_image->get_image_url("original");
     my $rotate_check_image_fullpath = $rotate_check_image->get_filename('original_converted', 'full');
     my ($rotate_check_image_width, $rotate_check_image_height) = imgsize($rotate_check_image_fullpath);
-    print STDERR "Template Rotation: $rotate_check_image_width $rotate_check_image_height \n";
+    $logger->debug("Template Rotation: $rotate_check_image_width $rotate_check_image_height ");
 
     # my $template_gcp_x_scale = $rotate_check_image_width/$rotate_check_target_image_width;
     # my $template_gcp_y_scale = $rotate_check_image_height/$rotate_check_target_image_height;
@@ -7406,7 +7408,7 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
         $c->stash->{rest} = { error => "Not enough GCP points to get the y scale!" };
         $c->detach();
     }
-    print STDERR Dumper [$template_gcp_x_scale, $template_gcp_y_scale];
+    $logger->error(Dumper([$template_gcp_x_scale, $template_gcp_y_scale]));
 
     my $rotate_angle_type_id = SGN::Model::Cvterm->get_cvterm_row($bcs_schema, 'drone_run_band_rotate_angle', 'project_property')->cvterm_id();
     my $cropping_polygon_type_id = SGN::Model::Cvterm->get_cvterm_row($bcs_schema, 'drone_run_band_cropped_polygon', 'project_property')->cvterm_id();
@@ -7425,10 +7427,10 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
     my $h = $bcs_schema->storage->dbh()->prepare($q);
     $h->execute();
     my ($rotate_value_old, $plot_polygons_value_json, $cropping_value_json, $drone_run_project_id, $drone_run_project_name) = $h->fetchrow_array();
-    print STDERR Dumper $rotate_value_old;
-    print STDERR Dumper $rotate_value_old * $rad_conversion;
-    print STDERR Dumper $cropping_value_json;
-    print STDERR Dumper $plot_polygons_value_json;
+    $logger->error(Dumper($rotate_value_old));
+    $logger->error(Dumper($rotate_value_old * $rad_conversion));
+    $logger->error(Dumper($cropping_value_json));
+    $logger->error(Dumper($plot_polygons_value_json));
     my $cropping_value_old = decode_json $cropping_value_json;
     my $plot_polygons_value_old = decode_json $plot_polygons_value_json;
 
@@ -7455,7 +7457,7 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
         }
         push @old_cropping_val_dists, \@diffs;
     }
-    # print STDERR Dumper \@old_cropping_val_dists;
+    # $logger->error(Dumper(\@old_cropping_val_dists));
 
     my $image_crop;
     my $counter_c = 0;
@@ -7478,7 +7480,7 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
         };
         $counter_c++;
     }
-    # print STDERR Dumper $image_crop;
+    # $logger->error(Dumper($image_crop));
 
     $dir = $c->tempfiles_subdir('/drone_imagery_cropped_image');
     my $archive_temp_image = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_cropped_image/imageXXXX');
@@ -7670,8 +7672,8 @@ sub standard_process_apply_ground_control_points_POST : Args(0) {
         }
     }
 
-    print STDERR Dumper \%selected_drone_run_band_types;
-    print STDERR Dumper \%vegetative_indices_hash;
+    $logger->error(Dumper(\%selected_drone_run_band_types));
+    $logger->error(Dumper(\%vegetative_indices_hash));
 
     _perform_minimal_vi_standard_process($c, $bcs_schema, $metadata_schema, \%vegetative_indices_hash, \%selected_drone_run_band_types, \%drone_run_band_info, $user_id, $user_name, $user_role, 'rectangular_square');
 
@@ -7768,7 +7770,7 @@ sub standard_process_apply_previous_imaging_event_POST : Args(0) {
             band_type => $drone_run_band_project_type
         };
     }
-    print STDERR Dumper \%apply_drone_run_band_project_ids_type_hash;
+    $logger->error(Dumper(\%apply_drone_run_band_project_ids_type_hash));
     my $drone_run_band_project_type_current = $apply_drone_run_band_project_ids_type_hash{$drone_run_band_project_id_input}->{band_type};
 
     my $gcp_drone_run_band_q = "SELECT project.project_id
@@ -7799,9 +7801,9 @@ sub standard_process_apply_previous_imaging_event_POST : Args(0) {
     my $h = $bcs_schema->storage->dbh()->prepare($q);
     $h->execute();
     my ($rotate_value, $plot_polygons_value_json, $cropping_value_json, $drone_run_project_id, $drone_run_project_name) = $h->fetchrow_array();
-    print STDERR Dumper $rotate_value;
-    print STDERR Dumper $cropping_value_json;
-    print STDERR Dumper $plot_polygons_value_json;
+    $logger->error(Dumper($rotate_value));
+    $logger->error(Dumper($cropping_value_json));
+    $logger->error(Dumper($plot_polygons_value_json));
 
     my $process_indicator_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($bcs_schema, 'drone_run_standard_process_in_progress', 'project_property')->cvterm_id();
     my $processed_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($bcs_schema, 'drone_run_standard_process_completed', 'project_property')->cvterm_id();
@@ -7910,8 +7912,8 @@ sub standard_process_apply_previous_imaging_event_POST : Args(0) {
         }
     }
 
-    print STDERR Dumper \%selected_drone_run_band_types;
-    print STDERR Dumper \%vegetative_indices_hash;
+    $logger->error(Dumper(\%selected_drone_run_band_types));
+    $logger->error(Dumper(\%vegetative_indices_hash));
 
     _perform_minimal_vi_standard_process($c, $bcs_schema, $metadata_schema, \%vegetative_indices_hash, \%selected_drone_run_band_types, \%drone_run_band_info, $user_id, $user_name, $user_role, 'rectangular_square');
 
@@ -7955,7 +7957,7 @@ sub standard_process_apply_raw_images_interactive : Path('/api/drone_imagery/sta
 sub standard_process_apply_raw_images_interactive_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $metadata_schema = $c->dbic_schema('CXGN::Metadata::Schema');
     my $phenome_schema = $c->dbic_schema('CXGN::Phenome::Schema');
@@ -8029,8 +8031,8 @@ sub standard_process_apply_raw_images_interactive_POST : Args(0) {
         $c->stash->{rest} = { error => "There are no stock polygons saved!" };
         $c->detach();
     }
-    # print STDERR Dumper $save_stock_polygons;
-    # print STDERR Dumper $saved_gps_positions;
+    # $logger->error(Dumper($save_stock_polygons));
+    # $logger->error(Dumper($saved_gps_positions));
 
     #if (scalar(keys %$saved_gps_positions_separated) != scalar(keys %$save_stock_polygons_separated)) {
     #    $c->stash->{rest} = { error => "The number of imaging passes is not equal for the image positions and the plot polygons!" };
@@ -8086,13 +8088,13 @@ sub standard_process_apply_raw_images_interactive_POST : Args(0) {
                         };
                         push @{$polygons_images_positions{$plot_name}}, $obj;
                     } else {
-                        print STDERR "Polygon outside image!\n";
+                        $logger->debug("Polygon outside image!");
                     }
                 }
             }
         }
     }
-    # print STDERR Dumper \%polygons_images_positions;
+    # $logger->error(Dumper(\%polygons_images_positions));
 
     my $term_map = CXGN::DroneImagery::ImageTypes::get_base_imagery_observation_unit_plot_polygon_term_map();
     my $drone_image_types = CXGN::DroneImagery::ImageTypes::get_all_project_md_image_observation_unit_plot_polygon_types($schema);
@@ -8128,7 +8130,7 @@ sub standard_process_apply_raw_images_interactive_POST : Args(0) {
     my $bulk_input_temp_file = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_plot_polygons/bulkinputXXXX');
 
     open(my $F, ">", $bulk_input_temp_file) || die "Can't open file ".$bulk_input_temp_file;
-    # print STDERR Dumper \%polygons_images_positions;
+    # $logger->error(Dumper(\%polygons_images_positions));
 
     my $plot_polygon_type_hash = CXGN::DroneImagery::ImageTypes::get_all_project_md_image_observation_unit_plot_polygon_types($schema);
     my @input_bulk_hash;
@@ -8176,15 +8178,15 @@ sub standard_process_apply_raw_images_interactive_POST : Args(0) {
         $band_counter++;
     }
     close($F);
-    # print STDERR Dumper \@input_bulk_hash;
+    # $logger->error(Dumper(\@input_bulk_hash));
 
     my $cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageCropping/CropToPolygonBulk.py --inputfile_path '$bulk_input_temp_file'";
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $number_system_cores = `getconf _NPROCESSORS_ONLN` or die "Could not get number of system cores!\n";
     chomp($number_system_cores);
-    print STDERR "NUMCORES $number_system_cores\n";
+    $logger->debug("NUMCORES $number_system_cores");
 
     my $pm = Parallel::ForkManager->new(ceil($number_system_cores/4));
     $pm->run_on_finish( sub {
@@ -8196,7 +8198,7 @@ sub standard_process_apply_raw_images_interactive_POST : Args(0) {
 
         my $archive_plot_polygons_temp_image = $obj->{plot_temp_image};
         my $stock_id = $obj->{plot_id};
-        print STDERR Dumper $stock_id;
+        $logger->error(Dumper($stock_id));
         my $drone_run_band_project_id = $obj->{drone_run_band_project_id};
 
         my $drone_run_band_project_type = $plot_polygon_type_objects[$band_counter]->{drone_run_project_types}->[0];
@@ -8467,7 +8469,7 @@ sub drone_imagery_accession_phenotype_histogram_GET : Args(0) {
     }
     ggsave(\''.$pheno_figure_tempfile.'\', sp, device=\'png\', width=3, height=3, units=\'in\');
     dev.off();"';
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $c->stash->{rest} = { success => 1, figure => $pheno_figure_tempfile_string };
@@ -8656,8 +8658,8 @@ sub standard_process_minimal_vi_apply_POST : Args(0) {
         };
     }
 
-    print STDERR Dumper \%selected_drone_run_band_types;
-    print STDERR Dumper \%vegetative_indices_hash;
+    $logger->error(Dumper(\%selected_drone_run_band_types));
+    $logger->error(Dumper(\%vegetative_indices_hash));
 
     _perform_minimal_vi_standard_process($c, $bcs_schema, $metadata_schema, \%vegetative_indices_hash, \%selected_drone_run_band_types, \%drone_run_band_info, $user_id, $user_name, $user_role, 'rectangular_square');
 
@@ -8833,8 +8835,8 @@ sub standard_process_extended_apply_GET : Args(0) {
         }
     }
 
-    print STDERR Dumper \%selected_drone_run_band_types;
-    print STDERR Dumper \%vegetative_indices_hash;
+    $logger->error(Dumper(\%selected_drone_run_band_types));
+    $logger->error(Dumper(\%vegetative_indices_hash));
 
     _perform_extended_vi_standard_process($c, $bcs_schema, $metadata_schema, \%vegetative_indices_hash, \%selected_drone_run_band_types, \%drone_run_band_info, $user_id, $user_name, $user_role);
 
@@ -9402,7 +9404,7 @@ sub _perform_image_cropping {
     my $image_fullpath = $image->get_filename('original_converted', 'full');
 
     my $cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageCropping/CropToPolygon.py --inputfile_path '$image_fullpath' --outputfile_path '$archive_temp_image' --polygon_json '$polygons' --polygon_type rectangular_square";
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
@@ -9475,7 +9477,7 @@ sub _perform_fourier_transform_calculation {
     my $user_id = shift;
     my $user_name = shift;
     my $user_role = shift;
-    print STDERR "FT Linking Table Type: $image_type\n";
+    $logger->debug("FT Linking Table Type: $image_type");
     my $linking_table_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, $image_type, 'project_md_image')->cvterm_id();
     my $image_channel_lookup = CXGN::DroneImagery::ImageTypes::get_all_project_md_image_types_whole_images($schema)->{$linking_table_type_id}->{corresponding_channel};
 
@@ -9488,7 +9490,7 @@ sub _perform_fourier_transform_calculation {
     $archive_temp_image .= '.png';
 
     my $cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageProcess/FourierTransform.py --image_path '$image_fullpath' --outfile_path '$archive_temp_image' --image_band_index ".$image_channel_lookup." --frequency_threshold $high_pass_filter --frequency_threshold_method $high_pass_filter_type";
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $ft_image_fullpath;
@@ -9504,7 +9506,7 @@ sub _perform_fourier_transform_calculation {
     my ($saved_image_id) = $h->fetchrow_array();
 
     if ($saved_image_id) {
-        print STDERR Dumper "Image $archive_temp_image has already been added to the database and will not be added again.";
+        $logger->error(Dumper("Image $archive_temp_image has already been added to the database and will not be added again."));
         $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
         $ft_image_fullpath = $image->get_filename('original_converted', 'full');
         $ft_image_url = $image->get_image_url('original');
@@ -9619,7 +9621,7 @@ sub _perform_vegetative_index_calculation {
     $archive_temp_image .= '.png';
 
     my $cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/VegetativeIndex/$index_script.py --image_path '$image_fullpath' --outfile_path '$archive_temp_image'";
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $index_image_fullpath;
@@ -9635,7 +9637,7 @@ sub _perform_vegetative_index_calculation {
     my ($saved_image_id) = $h->fetchrow_array();
 
     if ($view_only == 1 && $saved_image_id) {
-        print STDERR Dumper "Image $archive_temp_image has already been added to the database and will not be added again.";
+        $logger->error(Dumper("Image $archive_temp_image has already been added to the database and will not be added again."));
         $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
         $index_image_fullpath = $image->get_filename('original_converted', 'full');
         $index_image_url = $image->get_image_url('original');
@@ -9705,7 +9707,7 @@ sub _perform_image_background_remove_mask {
     $archive_temp_image .= '.png';
 
     my $cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageProcess/MaskRemoveBackground.py --image_path '$image_fullpath' --mask_image_path '$mask_image_fullpath' --outfile_path '$archive_temp_image'";
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
@@ -9751,7 +9753,7 @@ sub drone_imagery_get_plot_polygon_images_GET : Args(0) {
         project_image_type_id=>$plot_polygons_images_cvterm_id
     });
     my ($result, $total_count) = $images_search->search();
-    #print STDERR Dumper $result;
+    #$logger->error(Dumper($result));
 
     my @image_paths;
     my @image_urls;
@@ -9814,13 +9816,13 @@ sub _perform_image_merge {
         drone_run_band_project_id_list=>\@drone_run_bands,
     });
     my ($result, $total_count) = $images_search->search();
-    #print STDERR Dumper $result;
+    #$logger->error(Dumper($result));
 
     my %drone_run_bands_images;
     foreach (@$result) {
         $drone_run_bands_images{$_->{drone_run_band_project_id}} = $_->{image_id};
     }
-    #print STDERR Dumper \%drone_run_bands_images;
+    #$logger->error(Dumper(\%drone_run_bands_images));
 
     my @image_filesnames;
     foreach (@drone_run_bands) {
@@ -9835,7 +9837,7 @@ sub _perform_image_merge {
     $archive_temp_image .= '.png';
 
     my $cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageProcess/MergeChannels.py --image_path_band_1 '".$image_filesnames[0]."' --image_path_band_2 '".$image_filesnames[1]."' --image_path_band_3 '".$image_filesnames[2]."' --outfile_path '$archive_temp_image'";
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
@@ -9894,7 +9896,7 @@ sub _perform_phenotype_automated {
 
     my $number_system_cores = `getconf _NPROCESSORS_ONLN` or die "Could not get number of system cores!\n";
     chomp($number_system_cores);
-    print STDERR "NUMCORES $number_system_cores\n";
+    $logger->debug("NUMCORES $number_system_cores");
 
     my @allowed_composed_cvs = split ',', $c->config->{composable_cvs};
     my $composable_cvterm_delimiter = $c->config->{composable_cvterm_delimiter};
@@ -9914,7 +9916,7 @@ sub _perform_phenotype_automated {
     my $in_progress_indicator = 1;
     while ($in_progress_indicator == 1) {
         sleep(30);
-        print STDERR "Waiting for drone standard image process to finish before calculating phenotypes\n";
+        $logger->debug("Waiting for drone standard image process to finish before calculating phenotypes");
         my $process_indicator_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'drone_run_standard_process_in_progress', 'project_property')->cvterm_id();
         my $drone_run_band_remove_background_threshold_rs = $schema->resultset('Project::Projectprop')->search({
             type_id=>$process_indicator_cvterm_id,
@@ -9953,14 +9955,14 @@ sub _perform_phenotype_automated {
 
     my @result;
     while (my ($drone_run_band_project_id, $drone_run_band_name, $drone_run_band_project_type) = $h->fetchrow_array()) {
-        print STDERR Dumper [$drone_run_band_name, $drone_run_band_project_type];
+        $logger->error(Dumper([$drone_run_band_name, $drone_run_band_project_type]));
         foreach my $phenotype_method (@$phenotype_types) {
             #my $pm = Parallel::ForkManager->new(floor(int($number_system_cores)*0.5));
             foreach my $plot_polygon_type (@{$project_observation_unit_plot_polygons_types{$drone_run_band_project_type}->{$standard_process_type}}) {
                 #my $pid = $pm->start and next;
                 my $return = _perform_phenotype_calculation($c, $schema, $metadata_schema, $phenome_schema, $drone_run_band_project_id, $drone_run_band_project_type, $phenotype_method, $time_cvterm_id, $plot_polygon_type, $user_id, $user_name, $user_role, \@allowed_composed_cvs, $composable_cvterm_delimiter, $composable_cvterm_format, 1, $ignore_new_phenotype_values, $overwrite_phenotype_values);
                 if ($return->{error}){
-                    print STDERR Dumper $return->{error};
+                    $logger->error(Dumper($return->{error}));
                 }
                 #$pm->finish();
             }
@@ -10084,7 +10086,7 @@ sub drone_imagery_quality_control_get_images_GET : Args(0) {
         drone_run_project_id_list=>[$drone_run_project_id]
     });
     my ($result, $total_count) = $images_search->search();
-    # print STDERR Dumper $total_count;
+    # $logger->error(Dumper($total_count));
 
     my %stock_images;
     foreach (@$result) {
@@ -10148,7 +10150,7 @@ sub drone_imagery_get_image_for_saving_gcp_GET : Args(0) {
         project_image_type_id_list => [$image_type_id]
     });
     my ($result, $total_count) = $images_search->search();
-    # print STDERR Dumper $result;
+    # $logger->error(Dumper($result));
 
     my @image_ids;
     my @image_types;
@@ -10198,7 +10200,7 @@ sub drone_imagery_get_image_for_time_series_GET : Args(0) {
         project_image_type_id_list => [$image_type_id, $tgi_image_type_id, $vari_image_type_id, $ndvi_image_type_id, $ndre_image_type_id]
     });
     my ($result, $total_count) = $images_search->search();
-    # print STDERR Dumper $result;
+    # $logger->error(Dumper($result));
 
     my $calendar_funcs = CXGN::Calendar->new({});
 
@@ -10215,7 +10217,7 @@ sub drone_imagery_get_image_for_time_series_GET : Args(0) {
     my %seen_image_types;
     my %time_lookup;
     foreach (@$result) {
-        # print STDERR Dumper $_;
+        # $logger->error(Dumper($_));
         if ($_->{drone_run_band_plot_polygons}) {
             my $image_type = $_->{drone_run_band_project_type}.$image_type_map{$_->{project_image_type_name}};
             my $drone_run_date = $calendar_funcs->display_start_date($_->{drone_run_date});
@@ -10423,7 +10425,7 @@ sub _perform_phenotype_calculation {
     my $ignore_new_phenotype_values = shift;
     my $overwrite_phenotype_values = shift;
 
-    print STDERR Dumper [$drone_run_band_project_id, $drone_run_band_project_type, $phenotype_method, $time_cvterm_id, $plot_polygons_type];
+    $logger->error(Dumper([$drone_run_band_project_id, $drone_run_band_project_type, $phenotype_method, $time_cvterm_id, $plot_polygons_type]));
 
     my $non_zero_pixel_count_cvterm_id = SGN::Model::Cvterm->get_cvterm_row_from_trait_name($schema, 'Nonzero Pixel Count|G2F:0000014')->cvterm_id;
     my $total_pixel_sum_cvterm_id = SGN::Model::Cvterm->get_cvterm_row_from_trait_name($schema, 'Total Pixel Sum|G2F:0000015')->cvterm_id;
@@ -10515,7 +10517,7 @@ sub _perform_phenotype_calculation {
         project_image_type_id=>$plot_polygons_images_cvterm_id
     });
     my ($result, $total_count) = $images_search->search();
-    print STDERR Dumper $total_count;
+    $logger->error(Dumper($total_count));
 
     my @header_cols;
     my @stocks;
@@ -10535,8 +10537,8 @@ sub _perform_phenotype_calculation {
         });
         my $existing_traits = $traits->{existing_traits};
         my $new_traits = $traits->{new_traits};
-        #print STDERR Dumper $new_traits;
-        #print STDERR Dumper $existing_traits;
+        #$logger->error(Dumper($new_traits));
+        #$logger->error(Dumper($existing_traits));
         my %new_trait_names;
         foreach (@$new_traits) {
             my $components = $_->[0];
@@ -10663,7 +10665,7 @@ sub _perform_phenotype_calculation {
         my $archive_temp_results = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => $temp_results_subdir.'/imageXXXX');
 
         my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/'.$calculate_phenotypes_script.' --image_paths_input_file \''.$temp_input_file.'\' '.$out_paths_string.' --results_outfile_path \''.$archive_temp_results.'\''.$calculate_phenotypes_extra_args;
-        print STDERR Dumper $cmd;
+        $logger->error(Dumper($cmd));
         my $status = system($cmd);
 
         my $time = DateTime->now();
@@ -10673,7 +10675,7 @@ sub _perform_phenotype_calculation {
         open(my $fh, '<', $archive_temp_results)
             or die "Could not open file '$archive_temp_results' $!";
 
-            print STDERR "Opened $archive_temp_results\n";
+            $logger->debug("Opened $archive_temp_results");
             my $header = <$fh>;
             if ($csv->parse($header)) {
                 @header_cols = $csv->fields();
@@ -10733,7 +10735,7 @@ sub _perform_phenotype_calculation {
                     my $stock_uniquename = $stock_info{$stock_id}->{stock_uniquename};
                     my $image_id = $stock_info{$stock_id}->{image_id};
 
-                    #print STDERR Dumper \@columns;
+                    #$logger->error(Dumper(\@columns));
                     $stock_info{$stock_id}->{result} = \@columns;
 
                     $plots_seen{$stock_uniquename} = 1;
@@ -10759,7 +10761,7 @@ sub _perform_phenotype_calculation {
             }
 
         close $fh;
-        print STDERR "Read $line lines in results file\n";
+        $logger->debug("Read $line lines in results file");
 
         if ($line > 0) {
             my %phenotype_metadata = (
@@ -10825,7 +10827,7 @@ sub _perform_phenotype_calculation {
             my ($saved_image_id) = $h->fetchrow_array();
 
             if ($saved_image_id) {
-                print STDERR Dumper "Image $_ has already been added to the database and will not be added again.";
+                $logger->error(Dumper("Image $_ has already been added to the database and will not be added again."));
                 $image_id = $saved_image_id;
                 $image = SGN::Image->new( $schema->storage->dbh, $image_id, $c );
                 $image_fullpath = $image->get_filename('original_converted', 'full');
@@ -10879,8 +10881,8 @@ sub drone_imagery_compare_images_GET : Args(0) {
         image_id_list=>$image_ids
     });
     my ($result, $total_count) = $images_search->search();
-    #print STDERR Dumper $result;
-    print STDERR Dumper $total_count;
+    #$logger->error(Dumper($result));
+    $logger->error(Dumper($total_count));
 
     my %data_hash;
     my %unique_drone_run_band_project_names;
@@ -10896,7 +10898,7 @@ sub drone_imagery_compare_images_GET : Args(0) {
         my $image_fullpath = $image->get_filename('original_converted', 'full');
         push @{$data_hash{$drone_run_band_project_name}->{$project_image_type_name}->{image_fullpaths}}, $image_fullpath;
     }
-    print STDERR Dumper \%data_hash;
+    $logger->error(Dumper(\%data_hash));
     my @unique_drone_run_band_project_names_sort = sort keys %unique_drone_run_band_project_names;
     my @unique_image_type_names_sort = sort keys %unique_image_type_names;
     my $images1 = $data_hash{$unique_drone_run_band_project_names_sort[0]}->{$unique_image_type_names_sort[0]}->{image_fullpaths};
@@ -10917,7 +10919,7 @@ sub drone_imagery_compare_images_GET : Args(0) {
     my $archive_temp_output_file = $c->config->{basepath}."/".$archive_temp_output;
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/CompareTwoImagesPixelValues.py --image_path1 \''.$image1.'\' --image_path2 \''.$image2.'\' --image_type1 \''.$unique_image_type_names_sort[0].'\' --image_type2 \''.$unique_image_type_names_sort[1].'\' --outfile_path \''.$archive_temp_output_file.'\' ';
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     $c->stash->{rest} = { success => 1, result => $c->config->{main_production_site_url}.$archive_temp_output.".png" };
@@ -10927,7 +10929,7 @@ sub drone_imagery_train_keras_model : Path('/api/drone_imagery/train_keras_model
 sub drone_imagery_train_keras_model_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -10965,8 +10967,8 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
         accession_list=>\@accession_ids
     });
     my ($result, $total_count) = $images_search->search();
-    #print STDERR Dumper $result;
-    print STDERR Dumper $total_count;
+    #$logger->error(Dumper($result));
+    $logger->error(Dumper($total_count));
 
     my %data_hash;
     my %seen_day_times;
@@ -10999,7 +11001,7 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
         $seen_field_trial_ids{$field_trial_id}++;
         $seen_stock_ids{$stock_id}++;
     }
-    print STDERR Dumper \%seen_day_times;
+    $logger->error(Dumper(\%seen_day_times));
     undef $result;
 
     my $accession_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'accession', 'stock_type')->cvterm_id();
@@ -11009,7 +11011,7 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
     my $male_parent_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'male_parent', 'stock_relationship')->cvterm_id();
 
     my @seen_plots = keys %seen_stock_ids;
-    print STDERR Dumper \@seen_plots;
+    $logger->error(Dumper(\@seen_plots));
     my $plot_list_string = join ',', @seen_plots;
     my $q = "SELECT plot.stock_id, accession.stock_id, female_parent.stock_id, male_parent.stock_id
         FROM stock AS plot
@@ -11114,7 +11116,7 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
         }
         $aux_data_hash{$d->{trial_id}}->{$d->{observationunit_stock_id}} = $d;
     }
-    #print STDERR Dumper \%data_hash;
+    #$logger->error(Dumper(\%data_hash));
     undef $data;
 
     my $archive_temp_input_file = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_keras_cnn_dir/inputfileXXXX');
@@ -11209,7 +11211,7 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
                                 field_trial_id => $field_trial_id
                             };
                             my $geno_file = $unique_genotype_accessions{$germplasm_id} || '';
-                            print STDERR Dumper $geno_file;
+                            $logger->error(Dumper($geno_file));
 
                             print $F_aux "$stock_id,";
                             print $F_aux "$value,";
@@ -11333,7 +11335,7 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
         $c->stash->{rest} = {error => "$model_type not supported!"};
         $c->detach();
     }
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $csv = Text::CSV->new({ sep_char => ',' });
@@ -11357,7 +11359,7 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
             push @result_agg, $line;
         }
     close($fh);
-    #print STDERR Dumper \@result_agg;
+    #$logger->error(Dumper(\@result_agg));
 
     open($F, ">", $archive_temp_result_agg_file) || die "Can't open file ".$archive_temp_result_agg_file;
         foreach my $data (@result_agg){
@@ -11379,7 +11381,7 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
         }
     close($fh3);
 
-    print STDERR "Train loss PLOT $archive_temp_loss_history_file \n";
+    $logger->debug("Train loss PLOT $archive_temp_loss_history_file ");
     my $rmatrix = R::YapRI::Data::Matrix->new({
         name => 'matrix1',
         coln => 1,
@@ -11423,7 +11425,7 @@ sub drone_imagery_train_keras_model_POST : Args(0) {
             my $output_image_url;
             my $output_image_fullpath;
             # if ($saved_image_id) {
-            #     print STDERR Dumper "Image $image_file has already been added to the database and will not be added again.";
+            #     $logger->error(Dumper("Image $image_file has already been added to the database and will not be added again."));
             #     $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
             #     $output_image_fullpath = $image->get_filename('original_converted', 'full');
             #     $output_image_url = $image->get_image_url('original');
@@ -11546,7 +11548,7 @@ sub drone_imagery_predict_keras_model : Path('/api/drone_imagery/predict_keras_m
 sub drone_imagery_predict_keras_model_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -11652,7 +11654,7 @@ sub _perform_keras_cnn_predict {
         $seen_field_trial_ids{$field_trial_id}++;
         $seen_stock_ids{$stock_id}++;
     }
-    print STDERR Dumper \%seen_day_times;
+    $logger->error(Dumper(\%seen_day_times));
     undef $result;
     my @seen_plots = keys %seen_stock_ids;
 
@@ -11729,7 +11731,7 @@ sub _perform_keras_cnn_predict {
         nd_protocol_id=>$model_id
     });
     my $saved_model_object = $m->get_model();
-    print STDERR Dumper $saved_model_object;
+    $logger->error(Dumper($saved_model_object));
     my $trait_id = $saved_model_object->{model_properties}->{variable_id};
     my $trained_trait_name = $saved_model_object->{model_properties}->{variable_name};
     my $aux_trait_ids_previous = $saved_model_object->{model_properties}->{aux_trait_ids};
@@ -12002,7 +12004,7 @@ sub _perform_keras_cnn_predict {
     undef %data_hash;
     undef %aux_data_hash;
 
-    print STDERR "Predicting $trained_trait_name from Keras CNN $model_type\n";
+    $logger->debug("Predicting $trained_trait_name from Keras CNN $model_type");
 
     my $log_file_path = '';
     if ($c->config->{error_log}) {
@@ -12010,7 +12012,7 @@ sub _perform_keras_cnn_predict {
     }
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/CNN/PredictKerasCNN.py --input_image_label_file \''.$archive_temp_input_file.'\' --input_image_aux_file \''.$archive_temp_input_aux_file.'\' --outfile_path \''.$archive_temp_output_file.'\' --input_model_file_path \''.$model_file.'\' --input_autoencoder_model_file_path \''.$training_autoencoder_model_file.'\' --keras_model_type_name \''.$model_type.'\' --training_data_input_file \''.$training_input_data_file.'\' --training_aux_data_input_file \''.$training_input_aux_data_file.'\' --outfile_evaluation_path \''.$archive_temp_output_evaluation_file.'\' --outfile_activation_path \''.$archive_temp_output_activation_file_path.'\' '.$log_file_path;
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my @saved_trained_image_urls;
@@ -12032,7 +12034,7 @@ sub _perform_keras_cnn_predict {
         my $output_image_url;
         my $output_image_fullpath;
         # if ($saved_image_id) {
-        #     print STDERR Dumper "Image $image_file has already been added to the database and will not be added again.";
+        #     $logger->error(Dumper("Image $image_file has already been added to the database and will not be added again."));
         #     $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
         #     $output_image_fullpath = $image->get_filename('original_converted', 'full');
         #     $output_image_url = $image->get_image_url('original');
@@ -12060,7 +12062,7 @@ sub _perform_keras_cnn_predict {
     open(my $fh, '<', $archive_temp_output_file)
         or die "Could not open file '$archive_temp_output_file' $!";
 
-        print STDERR "Opened $archive_temp_output_file\n";
+        $logger->debug("Opened $archive_temp_output_file");
         while ( my $row = <$fh> ){
             my @columns;
             if ($csv->parse($row)) {
@@ -12070,7 +12072,7 @@ sub _perform_keras_cnn_predict {
             push @predictions, $prediction;
         }
     close($fh);
-    #print STDERR Dumper \@predictions;
+    #$logger->error(Dumper(\@predictions));
 
     my $time = DateTime->now();
     my $timestamp = $time->ymd()."_".$time->hms();
@@ -12119,8 +12121,8 @@ sub _perform_keras_cnn_predict {
     });
     my $existing_traits = $traits->{existing_traits};
     my $new_traits = $traits->{new_traits};
-    # print STDERR Dumper $new_traits;
-    # print STDERR Dumper $existing_traits;
+    # $logger->error(Dumper($new_traits));
+    # $logger->error(Dumper($existing_traits));
     my %new_trait_names;
     foreach (@$new_traits) {
         my $components = $_->[0];
@@ -12136,7 +12138,7 @@ sub _perform_keras_cnn_predict {
     my %keras_features_phenotype_data;
     my $iter = 0;
     my %seen_stock_names;
-    #print STDERR Dumper \%phenotype_data_hash;
+    #$logger->error(Dumper(\%phenotype_data_hash));
     foreach my $sorted_stock_id (sort keys %predicted_stock_ids) {
         my $prediction = $predictions[$iter];
         my $stock_uniquename = $stock_info{$sorted_stock_id}->{uniquename};
@@ -12159,7 +12161,7 @@ sub _perform_keras_cnn_predict {
         $keras_predict_composed_trait_name
     );
 
-    print STDERR "Read $iter lines in results file\n";
+    $logger->debug("Read $iter lines in results file");
 
     if ($iter > 0) {
         my %phenotype_metadata = (
@@ -12198,10 +12200,10 @@ sub _perform_keras_cnn_predict {
     undef %data_hash;
     undef %phenotype_data_hash;
 
-    print STDERR "CNN Prediction Correlation\n";
+    $logger->debug("CNN Prediction Correlation");
     my @model_results;
     my @simple_data_matrix_colnames = ("previous_value", "prediction");
-    print STDERR Dumper \@simple_data_matrix;
+    $logger->error(Dumper(\@simple_data_matrix));
     my $rmatrix = R::YapRI::Data::Matrix->new({
         name => 'matrix1',
         coln => scalar(@simple_data_matrix_colnames),
@@ -12210,7 +12212,7 @@ sub _perform_keras_cnn_predict {
         data => \@simple_data_matrix
     });
 
-    print STDERR "CORR PLOT $archive_temp_output_corr_plot_file \n";
+    $logger->debug("CORR PLOT $archive_temp_output_corr_plot_file ");
     my $rbase = R::YapRI::Base->new();
     my $r_block = $rbase->create_block('r_block');
     $rmatrix->send_rbase($rbase, 'r_block');
@@ -12225,7 +12227,7 @@ sub _perform_keras_cnn_predict {
     $r_block->add_command('dev.off()');
     $r_block->run_block();
     my $result_matrix = R::YapRI::Data::Matrix->read_rbase($rbase,'r_block','mixed.lmer.matrix');
-    print STDERR Dumper $result_matrix;
+    $logger->error(Dumper($result_matrix));
     push @model_results, $result_matrix->{data}->[0];
 
     my @data_matrix_clean;
@@ -12237,10 +12239,10 @@ sub _perform_keras_cnn_predict {
             push @data_matrix_clean, 'NA';
         }
     }
-    #print STDERR Dumper \@data_matrix_clean;
+    #$logger->error(Dumper(\@data_matrix_clean));
 
     if ($model_prediction_type eq 'cnn_prediction_mixed_model') {
-        print STDERR "CNN Prediction Mixed Model\n";
+        $logger->debug("CNN Prediction Mixed Model");
 
         my $rmatrix = R::YapRI::Data::Matrix->new({
             name => 'matrix1',
@@ -12267,7 +12269,7 @@ sub _perform_keras_cnn_predict {
         $r_block->add_command('mixed.lmer.matrix[1,2] <- cor(predict(mixed.lmer), dataframe.matrix1$previous_value)');
         $r_block->run_block();
         my $result_matrix = R::YapRI::Data::Matrix->read_rbase($rbase,'r_block','mixed.lmer.matrix');
-        print STDERR Dumper $result_matrix;
+        $logger->error(Dumper($result_matrix));
         push @model_results, $result_matrix->{data}->[0];
         push @model_results, $result_matrix->{data}->[1];
     }
@@ -12301,7 +12303,7 @@ sub drone_imagery_autoencoder_keras_vi_model : Path('/api/drone_imagery/perform_
 sub drone_imagery_autoencoder_keras_vi_model_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -12408,7 +12410,7 @@ sub _perform_autoencoder_keras_cnn_vi {
         $training_seen_field_trial_ids{$field_trial_id}++;
         $training_seen_stock_ids{$stock_id}++;
     }
-    print STDERR Dumper \%training_seen_day_times;
+    $logger->error(Dumper(\%training_seen_day_times));
     undef $training_result;
     my @training_seen_plots = keys %training_seen_stock_ids;
 
@@ -12443,7 +12445,7 @@ sub _perform_autoencoder_keras_cnn_vi {
         $seen_field_trial_ids{$field_trial_id}++;
         $seen_stock_ids{$stock_id}++;
     }
-    print STDERR Dumper \%seen_day_times;
+    $logger->error(Dumper(\%seen_day_times));
     undef $result;
     my @seen_plots = keys %seen_stock_ids;
 
@@ -12574,7 +12576,7 @@ sub _perform_autoencoder_keras_cnn_vi {
     }
 
     my $cmd = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/CalculatePhenotypeAutoEncoderVegetationIndices.py --input_training_image_file \''.$archive_training_temp_input_file.'\' --input_image_file \''.$archive_temp_input_file.'\' --output_encoded_images_file \''.$archive_temp_output_images_file.'\' --outfile_path \''.$archive_temp_output_file.'\' --autoencoder_model_type \''.$autoencoder_model_type.'\' '.$log_file_path;
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my @saved_trained_image_urls;
@@ -12615,8 +12617,8 @@ sub _perform_autoencoder_keras_cnn_vi {
     });
     my $existing_traits = $traits->{existing_traits};
     my $new_traits = $traits->{new_traits};
-    #print STDERR Dumper $new_traits;
-    #print STDERR Dumper $existing_traits;
+    #$logger->error(Dumper($new_traits));
+    #$logger->error(Dumper($existing_traits));
     my %new_trait_names;
     foreach (@$new_traits) {
         my $components = $_->[0];
@@ -12639,7 +12641,7 @@ sub _perform_autoencoder_keras_cnn_vi {
     open(my $fh, '<', $archive_temp_output_file)
         or die "Could not open file '$archive_temp_output_file' $!";
 
-        print STDERR "Opened $archive_temp_output_file\n";
+        $logger->debug("Opened $archive_temp_output_file");
         my $line = 0;
         my %autoencoder_vi_phenotype_data;
         my %plots_seen;
@@ -12660,7 +12662,7 @@ sub _perform_autoencoder_keras_cnn_vi {
             my $stock_uniquename = $stock_info{$stock_id}->{stock_uniquename};
             my $output_images = $output_image_ids{$stock_id};
 
-            #print STDERR Dumper \@columns;
+            #$logger->error(Dumper(\@columns));
             $stock_info{$stock_id}->{result} = \@columns;
 
             $plots_seen{$stock_uniquename} = 1;
@@ -12672,8 +12674,8 @@ sub _perform_autoencoder_keras_cnn_vi {
         my @stocks = values %stock_info;
 
     close($fh);
-    print STDERR "Read $line lines in results file\n";
-    # print STDERR Dumper \%autoencoder_vi_phenotype_data;
+    $logger->debug("Read $line lines in results file");
+    # $logger->error(Dumper(\%autoencoder_vi_phenotype_data));
 
     if ($line > 0) {
         my %phenotype_metadata = (
@@ -12725,14 +12727,14 @@ sub drone_imagery_delete_drone_run_GET : Args(0) {
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
     my $drone_run_project_id = $c->req->param('drone_run_project_id');
     my ($user_id, $user_name, $user_role) = _check_user_login($c, 'curator');
-    print STDERR "DELETING DRONE RUN\n";
+    $logger->debug("DELETING DRONE RUN");
 
     my $images_search = CXGN::DroneImagery::ImagesSearch->new({
         bcs_schema=>$schema,
         drone_run_project_id_list=>[$drone_run_project_id],
     });
     my ($result, $total_count) = $images_search->search();
-    print STDERR Dumper $total_count;
+    $logger->error(Dumper($total_count));
 
     my %drone_run_band_project_ids;
     my %image_ids;
@@ -12754,10 +12756,10 @@ sub drone_imagery_delete_drone_run_GET : Args(0) {
     my $q2 = "DELETE FROM project WHERE project_id IN ($drone_run_band_project_ids_sql);";
     my $q3 = "DELETE FROM project WHERE project_id = $drone_run_project_id;";
     my $q4 = "DELETE FROM phenome.stock_image WHERE image_id IN (SELECT image_id FROM phenome.project_md_image WHERE project_id IN ($drone_run_band_project_ids_sql));";
-    print STDERR $q4."\n";
-    print STDERR $q1."\n";
-    print STDERR $q2."\n";
-    print STDERR $q3."\n";
+    $logger->debug($q4."");
+    $logger->debug($q1."");
+    $logger->debug($q2."");
+    $logger->debug($q3."");
     my $h4 = $schema->storage->dbh()->prepare($q4);
     $h4->execute();
     my $h1 = $schema->storage->dbh()->prepare($q1);
@@ -12814,7 +12816,7 @@ sub drone_imagery_growing_degree_days_GET : Args(0) {
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
 
     my $gdd_result = _perform_gdd_calculation_and_drone_run_time_saving($c, $schema, $field_trial_id, $drone_run_project_id, $c->config->{noaa_ncdc_access_token}, $gdd_base_temperature, $formula);
-    print STDERR Dumper $gdd_result;
+    $logger->error(Dumper($gdd_result));
 
     $c->stash->{rest} = {success => 1};
 }
@@ -12832,7 +12834,7 @@ sub drone_imagery_precipitation_sum_GET : Args(0) {
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
 
     my $precipitation_result = _perform_precipitation_sum_calculation_and_drone_run_time_saving($c, $schema, $field_trial_id, $drone_run_project_id, $c->config->{noaa_ncdc_access_token}, $formula);
-    print STDERR Dumper $precipitation_result;
+    $logger->error(Dumper($precipitation_result));
 
     $c->stash->{rest} = {success => 1};
 }
@@ -13081,7 +13083,7 @@ sub drone_imagery_retrain_mask_rcnn_GET : Args(0) {
             }
         }
     }
-    # print STDERR Dumper \%unique_image_ids;
+    # $logger->error(Dumper(\%unique_image_ids));
 
     my $drone_run_band_plot_polygons_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'drone_run_band_plot_polygons', 'project_property')->cvterm_id();
     my $denoised_stitched_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'denoised_stitched_drone_imagery', 'project_md_image')->cvterm_id();
@@ -13095,8 +13097,8 @@ sub drone_imagery_retrain_mask_rcnn_GET : Args(0) {
     $drone_run_band_polygons_h->execute();
     while (my ($project_id, $image_id, $polygon_json) = $drone_run_band_polygons_h->fetchrow_array()) {
         my $polygons = decode_json $polygon_json;
-        # print STDERR Dumper $polygons;
-        # print STDERR Dumper $image_id;
+        # $logger->error(Dumper($polygons));
+        # $logger->error(Dumper($image_id));
 
         my $image = SGN::Image->new( $schema->storage->dbh, $image_id, $c );
         my $image_url = $image->get_image_url("original");
@@ -13113,14 +13115,14 @@ sub drone_imagery_retrain_mask_rcnn_GET : Args(0) {
         $unique_image_ids{$image_id}->{image_fullpath} = $image_fullpath;
         $unique_image_ids{$image_id}->{image_url} = $image_url;
     }
-    # print STDERR Dumper \%unique_image_ids;
+    # $logger->error(Dumper(\%unique_image_ids));
 
     my $dir = $c->tempfiles_subdir('/drone_imagery_keras_cnn_maskrcnn_input_annotations_dir');
     my $output_dir = $c->tempfiles_subdir('/drone_imagery_keras_cnn_maskrcnn_dir');
     my $temp_output_model_file = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_keras_cnn_maskrcnn_dir/outputmodelfileXXXX').".h5";
     my $temp_output_dir = $c->config->{basepath}."/".$output_dir;
     my $temp_input_dir = $c->config->{basepath}."/".$dir;
-    print STDERR Dumper $temp_input_dir;
+    $logger->error(Dumper($temp_input_dir));
 
     my $temp_model_input_file = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_keras_cnn_maskrcnn_dir/annotationfileXXXX');
     open(my $F_model, ">", $temp_model_input_file) || die "Can't open file ".$temp_model_input_file;
@@ -13131,7 +13133,7 @@ sub drone_imagery_retrain_mask_rcnn_GET : Args(0) {
             my $width = $p->{width};
             my $height = $p->{height};
             my $temp_input_file = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_keras_cnn_maskrcnn_input_annotations_dir/inputannotationfileXXXX');
-            # print STDERR Dumper $archive_temp_input_file;
+            # $logger->error(Dumper($archive_temp_input_file));
 
             open(my $F_img, ">", $temp_input_file) || die "Can't open file ".$temp_input_file;
                 print $F_img "<annotation>\n";
@@ -13204,7 +13206,7 @@ sub drone_imagery_retrain_mask_rcnn_GET : Args(0) {
         $log_file_path = ' --log_file_path \''.$c->config->{error_log}.'\'';
     }
     my $cmd = $c->config->{python_executable_maskrcnn_env}.' '.$c->config->{rootpath}.'/DroneImageScripts/CNN/MaskRCNNBoundingBoxTrain.py --input_annotations_dir \''.$temp_input_dir.'\' --output_model_path \''.$temp_output_model_file.'\' --output_model_dir \''.$temp_output_dir.'\' '.$log_file_path;
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my $keras_mask_r_cnn_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'trained_keras_mask_r_cnn_model', 'protocol_type')->cvterm_id();
@@ -13278,7 +13280,7 @@ sub drone_imagery_predict_mask_rcnn_GET : Args(0) {
         nd_protocol_id=>$model_id
     });
     my $saved_model_object = $m->get_model();
-    print STDERR Dumper $saved_model_object;
+    $logger->error(Dumper($saved_model_object));
     my $model_type = $saved_model_object->{model_properties}->{model_type};
     my $trained_image_type = $saved_model_object->{model_properties}->{image_type};
     my $model_file = $saved_model_object->{model_files}->{trained_keras_mask_r_cnn_model};
@@ -13296,7 +13298,7 @@ sub drone_imagery_predict_mask_rcnn_GET : Args(0) {
     my $model_dir = $c->tempfiles_subdir('/drone_imagery_keras_cnn_maskrcnn_predict_input_model_dir');
     my $temp_input_dir = $c->config->{basepath}."/".$dir;
     my $temp_model_dir = $c->config->{basepath}."/".$model_dir;
-    print STDERR Dumper $temp_input_dir;
+    $logger->error(Dumper($temp_input_dir));
 
     my $archive_temp_output_results_file = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_keras_cnn_maskrcnn_predict_dir/outputfileXXXX');
     my $archive_temp_output_activation_file = $c->tempfile( TEMPLATE => 'drone_imagery_keras_cnn_maskrcnn_predict_input_model_dir/outputactivationfileXXXX');
@@ -13304,7 +13306,7 @@ sub drone_imagery_predict_mask_rcnn_GET : Args(0) {
     my $archive_temp_output_activation_file_path = $c->config->{basepath}."/".$archive_temp_output_activation_file;
 
     my $temp_input_file = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_keras_cnn_maskrcnn_predict_input_annotations_dir/inputannotationfileXXXX');
-    # print STDERR Dumper $archive_temp_input_file;
+    # $logger->error(Dumper($archive_temp_input_file));
 
     open(my $F_img, ">", $temp_input_file) || die "Can't open file ".$temp_input_file;
         print $F_img "<annotation>\n";
@@ -13322,19 +13324,19 @@ sub drone_imagery_predict_mask_rcnn_GET : Args(0) {
         $log_file_path = ' --log_file_path \''.$c->config->{error_log}.'\'';
     }
     my $cmd = $c->config->{python_executable_maskrcnn_env}.' '.$c->config->{rootpath}.'/DroneImageScripts/CNN/MaskRCNNBoundingBoxPredict.py --input_annotations_dir \''.$temp_input_dir.'\' --model_path \''.$model_file.'\' --model_dir \''.$temp_model_dir.'\' --outfile_annotated \''.$archive_temp_output_activation_file_path.'\' --results_outfile \''.$archive_temp_output_results_file.'\' '.$log_file_path;
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
     my $status = system($cmd);
 
     my @bounding_boxes;
     my $csv = Text::CSV->new({ sep_char => ',' });
     open(my $fh, '<', $archive_temp_output_results_file) or die "Could not open file '$archive_temp_output_results_file' $!";
-        print STDERR "Opened $archive_temp_output_results_file\n";
+        $logger->debug("Opened $archive_temp_output_results_file");
         while ( my $row = <$fh> ){
             my @columns;
             if ($csv->parse($row)) {
                 @columns = $csv->fields();
             }
-            print STDERR Dumper \@columns;
+            $logger->error(Dumper(\@columns));
             push @bounding_boxes, \@columns;
         }
     close($fh);
@@ -13443,7 +13445,7 @@ sub drone_imagery_export_drone_runs_GET : Args(0) {
             }
         }
     }
-    # print STDERR Dumper \%drone_run_csv_info;
+    # $logger->error(Dumper(\%drone_run_csv_info));
 
     my $images_zip = Archive::Zip->new();
     # my $dir_images_member = $images_zip->addDirectory( 'orthoimage_files/' );
@@ -13484,7 +13486,7 @@ sub drone_imagery_export_drone_runs_GET : Args(0) {
                 my $image_id = $band->{image_id};
                 my $image = SGN::Image->new( $schema->storage->dbh, $image_id, $c );
                 my $image_fullpath = $image->get_filename('original_converted', 'full');
-                print STDERR Dumper $image_fullpath;
+                $logger->error(Dumper($image_fullpath));
                 my $image_name = $image_id."__".$spec.".JPG";
                 my $file_member = $images_zip->addFile( $image_fullpath, $image_name );
                 push @images_file_names_return, $image_name;
@@ -13493,8 +13495,8 @@ sub drone_imagery_export_drone_runs_GET : Args(0) {
 
             my $trial = CXGN::Trial->new({ bcs_schema => $schema, trial_id => $field_trial_id });
             my $trial_layout = $trial->get_layout()->get_design();
-            # print STDERR Dumper $trial_layout;
-            # print STDERR Dumper $plot_polygons_value;
+            # $logger->error(Dumper($trial_layout));
+            # $logger->error(Dumper($plot_polygons_value));
 
             my %plot_name_lookup;
             while (my ($plot_number, $plot_info) = each %$trial_layout) {
@@ -13569,7 +13571,7 @@ sub drone_imagery_export_drone_runs_GET : Args(0) {
         my $geojson_file = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'drone_imagery_export_image_geojson_dir/geojsonXXXX');
 
         open(my $fh_geojson, '>', $geojson_file) or die "Could not open file '$geojson_file' $!";
-            print STDERR "Opened $geojson_file\n";
+            $logger->debug("Opened $geojson_file");
             print $fh_geojson $geojson_string;
         close($fh_geojson);
 

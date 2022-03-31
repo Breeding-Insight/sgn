@@ -4,6 +4,8 @@ package CXGN::List::Transform::Plugin::ProjectIds2Projects;
 use Moose;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "project_ids_2_projects";
 }
@@ -18,7 +20,7 @@ sub can_transform {
     my $type2= shift;
 
     if ((($type1 eq "project_ids") and ($type2 eq "projects")) or (($type1 eq "trial_ids")  and ($type2 eq "trials"))) { 
-        print STDERR "ProjectIds2Projects: can transform $type1 to $type2\n";
+        $logger->debug("ProjectIds2Projects: can transform $type1 to $type2");
         return 1;
     }
     return 0;
@@ -33,7 +35,7 @@ sub transform {
     my @missing = ();
 
     foreach my $l (@$list) { 
-        print STDERR "project_name = $l \n";
+        $logger->debug("project_name = $l ");
         my $rs = $schema->resultset("Project::Project")->search({
             project_id => $l,
         });
@@ -44,8 +46,8 @@ sub transform {
             push @transform, $rs->first()->name();
         }
     }
-    print STDERR " transform array = " . Dumper(@transform);
-    print STDERR " missing array = " . Dumper(@missing);
+    $logger->error(" transform array = " . Dumper(@transform));
+    $logger->error(" missing array = " . Dumper(@missing));
     return {
         transform => \@transform,
         missing   => \@missing,

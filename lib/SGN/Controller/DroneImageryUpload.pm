@@ -29,6 +29,8 @@ use CXGN::ZipFile;
 use Text::CSV;
 use SGN::Controller::AJAX::DroneImagery::DroneImagery;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) {
@@ -40,7 +42,7 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
 
     my $selected_trial_id = $c->req->param('drone_run_field_trial_id');
     if (!$selected_trial_id) {
@@ -454,16 +456,16 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
                     my $outfile_geoparams = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'upload_drone_imagery_bulk_previous/fileXXXX').".csv";
 
                     my $geo_cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageProcess/GDALOpenImageRGBGeoTiff.py --image_path $new_drone_run_input_image --outfile_path_image $outfile_image --outfile_path_image_1 $outfile_image_r --outfile_path_image_2 $outfile_image_g --outfile_path_image_3 $outfile_image_b --outfile_path_geo_params $outfile_geoparams ";
-                    print STDERR $geo_cmd."\n";
+                    $logger->debug($geo_cmd."");
                     my $geo_cmd_status = system($geo_cmd);
                     $ortho_file = $outfile_image;
 
                     open(my $fh_geoparams, '<', $outfile_geoparams) or die "Could not open file '".$outfile_geoparams."' $!";
-                        print STDERR "Opened ".$outfile_geoparams."\n";
+                        $logger->debug("Opened ".$outfile_geoparams."");
                         my $geoparams = <$fh_geoparams>;
                         chomp $geoparams;
                         @geoparams_coordinates = split ',', $geoparams;
-                        print STDERR Dumper [$geoparams, \@geoparams_coordinates];
+                        $logger->error(Dumper([$geoparams, \@geoparams_coordinates]));
                     close($fh_geoparams);
                 }
                 else {
@@ -471,16 +473,16 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
                     my $outfile_geoparams = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'upload_drone_imagery_bulk_previous/fileXXXX').".csv";
 
                     my $geo_cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageProcess/GDALOpenSingleChannelImageGeoTiff.py --image_path $new_drone_run_input_image --outfile_path_image $outfile_image --outfile_path_geo_params $outfile_geoparams ";
-                    print STDERR $geo_cmd."\n";
+                    $logger->debug($geo_cmd."");
                     my $geo_cmd_status = system($geo_cmd);
                     $ortho_file = $outfile_image;
 
                     open(my $fh_geoparams, '<', $outfile_geoparams) or die "Could not open file '".$outfile_geoparams."' $!";
-                        print STDERR "Opened ".$outfile_geoparams."\n";
+                        $logger->debug("Opened ".$outfile_geoparams."");
                         my $geoparams = <$fh_geoparams>;
                         chomp $geoparams;
                         @geoparams_coordinates = split ',', $geoparams;
-                        print STDERR Dumper [$geoparams, \@geoparams_coordinates];
+                        $logger->error(Dumper([$geoparams, \@geoparams_coordinates]));
                     close($fh_geoparams);
                 }
 
@@ -512,17 +514,17 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
                 return;
             }
             unlink $new_drone_run_input_image;
-            print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+            $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
             my ($check_image_width, $check_image_height) = imgsize($archived_filename_with_path);
             if ($check_image_width > 16384) {
                 my $cmd_resize = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/Resize.py --image_path \''.$archived_filename_with_path.'\' --outfile_path \''.$archived_filename_with_path.'\' --width 16384';
-                print STDERR Dumper $cmd_resize;
+                $logger->error(Dumper($cmd_resize));
                 my $status_resize = system($cmd_resize);
             }
             elsif ($check_image_height > 16384) {
                 my $cmd_resize = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/Resize.py --image_path \''.$archived_filename_with_path.'\' --outfile_path \''.$archived_filename_with_path.'\' --height 16384';
-                print STDERR Dumper $cmd_resize;
+                $logger->error(Dumper($cmd_resize));
                 my $status_resize = system($cmd_resize);
             }
 
@@ -543,7 +545,7 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
         my $upload_tempfile = $upload_file->tempname;
         my $time = DateTime->now();
         my $timestamp = $time->ymd()."_".$time->hms();
-        print STDERR Dumper [$upload_original_name, $upload_tempfile];
+        $logger->error(Dumper([$upload_original_name, $upload_tempfile]));
 
         my $uploader = CXGN::UploadFile->new({
             tempfile => $upload_tempfile,
@@ -563,11 +565,11 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
             return;
         }
         unlink $upload_tempfile;
-        print STDERR "Archived Drone Image ODM Zip File: $archived_filename_with_path\n";
+        $logger->debug("Archived Drone Image ODM Zip File: $archived_filename_with_path");
 
         my $image = SGN::Image->new( $c->dbc->dbh, undef, $c );
         my $zipfile_return = $image->upload_drone_imagery_zipfile($archived_filename_with_path, $user_id, $selected_drone_run_id);
-        # print STDERR Dumper $zipfile_return;
+        # $logger->error(Dumper($zipfile_return));
         if ($zipfile_return->{error}) {
             $c->stash->{message} = "Problem saving images!".$zipfile_return->{error};
             $c->stash->{template} = 'generic_message.mas';
@@ -596,7 +598,7 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
                 $c->stash->{template} = 'generic_message.mas';
                 return;
             }
-            print STDERR "Archived Drone Image ODM IMG File: $archived_filename_with_path_odm_img\n";
+            $logger->debug("Archived Drone Image ODM IMG File: $archived_filename_with_path_odm_img");
             $example_archived_filename_with_path_odm_img = $archived_filename_with_path_odm_img;
         }
 
@@ -607,7 +609,7 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
             return;
         }
 
-        print STDERR $example_archived_filename_with_path_odm_img."\n";
+        $logger->debug($example_archived_filename_with_path_odm_img."");
         my @img_path_split = split '\/', $example_archived_filename_with_path_odm_img;
         my $image_path_img_name = pop(@img_path_split);
         my $image_path_project_name = pop(@img_path_split);
@@ -615,7 +617,7 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
         # my $image_path_remaining_host = $image_path_remaining =~ s/cxgn\/sgn\/static\/documents\/tempfiles/tmp\/breedbase\-site/gr;
         my $hostpath = $c->config->{hostpath_archive};
         my $image_path_remaining_host = $image_path_remaining =~ s/\/home\/production/$hostpath/gr;
-        print STDERR Dumper [$image_path_img_name, $image_path_project_name, $image_path_remaining, $image_path_remaining_host];
+        $logger->error(Dumper([$image_path_img_name, $image_path_project_name, $image_path_remaining, $image_path_remaining_host]));
 
         my $dir = $c->tempfiles_subdir('/upload_drone_imagery_raw_images');
         my $temp_file_docker_log = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'upload_drone_imagery_raw_images/fileXXXX');
@@ -652,18 +654,18 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
                     return;
                 }
                 unlink $upload_panel_tempfile;
-                print STDERR "Archived Drone Image ODM Zip File: $archived_filename_panel_with_path\n";
+                $logger->debug("Archived Drone Image ODM Zip File: $archived_filename_panel_with_path");
 
                 # my $dtm_string = '';
                 # my $ua       = LWP::UserAgent->new();
                 # my $response = $ua->post( $c->config->{main_production_site_url}."/RunODMDocker.php", { 'file_path' => $image_path_remaining_host, 'dtm_string' => $dtm_string } );
                 # my $content  = $response->decoded_content();
-                # print STDERR Dumper $content;
+                # $logger->error(Dumper($content));
 
                 my $odm_radiometric_calibration = $new_drone_run_band_stitching_odm_radiocalibration ? '--radiometric-calibration camera' : '';
 
                 my $odm_command = 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v '.$image_path_remaining_host.':/datasets/code opendronemap/odm --project-path /datasets --rerun-all --dsm --dtm '.$odm_radiometric_calibration.' > '.$temp_file_docker_log;
-                print STDERR $odm_command."\n";
+                $logger->debug($odm_command."");
                 my $odm_status = system($odm_command);
 
                 my $odm_b1 = "$image_path_remaining/odm_orthophoto/b1.png";
@@ -691,7 +693,7 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
             }
             elsif ($new_drone_run_camera_info eq 'ccd_color' || $new_drone_run_camera_info eq 'cmos_color') {
                 my $odm_command = 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v '.$image_path_remaining_host.':/datasets/code opendronemap/odm --project-path /datasets --rerun-all --dsm --dtm > '.$temp_file_docker_log;
-                print STDERR $odm_command."\n";
+                $logger->debug($odm_command."");
                 my $odm_status = system($odm_command);
 
                 my $odm_dsm_png = "$image_path_remaining/odm_dem/dsm.png";
@@ -717,7 +719,7 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
                 $calibration_info = ' without radiocalibration';
             }
 
-            print STDERR Dumper \@stitched_bands;
+            $logger->error(Dumper(\@stitched_bands));
 
             foreach my $m (@stitched_bands) {
                 my $project_rs = $schema->resultset("Project::Project")->create({
@@ -749,7 +751,7 @@ sub upload_drone_imagery : Path("/drone_imagery/upload_drone_imagery") :Args(0) 
                     return;
                 }
                 unlink $upload_tempfile;
-                print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+                $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
                 my $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
                 $image->set_sp_person_id($user_id);
@@ -780,7 +782,7 @@ sub upload_drone_imagery_bulk : Path("/drone_imagery/upload_drone_imagery_bulk")
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
     my $dbh = $c->dbc->dbh;
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
 
     my $imaging_vehicle_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'imaging_event_vehicle', 'stock_type')->cvterm_id();
     my $imaging_vehicle_properties_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'imaging_event_vehicle_json', 'stock_property')->cvterm_id();
@@ -826,7 +828,7 @@ sub upload_drone_imagery_bulk : Path("/drone_imagery/upload_drone_imagery_bulk")
         return;
     }
     unlink $upload_tempfile;
-    print STDERR "Archived Drone Image Bulk Orthophoto Zip File: $archived_filename_with_path\n";
+    $logger->debug("Archived Drone Image Bulk Orthophoto Zip File: $archived_filename_with_path");
 
     my $archived_zip = CXGN::ZipFile->new(archived_zipfile_path=>$archived_filename_with_path);
     my $file_members = $archived_zip->file_members();
@@ -881,7 +883,7 @@ sub upload_drone_imagery_bulk : Path("/drone_imagery/upload_drone_imagery_bulk")
             return;
         }
         my $spectral_band = $spectral_lookup{$band};
-        print STDERR Dumper [$filename_wext, $filename, $temp_file, $imaging_event_name, $spectral_band];
+        $logger->error(Dumper([$filename_wext, $filename, $temp_file, $imaging_event_name, $spectral_band]));
         $filename_imaging_event_lookup{$filename_wext} = {
             file => $temp_file,
             band => $spectral_band,
@@ -1301,7 +1303,7 @@ sub upload_drone_imagery_bulk : Path("/drone_imagery/upload_drone_imagery_bulk")
                 $c->detach();
             }
             unlink $upload_tempfile;
-            print STDERR "Archived Bulk Orthophoto File: $archived_filename_with_path\n";
+            $logger->debug("Archived Bulk Orthophoto File: $archived_filename_with_path");
 
             my $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
             $image->set_sp_person_id($user_id);
@@ -1330,7 +1332,7 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
     my $dbh = $c->dbc->dbh;
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
 
     my $imaging_vehicle_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'imaging_event_vehicle', 'stock_type')->cvterm_id();
     my $imaging_vehicle_properties_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'imaging_event_vehicle_json', 'stock_property')->cvterm_id();
@@ -1421,7 +1423,7 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
         $c->detach();
     }
     unlink $upload_tempfile;
-    print STDERR "Archived Drone Image Bulk Previous Orthophoto Zip File: $archived_filename_with_path\n";
+    $logger->debug("Archived Drone Image Bulk Previous Orthophoto Zip File: $archived_filename_with_path");
 
     my $archived_zip = CXGN::ZipFile->new(archived_zipfile_path=>$archived_filename_with_path);
     my $file_members = $archived_zip->file_members();
@@ -1457,7 +1459,7 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
             return;
         }
         my $spectral_band = $spectral_lookup{$band};
-        print STDERR Dumper [$filename_wext, $filename, $temp_file, $imaging_event_name, $spectral_band];
+        $logger->error(Dumper([$filename_wext, $filename, $temp_file, $imaging_event_name, $spectral_band]));
         $filename_imaging_event_lookup{$filename_wext} = {
             file => $temp_file,
             band => $spectral_band,
@@ -1489,7 +1491,7 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
         return;
     }
     unlink $upload_geojson_tempfile;
-    print STDERR "Archived Drone Image Bulk Previous GeoJSON Zip File: $geojson_archived_filename_with_path\n";
+    $logger->debug("Archived Drone Image Bulk Previous GeoJSON Zip File: $geojson_archived_filename_with_path");
 
     my $archived_zip_geojson = CXGN::ZipFile->new(archived_zipfile_path=>$geojson_archived_filename_with_path);
     my $file_members_geojson = $archived_zip_geojson->file_members();
@@ -1514,13 +1516,13 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
             $filename_wext = $zipfile_comp[1];
         }
 
-        print STDERR Dumper [$filename, $temp_file, $filename_wext];
+        $logger->error(Dumper([$filename, $temp_file, $filename_wext]));
         $filename_imaging_event_geojson_lookup{$filename_wext} = $temp_file;
 
         open(my $fh_geojson_check, '<', $temp_file) or die "Could not open file '$temp_file' $!";
-            print STDERR "Opened $temp_file\n";
+            $logger->debug("Opened $temp_file");
             my $geojson_value_check = decode_json <$fh_geojson_check>;
-            # print STDERR Dumper $geojson_value_check;
+            # $logger->error(Dumper($geojson_value_check));
             if (!$geojson_value_check->{features}) {
                 $c->stash->{message} = 'The GeoJSON file '.$filename.' does not have a \'features\' key in it. Make sure the GeoJSON is formatted correctly.';
                 $c->stash->{template} = 'generic_message.mas';
@@ -1777,7 +1779,7 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
             push @parse_csv_errors, "The GeoJSON filename $geojson_filename does not exist in the uploaded GeoJSON zipfile!";
         }
         open(my $fh_geojson_check, '<', $filename_imaging_event_geojson_lookup{$geojson_filename}) or die "Could not open file '".$filename_imaging_event_geojson_lookup{$geojson_filename}."' $!";
-            print STDERR "Opened ".$filename_imaging_event_geojson_lookup{$geojson_filename}."\n";
+            $logger->debug("Opened ".$filename_imaging_event_geojson_lookup{$geojson_filename}."");
             my $geojson_value_check = decode_json <$fh_geojson_check>;
             foreach (@{$geojson_value_check->{features}}) {
                 my $plot_number = $_->{properties}->{ID};
@@ -1952,16 +1954,16 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
                     my $outfile_geoparams = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'upload_drone_imagery_bulk_previous/fileXXXX').".csv";
 
                     my $geo_cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageProcess/GDALOpenImageRGBGeoTiff.py --image_path $file --outfile_path_image $outfile_image --outfile_path_image_1 $outfile_image_r --outfile_path_image_2 $outfile_image_g --outfile_path_image_3 $outfile_image_b --outfile_path_geo_params $outfile_geoparams ";
-                    print STDERR $geo_cmd."\n";
+                    $logger->debug($geo_cmd."");
                     my $geo_cmd_status = system($geo_cmd);
                     $ortho_file = $outfile_image;
 
                     open(my $fh_geoparams, '<', $outfile_geoparams) or die "Could not open file '".$outfile_geoparams."' $!";
-                        print STDERR "Opened ".$outfile_geoparams."\n";
+                        $logger->debug("Opened ".$outfile_geoparams."");
                         my $geoparams = <$fh_geoparams>;
                         chomp $geoparams;
                         @geoparams_coordinates = split ',', $geoparams;
-                        print STDERR Dumper [$geoparams, \@geoparams_coordinates];
+                        $logger->error(Dumper([$geoparams, \@geoparams_coordinates]));
                     close($fh_geoparams);
                 }
                 else {
@@ -1969,16 +1971,16 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
                     my $outfile_geoparams = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'upload_drone_imagery_bulk_previous/fileXXXX').".csv";
 
                     my $geo_cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageProcess/GDALOpenSingleChannelImageGeoTiff.py --image_path $file --outfile_path_image $outfile_image --outfile_path_geo_params $outfile_geoparams ";
-                    print STDERR $geo_cmd."\n";
+                    $logger->debug($geo_cmd."");
                     my $geo_cmd_status = system($geo_cmd);
                     $ortho_file = $outfile_image;
 
                     open(my $fh_geoparams, '<', $outfile_geoparams) or die "Could not open file '".$outfile_geoparams."' $!";
-                        print STDERR "Opened ".$outfile_geoparams."\n";
+                        $logger->debug("Opened ".$outfile_geoparams."");
                         my $geoparams = <$fh_geoparams>;
                         chomp $geoparams;
                         @geoparams_coordinates = split ',', $geoparams;
-                        print STDERR Dumper [$geoparams, \@geoparams_coordinates];
+                        $logger->error(Dumper([$geoparams, \@geoparams_coordinates]));
                     close($fh_geoparams);
                 }
             }
@@ -2013,7 +2015,7 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
                 $c->detach();
             }
             unlink $upload_tempfile;
-            print STDERR "Archived Bulk Orthophoto File: $archived_filename_with_path\n";
+            $logger->debug("Archived Bulk Orthophoto File: $archived_filename_with_path");
 
             my $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
             $image->set_sp_person_id($user_id);
@@ -2099,7 +2101,7 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
         my $geojson_value;
 
         open(my $fh_geojson, '<', $geojson_filename) or die "Could not open file '$geojson_filename' $!";
-            print STDERR "Opened $geojson_filename\n";
+            $logger->debug("Opened $geojson_filename");
             $geojson_value = decode_json <$fh_geojson>;
         close($fh_geojson);
 
@@ -2240,8 +2242,8 @@ sub upload_drone_imagery_bulk_previous : Path("/drone_imagery/upload_drone_image
             $drone_run_band_counter++;
         }
 
-        print STDERR Dumper \%selected_drone_run_band_types;
-        print STDERR Dumper \%vegetative_indices_hash;
+        $logger->error(Dumper(\%selected_drone_run_band_types));
+        $logger->error(Dumper(\%vegetative_indices_hash));
 
         SGN::Controller::AJAX::DroneImagery::DroneImagery::_perform_minimal_vi_standard_process($c, $schema, $metadata_schema, \%vegetative_indices_hash, \%selected_drone_run_band_types, \%drone_run_band_info, $user_id, $user_name, $user_role, 'rectangular_polygon');
 

@@ -29,6 +29,7 @@ use SGN::Image;
 use Data::Dumper;
 
 with 'Catalyst::Component::ApplicationAttribute';
+my $logger = Log::Log4perl->get_logger();
 
 =head1 ACTIONS
 
@@ -138,9 +139,9 @@ sub view_sol100 :Path('sol100/view') :Args(0) {
     my ( $self, $c ) = @_;
 
     my ($person_id, $user_type) = CXGN::Login->new( $c->dbc->dbh )->has_session();
-    print STDERR "ACTION: ".$self->action_for('organism_tree_image')."\n";
+    $logger->debug("ACTION: ".$self->action_for('organism_tree_image')."");
 
-    print STDERR "IMAGE URI: ".$c->uri_for( $self->action_for('organism_tree_image'), ['sol100'] )->relative()."\n";
+    $logger->debug("IMAGE URI: ".$c->uri_for( $self->action_for('organism_tree_image'), ['sol100'] )->relative()."");
     
     $c->stash({
         template => "/sequencing/sol100.mas",

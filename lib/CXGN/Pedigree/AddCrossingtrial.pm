@@ -16,6 +16,8 @@ use CXGN::Trial;
 use SGN::Model::Cvterm;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'chado_schema' => (isa => 'DBIx::Class::Schema',
 		 is => 'rw',
 		 required => 1,
@@ -70,18 +72,18 @@ sub existing_crossingtrials {
 
 
 sub save_crossingtrial {
-    print STDERR "Check 4.1:".localtime();
+    $logger->error("Check 4.1:".localtime());
     my $self = shift;
     my $schema = $self->get_chado_schema();
 
     if ($self->existing_crossingtrials()){
-        print STDERR "Can't create crossing experiment: Crossing experiment name already exists\n";
+        $logger->error("Can't create crossing experiment: Crossing experiment name already exists");
         return {error => "Crossing experiment not saved: Crossing experiment name already exists"};
     }
 
 
     if (!$self->get_breeding_program_id()){
-        print STDERR "Can't create crossing experiment: Breeding program does not exist\n";
+        $logger->error("Can't create crossing experiment: Breeding program does not exist");
         return {error => "Crossing experiment not saved: Breeding program does not exist"};
     }
 

@@ -19,6 +19,8 @@ use CXGN::Genotype::Protocol;
 use CXGN::Genotype::MarkersSearch;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -78,7 +80,7 @@ sub genotyping_protocol_search_GET : Args(0) {
             $_->{create_date}
           ];
     }
-    #print STDERR "PROTOCOL LIST =".Dumper \@result."\n";
+    #$logger->error("PROTOCOL LIST =".Dumper \@result."");
 
     $c->stash->{rest} = { data => \@result };
 }
@@ -156,7 +158,7 @@ sub genotyping_protocol_pcr_markers_GET : Args(0) {
         my $linkage_group = $marker_details{$marker_name}{'linkage_group'};
         push @results, [$marker_name, $product_sizes, $forward_primer, $reverse_primer, $annealing_temperature, $sequence_motif, $sequence_source, $linkage_group];
     }
-    print STDERR "MARKER INFO =".Dumper(\@results)."\n";
+    $logger->debug("MARKER INFO =".Dumper(\@results)."");
     $c->stash->{rest} = {data => \@results};
 }
 

@@ -10,6 +10,8 @@ use CXGN::People::Person;
 use List::MoreUtils 'uniq';
 use JSON::XS;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -53,7 +55,7 @@ sub index :Path :Args(0) {
         foreach (sort {$b <=> $a} keys %file_info){
             push @file_array, $file_info{$_};
         }
-        #print STDERR Dumper \@file_array;
+        #$logger->error(Dumper(\@file_array));
         $c->stash->{phenotype_files} = \@file_array;
     }
 

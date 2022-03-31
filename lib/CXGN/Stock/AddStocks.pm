@@ -33,6 +33,8 @@ use Try::Tiny;
 use CXGN::People::Person;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'schema' => (
 		 is       => 'rw',
@@ -117,7 +119,7 @@ sub _add_stocks {
                 type_id => $population_cvterm->cvterm_id(),
                    });
         if (!$population){
-            print STDERR "Could not find population $population\n";
+            $logger->debug("Could not find population $population");
             return;
         }
     }
@@ -154,7 +156,7 @@ sub _add_stocks {
     $transaction_error =  $_;
   };
   if ($transaction_error) {
-    print STDERR "Transaction error storing stocks: $transaction_error\n";
+    $logger->error("Transaction error storing stocks: $transaction_error");
     return;
   }
 
@@ -188,12 +190,12 @@ sub validate_stocks {
 	       } );
     if ($stock_search->first()) {
       $name_conflicts++;
-      print STDERR "Stock name conflict for: $stock_name\n";
+      $logger->error("Stock name conflict for: $stock_name");
     }
   }
 
   if ($name_conflicts > 0) {
-    print STDERR "There were $name_conflicts conflict(s)\n";
+    $logger->error("There were $name_conflicts conflict(s)");
     return;
   }
 

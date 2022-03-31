@@ -10,6 +10,8 @@ use Encode;
 use CXGN::BrAPI::v2::ExternalReferences;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
 		 is       => 'rw',
 		 isa      => 'DBIx::Class::Schema',
@@ -98,7 +100,7 @@ sub get_breeding_program_by_name {
   if (!$rs) {
     return;
   }
-  print STDERR "**Projects.pm: found program_name $program_name id = " . $rs->project_id . "\n\n";
+  $logger->debug("**Projects.pm: found program_name $program_name id = " . $rs->project_id . "\n");
 
   return $rs;
 
@@ -164,7 +166,7 @@ sub get_trials_by_breeding_program {
     my %projects_that_are_sampling_trials;
 
     while (my ($id, $name, $desc, $prop, $propvalue) = $h->fetchrow_array()) {
-        #print STDERR "PROP: $prop, $propvalue \n";
+        #$logger->error("PROP: $prop, $propvalue ");
         #push @$trials, [ $id, $name, $desc ];
         if ($name) {
             $project_name{$id} = $name;
@@ -531,7 +533,7 @@ sub new_breeding_program {
         return {error => "An error occurred while generating a new breeding program."}
     }
 
-    print STDERR "The new breeding program $name was created with id $project_id\n";
+    $logger->debug("The new breeding program $name was created with id $project_id");
     return { success => "The new breeding program $name was created.", id => $project_id };
 
 }
@@ -667,12 +669,12 @@ sub get_gt_protocols {
     my $self = shift;
     my $genotyping_protocol_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($self->schema, 'genotyping_experiment', 'experiment_type')->cvterm_id();
     my $rs = $self->schema->resultset("NaturalDiversity::NdProtocol")->search( { type_id => $genotyping_protocol_cvterm_id} );
-    #print STDERR "NdProtocol resultset rows:\n";
+    #$logger->error("NdProtocol resultset rows:");
     my @protocols;
     while (my $row = $rs->next()) {
-	#print STDERR "Name: " . $row->name() . "\n";
-	#print STDERR "Name: " . $row->nd_protocol_id() . "\n";
-	#print STDERR $row;
+	#$logger->error("Name: " . $row->name() . "");
+	#$logger->error("Name: " . $row->nd_protocol_id() . "");
+	#$logger->error($row);
 	push @protocols, [ $row->nd_protocol_id(), $row->name()];
     }
     return \@protocols;

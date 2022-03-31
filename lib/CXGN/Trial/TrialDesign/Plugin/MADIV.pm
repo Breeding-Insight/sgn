@@ -3,6 +3,8 @@ package CXGN::Trial::TrialDesign::Plugin::MADIV;
 
 use Moose::Role;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub create_design {
 #sub _get_madiv_design {
     my $self = shift;
@@ -187,8 +189,8 @@ sub create_design {
     
     
     my @commands = $r_block->read_commands();
-    print STDERR join "\n", @commands;
-    print STDERR "\n";
+    $logger->debug(join("\n", @commands));
+    $logger->debug("");
     
     
     $r_block->run_block();

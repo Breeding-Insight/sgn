@@ -81,6 +81,8 @@ use JSON;
 use SGN::Context;
 use SGN::Model::Cvterm
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'shell_script_dir' => (
     isa => 'Str',
@@ -743,11 +745,11 @@ OR ((s->>'start')::int < ? AND (s->>'end')::int > ?)
     }
     $query .= " ORDER BY start ASC";
 
-    # print STDERR "QUERY:\n";
-    # print STDERR "$query\n";
-    # print STDERR "QUERY PARAMS:\n";
+    # $logger->error("QUERY:");
+    # $logger->error("$query");
+    # $logger->error("QUERY PARAMS:");
     # use Data::Dumper;
-    # print STDERR Dumper \@query_params;
+    # $logger->error(Dumper(\@query_params));
 
     # Perform the search
     my $h = $dbh->prepare($query);

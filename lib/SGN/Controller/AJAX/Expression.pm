@@ -19,6 +19,8 @@ use CXGN::Chado::Dbxref::DbxrefI;
 use CXGN::Page::FormattingHelpers qw| page_title_html info_table_html hierarchical_selectboxes_html |;
 use CXGN::Page::UserPrefs;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -73,11 +75,11 @@ sub get_data :Path('/tools/expression/result') :Args(0) {
 		}
     }
 
-	# print STDERR "my data: ".Dumper(@all_data)."\n";
-	# print STDERR "my data: ".Dumper($all_data[0]{"data"})."\n";
+	# $logger->error("my data: ".Dumper(@all_data)."");
+	# $logger->error("my data: ".Dumper($all_data[0]{"data"})."");
 
 
-#   print STDERR "final design:".Dumper(@all_design_data)."\n";
+#   $logger->error("final design:".Dumper(@all_design_data)."");
 	
 	# return errors if needed
     if (scalar (@errors) > 0){
@@ -103,7 +105,7 @@ sub get_expression_data {
     my @one_design;
     my @one_experiment;
     my $experiment;
-	
+
 	my $title;
 	my $journal;
 	my $pyear;
@@ -117,7 +119,7 @@ sub get_expression_data {
     my @exp_exp_values_rows = $schema->resultset('GeExpressionByExperiment')
                                      ->search( { template_id => $template_id } );
 	
-#   print STDERR "rows: ".Dumper(@exp_exp_values_rows)."\n";
+#   $logger->error("rows: ".Dumper(@exp_exp_values_rows)."");
 
 	foreach my $expexp_value_row (@exp_exp_values_rows) {
 		my %exp_values = $expexp_value_row->get_columns();
@@ -130,7 +132,7 @@ sub get_expression_data {
 		if (defined $experiment && defined $experiment->get_experiment_id() ) {
     
 			my $exp_name = $experiment->get_experiment_name();
-#			print STDERR "\nEXP_NAME: $exp_name\n";
+#			$logger->error("\nEXP_NAME: $exp_name");
 
 			my $exp_rep = $exp_values{'replicates_used'} || 'NA';
 
@@ -168,7 +170,7 @@ sub get_expression_data {
 				 $exp_dbxref_html = "$exp_dbxref_html ".get_dbxref_html($dbxref_id, $schema);
 		     }
 			 
-			 print STDERR "SRA dbxref: $exp_dbxref_html\n";
+			 $logger->debug("SRA dbxref: $exp_dbxref_html");
  			$one_exp{"exp_links"} = $exp_dbxref_html;
 			 
 
@@ -176,7 +178,7 @@ sub get_expression_data {
 #           my $tissue = set_tissue($target_list[0]);
 
 		}
-	#	print STDERR "one exp:".Dumper(@one_experiment)."\n";
+	#	$logger->error("one exp:".Dumper(@one_experiment)."");
 		my %tmp_hash = %one_exp;
 		push (@all_exp, \%tmp_hash);
 		# %one_exp;
@@ -192,7 +194,7 @@ sub get_expression_data {
 	my $pub_html = '';
 	my $expdesign_dbxref_html = '';
 	
-    #print STDERR "$expdesign_name: experiment replicates: $exp_rep\n\n";
+    #$logger->error("$expdesign_name: experiment replicates: $exp_rep\n");
 	
 	# get exp_design publications
 	my @pub_id_list = $expdesign->get_publication_list();
@@ -228,7 +230,7 @@ sub get_expression_data {
 		}
 
 	}
-	# print STDERR "$expdesign_dbxref_html\n";
+	# $logger->error("$expdesign_dbxref_html");
 	
 	# my $exp_design_description = "<b>$expdesign_name:</b> $expdesign_desc.";
 	
@@ -283,7 +285,7 @@ sub set_tissue {
 	    my $cvterm = CXGN::Chado::Cvterm->new( $dbh, $dbxref_po{'cvterm.cvterm_id'} );
 	    my $accession   = $cvterm->get_accession;
 			
-#	    print STDERR "$accession: $po_name\n";
+#	    $logger->error("$accession: $po_name");
 	}
     }
     return $tissue;

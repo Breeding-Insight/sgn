@@ -49,6 +49,8 @@ use LWP::Simple;
 use HTML::Entities;
 use URI::Encode qw(uri_encode uri_decode);
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -62,11 +64,11 @@ sub create_cross_wishlist : Path('/ajax/cross/create_cross_wishlist') : ActionCl
 sub create_cross_wishlist_POST : Args(0) {
     my ($self, $c) = @_;
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
     my $data = decode_json $c->req->param('crosses');
     my $female_trial_id = $c->req->param('female_trial_id');
     my $male_trial_id = $c->req->param('male_trial_id');
-#    print STDERR "CROSSES =".Dumper($data)."\n";
+#    $logger->error("CROSSES =".Dumper($data)."");
 
     my $female_trial = CXGN::Trial->new( { bcs_schema => $schema, trial_id => $female_trial_id });
     my $location = $female_trial->get_location();
@@ -84,7 +86,7 @@ sub create_cross_wishlist_POST : Args(0) {
         $selected_females{$_->{female_id}}++;
         $selected_males{$_->{male_id}}++;
     }
-#    print STDERR "CROSS HASH =".Dumper(\%selected_cross_hash)."\n";
+#    $logger->error("CROSS HASH =".Dumper(\%selected_cross_hash)."");
 
     my %ordered_data;
     foreach my $female_id (keys %selected_cross_hash){
@@ -95,18 +97,18 @@ sub create_cross_wishlist_POST : Args(0) {
             }
         }
     }
-#    print STDERR "ORDERED DATA =".Dumper(\%ordered_data)."\n";
+#    $logger->error("ORDERED DATA =".Dumper(\%ordered_data)."");
 
     my $female_trial_layout = CXGN::Trial::TrialLayout->new({ schema => $schema, trial_id => $female_trial_id, experiment_type=>'field_layout' });
     my $design_layout = $female_trial_layout->get_design();
-    print STDERR Dumper $design_layout;
+    $logger->error(Dumper($design_layout));
 
     my %block_plot_hash;
-    print STDERR "NUM PLOTS:".scalar(keys %$design_layout);
+    $logger->error("NUM PLOTS:".scalar(keys %$design_layout));
     while ( my ($key,$value) = each %$design_layout){
         $block_plot_hash{$value->{block_number}}->{$value->{plot_number}} = $value;
     }
-#    print STDERR "BLOCK PLOT HASH =".Dumper(\%block_plot_hash)."\n";
+#    $logger->error("BLOCK PLOT HASH =".Dumper(\%block_plot_hash)."");
 
     my $cross_wishlist_plot_select_html = '<h1>Select Female <!--and Male -->Plots For Each Desired Cross Below:</h1>';
 
@@ -164,7 +166,7 @@ sub create_cross_wishlist_POST : Args(0) {
         #$cross_wishlist_plot_select_html .= '<script>jQuery(document).on("change", "#cross_wishlist_plot_select_all_male_'.$female_accession_name.'", function(){if(jQuery(this).is(":checked")){var female_accession = jQuery(this).data("female_accession_name");jQuery(\'input[name="cross_wishlist_plot_select_male_input"]\').each(function(){if(jQuery(this).data("female_accession_name")==female_accession){jQuery(this).prop("checked", true);}});}});jQuery(document).on("change", "#cross_wishlist_plot_select_all_female_'.$female_accession_name.'", function(){if(jQuery(this).is(":checked")){var female_accession = jQuery(this).data("female_accession_name");jQuery(\'input[name="cross_wishlist_plot_select_female_input"]\').each(function(){if(jQuery(this).data("female_accession_name")==female_accession){jQuery(this).prop("checked", true);}});}});</script>';
         $cross_wishlist_plot_select_html .= '<script>jQuery(document).on("change", "input[name=\"cross_wishlist_plot_select_all_female\"]", function(){var female_accession = jQuery(this).data("female_accession_name");if(jQuery(this).is(":checked")){jQuery(\'input[name="cross_wishlist_plot_select_female_input"]\').each(function(){if(jQuery(this).data("female_accession_name")==female_accession){jQuery(this).prop("checked", true);}});}else{jQuery(\'input[name="cross_wishlist_plot_select_female_input"]\').each(function(){if(jQuery(this).data("female_accession_name")==female_accession){jQuery(this).prop("checked", false);}});}});</script>';
 
-#        print STDERR "NUM PLOTS SEEN: $num_seen\n";
+#        $logger->error("NUM PLOTS SEEN: $num_seen");
     }
 
     $c->stash->{rest}->{data} = $cross_wishlist_plot_select_html;
@@ -190,7 +192,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
     my $phenome_schema = $c->dbic_schema('CXGN::Phenome::Schema');
     my $metadata_schema = $c->dbic_schema('CXGN::Metadata::Schema');
 
-    #print STDERR Dumper $c->req->params();
+    #$logger->error(Dumper($c->req->params()));
     my $data = decode_json $c->req->param('crosses');
     my $female_trial_id = $c->req->param('female_trial_id');
     my $male_trial_id = $c->req->param('male_trial_id');
@@ -200,16 +202,16 @@ sub create_cross_wishlist_submit_POST : Args(0) {
     my $test_ona_form_name = $c->config->{odk_crossing_data_test_form_name};
     my $separate_crosswishlist_by_location = $c->config->{odk_crossing_data_separate_wishlist_by_location};
 
-#    print STDERR "CROSSES =".Dumper($data)."\n";
-#    print STDERR "SELECT PLOT IDS =".Dumper($selected_plot_ids)."\n";
+#    $logger->error("CROSSES =".Dumper($data)."");
+#    $logger->error("SELECT PLOT IDS =".Dumper($selected_plot_ids)."");
 
     #For test ona forms, the cross wishlists are combined irrespective of location. On non-test forms, the cross wishlists can be separated by location
     my $is_test_form;
     if ($ona_form_name eq $test_ona_form_name){
         $is_test_form = 1;
     }
-    #print STDERR Dumper $data;
-    #print STDERR Dumper $selected_plot_ids;
+    #$logger->error(Dumper($data));
+    #$logger->error(Dumper($selected_plot_ids));
 
     my %individual_cross_plot_ids;
     foreach (@$selected_plot_ids){
@@ -227,7 +229,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
             }
         }
     }
-    #print STDERR Dumper \%individual_cross_plot_ids;
+    #$logger->error(Dumper(\%individual_cross_plot_ids));
 
     my %selected_cross_hash;
     my %selected_females;
@@ -235,7 +237,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
     foreach (@$data){
         push @{$selected_cross_hash{$_->{female_id}}->{$_->{priority}}}, $_->{male_id};
     }
-    #print STDERR Dumper \%selected_cross_hash;
+    #$logger->error(Dumper(\%selected_cross_hash));
 
     my %ordered_data;
     foreach my $female_id (keys %selected_cross_hash){
@@ -246,7 +248,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
             }
         }
     }
-    #print STDERR Dumper \%ordered_data;
+    #$logger->error(Dumper(\%ordered_data));
 
     my $female_trial = CXGN::Trial->new( { bcs_schema => $schema, trial_id => $female_trial_id });
     my $female_location = $female_trial->get_location();
@@ -281,7 +283,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
     $ua->credentials( 'api.ona.io:443', 'DJANGO', $c->config->{odk_crossing_data_service_username}, $c->config->{odk_crossing_data_service_password} );
     my $login_resp = $ua->get("https://api.ona.io/api/v1/user.json");
     my $server_endpoint = "https://api.ona.io/api/v1/data/$ona_form_id";
-    print STDERR $server_endpoint."\n";
+    $logger->debug($server_endpoint."");
     my $resp = $ua->get($server_endpoint);
 
     my $server_endpoint2 = "https://api.ona.io/api/v1/metadata?xform=".$ona_form_id;
@@ -296,7 +298,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
                 $cross_wishlist_file_name =~ s/.csv//;
                 my $wishlist_file_name_loc = $cross_wishlist_file_name;
                 $wishlist_file_name_loc =~ s/cross_wishlist_//;
-                print STDERR Dumper $wishlist_file_name_loc;
+                $logger->error(Dumper($wishlist_file_name_loc));
 
                 if ($separate_crosswishlist_by_location){
                     if ($female_location_name eq $wishlist_file_name_loc) {
@@ -314,7 +316,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
                 $germplasm_info_file_name =~ s/.csv//;
                 my $germplasm_info_file_name_loc = $germplasm_info_file_name;
                 $germplasm_info_file_name_loc =~ s/germplasm_info_//;
-                print STDERR Dumper $germplasm_info_file_name_loc;
+                $logger->error(Dumper($germplasm_info_file_name_loc));
 
                 if ($separate_crosswishlist_by_location){
                     if ($female_location_name eq $germplasm_info_file_name_loc) {
@@ -334,7 +336,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
     my $old_header_row;
     my @old_header_row_array;
     if ($cross_wihlist_ona_id){
-        print STDERR "Previous cross_wishlist temp file $cross_wishlist_temp_file_path\n";
+        $logger->debug("Previous cross_wishlist temp file $cross_wishlist_temp_file_path");
         open(my $fh, '<', $cross_wishlist_temp_file_path)
             or die "Could not open file '$cross_wishlist_temp_file_path' $!";
         $old_header_row = <$fh>;
@@ -348,12 +350,12 @@ sub create_cross_wishlist_submit_POST : Args(0) {
             $previous_file_lookup{$previous_female_obs_unit_id} = \@previous_file_line_contents;
         }
     }
-    #print STDERR Dumper \@previous_file_lines;
+    #$logger->error(Dumper(\@previous_file_lines));
 
     my @previous_germplasm_info_lines;
     my %seen_info_obs_units;
     if ($germplasm_info_ona_id){
-        print STDERR "PREVIOUS germplasm_info temp file $germplasm_info_temp_file_path\n";
+        $logger->debug("PREVIOUS germplasm_info temp file $germplasm_info_temp_file_path");
         open(my $fh, '<', $germplasm_info_temp_file_path)
             or die "Could not open file '$germplasm_info_temp_file_path' $!";
         my $header_row = <$fh>;
@@ -441,11 +443,11 @@ sub create_cross_wishlist_submit_POST : Args(0) {
             my $seedlot_transaction_operator = $value->{seed_transaction_operator} || '';
             my $seedlot_num_seed_per_plot = $value->{num_seed_per_plot} || '';
 
-#            print STDERR "GERMPLASM PLANT NAMES =".Dumper($plant_names)."\n";
+#            $logger->error("GERMPLASM PLANT NAMES =".Dumper($plant_names)."");
             my $plant_number = 1;
             my $plant_index = 0;
             my $plant_num = @$plant_names;
-#            print STDERR "GERMPLASM PLANT NUMBER =".Dumper($plant_num)."\n";
+#            $logger->error("GERMPLASM PLANT NUMBER =".Dumper($plant_num)."");
             if ($plant_num != 0){
                 foreach (@$plant_names){
                     my $plant_id = $plant_ids->[$plant_index];
@@ -548,8 +550,8 @@ sub create_cross_wishlist_submit_POST : Args(0) {
         #my $male_plot_ids = $individual_cross_plot_ids{$female_id}->{male_plot_ids};
         #my %allowed_male_plot_ids = map {$_=>1} @$male_plot_ids;
         my %allowed_male_genotypes = %{$individual_cross_plot_ids{$female_id}->{male_genotypes}};
-        #print STDERR Dumper $female_plots;
-        #print STDERR Dumper $male_ids;
+        #$logger->error(Dumper($female_plots));
+        #$logger->error(Dumper($male_ids));
         foreach my $female_plot_id (@$female_plot_ids){
             my $female = $plot_id_hash{$female_plot_id};
             my $plot_name = $female->{plot_name};
@@ -565,9 +567,9 @@ sub create_cross_wishlist_submit_POST : Args(0) {
             my $plant_number = 1;
             my $plant_index = 0;
 
-#            print STDERR "WISHLIST PLANT NAMES =".Dumper($plant_names)."\n";
+#            $logger->error("WISHLIST PLANT NAMES =".Dumper($plant_names)."");
             my $plant_num = @$plant_names;
-#            print STDERR "WISHLIST PLANT NUMBER =".Dumper($plant_num)."\n";
+#            $logger->error("WISHLIST PLANT NUMBER =".Dumper($plant_num)."");
 
             if ($plant_num != 0) {
                 foreach (@$plant_names){
@@ -663,9 +665,9 @@ sub create_cross_wishlist_submit_POST : Args(0) {
         push @{$priority_order_hash{$_->{priority}}}, [$_->{female_id}, $_->{male_id}];
     }
     my @new_header_row = split ',', $header;
-    #print STDERR Dumper \%priority_order_hash;
-    #print STDERR Dumper \@lines;
-    #print STDERR Dumper \@germaplasm_info_lines;
+    #$logger->error(Dumper(\%priority_order_hash));
+    #$logger->error(Dumper(\@lines));
+    #$logger->error(Dumper(\@germaplasm_info_lines));
 
     if (scalar(@old_header_row_array)>scalar(@new_header_row)){
         chomp $old_header_row;
@@ -687,10 +689,10 @@ sub create_cross_wishlist_submit_POST : Args(0) {
             }
         }
     close($F1);
-    print STDERR Dumper $file_path1;
-    #print STDERR Dumper $uri1;
+    $logger->error(Dumper($file_path1));
+    #$logger->error(Dumper($uri1));
     my $urlencoded_filename1 = $urlencode{$uri1};
-    #print STDERR Dumper $urlencoded_filename1;
+    #$logger->error(Dumper($urlencoded_filename1));
     #$c->stash->{rest}->{filename} = $urlencoded_filename1;
 
     my ($file_path2, $uri2) = $c->tempfile( TEMPLATE => "download/cross_wishlist_XXXXX");
@@ -706,10 +708,10 @@ sub create_cross_wishlist_submit_POST : Args(0) {
             print $F $_."\n";
         }
     close($F);
-    print STDERR Dumper $file_path2;
-    #print STDERR Dumper $uri2;
+    $logger->error(Dumper($file_path2));
+    #$logger->error(Dumper($uri2));
     my $urlencoded_filename2 = $urlencode{$uri2};
-    #print STDERR Dumper $urlencoded_filename2;
+    #$logger->error(Dumper($urlencoded_filename2));
     #$c->stash->{rest}->{filename} = $urlencoded_filename2;
 
     my $archive_name;
@@ -742,7 +744,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
     });
     my $uploaded_file = $uploader->archive();
     my $md5 = $uploader->get_md5($uploaded_file);
-#    print STDERR "WISHLIST UPLOADED FILE =".Dumper($uploaded_file)."\n";
+#    $logger->error("WISHLIST UPLOADED FILE =".Dumper($uploaded_file)."");
 
     my $wishlist_md_row = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
     $wishlist_md_row->insert();
@@ -767,10 +769,10 @@ sub create_cross_wishlist_submit_POST : Args(0) {
             print $F3 $_."\n";
         }
     close($F3);
-    print STDERR Dumper $file_path3;
-    #print STDERR Dumper $uri3;
+    $logger->error(Dumper($file_path3));
+    #$logger->error(Dumper($uri3));
     my $urlencoded_filename3 = $urlencode{$uri3};
-    #print STDERR Dumper $urlencoded_filename3;
+    #$logger->error(Dumper($urlencoded_filename3));
     #$c->stash->{rest}->{filename} = $urlencoded_filename3;
 
     my $germplasm_info_archive_name;
@@ -794,7 +796,7 @@ sub create_cross_wishlist_submit_POST : Args(0) {
     });
     my $germplasm_info_uploaded_file = $uploader->archive();
     my $germplasm_info_md5 = $uploader->get_md5($germplasm_info_uploaded_file);
-#    print STDERR "GERMPLASM INFO UPLOADED FILE =".Dumper($germplasm_info_uploaded_file)."\n";
+#    $logger->error("GERMPLASM INFO UPLOADED FILE =".Dumper($germplasm_info_uploaded_file)."");
     my $germplasm_info_md_row = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
     $germplasm_info_md_row->insert();
     my $germplasm_info_md5checksum = $germplasm_info_md5->hexdigest();
@@ -826,11 +828,11 @@ sub create_cross_wishlist_submit_POST : Args(0) {
                 $server_endpoint."/$cross_wihlist_ona_id"
             );
             if ($delete_resp->is_success) {
-                print STDERR "Deleted cross wishlist file on ONA $cross_wihlist_ona_id, in order to replace the file.\n";
+                $logger->debug("Deleted cross wishlist file on ONA $cross_wihlist_ona_id, in order to replace the file.");
             }
             else {
-                print STDERR "ERROR: Did not delete cross wishlist file on ONA $cross_wihlist_ona_id, in order to replace the file.\n";
-                #print STDERR Dumper $delete_resp;
+                $logger->error("ERROR: Did not delete cross wishlist file on ONA $cross_wihlist_ona_id, in order to replace the file.");
+                #$logger->error(Dumper($delete_resp));
             }
         }
         if ($germplasm_info_ona_id){
@@ -838,11 +840,11 @@ sub create_cross_wishlist_submit_POST : Args(0) {
                 $server_endpoint."/$germplasm_info_ona_id"
             );
             if ($delete_resp->is_success) {
-                print STDERR "Deleted germplasm info file on ONA $germplasm_info_ona_id, in order to replace the file.\n";
+                $logger->debug("Deleted germplasm info file on ONA $germplasm_info_ona_id, in order to replace the file.");
             }
             else {
-                print STDERR "ERROR: Did not delete cross wishlist file $germplasm_info_ona_id, in order to replace the file.\n";
-                #print STDERR Dumper $delete_resp;
+                $logger->error("ERROR: Did not delete cross wishlist file $germplasm_info_ona_id, in order to replace the file.");
+                #$logger->error(Dumper($delete_resp));
             }
         }
 
@@ -860,14 +862,14 @@ sub create_cross_wishlist_submit_POST : Args(0) {
         if ($resp->is_success) {
             my $message = $resp->decoded_content;
             my $message_hash = decode_json $message;
-            #print STDERR Dumper $message_hash;
+            #$logger->error(Dumper($message_hash));
             if ($message_hash->{id}){
                 $c->stash->{rest}->{success} .= 'The cross wishlist is now ready to be used on the ODK tablet application. Files uploaded to ONA here: <a href="'.$message_hash->{media_url}.'">'.$message_hash->{data_value}.'</a> with <a href="'.$message_hash->{url}.'">metadata entry</a>.';
             } else {
                 $c->stash->{rest}->{error} = 'The cross wishlist was not posted to ONA. Please try again.';
             }
         } else {
-            #print STDERR Dumper $resp;
+            #$logger->error(Dumper($resp));
             $c->stash->{rest}->{error} = "There was an error submitting cross wishlist to ONA. Please try again.";
         }
 
@@ -885,14 +887,14 @@ sub create_cross_wishlist_submit_POST : Args(0) {
         if ($germplasm_info_resp->is_success) {
             my $message = $germplasm_info_resp->decoded_content;
             my $message_hash = decode_json $message;
-            #print STDERR Dumper $message_hash;
+            #$logger->error(Dumper($message_hash));
             if ($message_hash->{id}){
                 $c->stash->{rest}->{success} .= 'The germplasm info file is now ready to be used on the ODK tablet application. Files uploaded to ONA here: <a href="'.$message_hash->{media_url}.'">'.$message_hash->{data_value}.'</a> with <a href="'.$message_hash->{url}.'">metadata entry</a>.';
             } else {
                 $c->stash->{rest}->{error} .= 'The germplasm info file was not posted to ONA. Please try again.';
             }
         } else {
-            #print STDERR Dumper $germplasm_info_resp;
+            #$logger->error(Dumper($germplasm_info_resp));
             $c->stash->{rest}->{error} .= "There was an error submitting germplasm info file to ONA. Please try again.";
         }
     }
@@ -919,7 +921,7 @@ sub list_cross_wishlists_GET : Args(0) {
     while(my ($file_id, $basename, $dirname, $filetype, $comment, $create_date, $sp_person_id, $first_name, $last_name) = $h->fetchrow_array()){
         push @files, [$file_id, $basename, $dirname, $filetype, $comment, $create_date, $sp_person_id, $first_name, $last_name];
     }
-    #print STDERR Dumper \@files;
+    #$logger->error(Dumper(\@files));
     $c->stash->{rest} = {"success" => 1, "files"=>\@files};
 }
 
@@ -942,8 +944,8 @@ sub create_wishlist_by_uploading_POST : Args(0) {
     my $female_trial_id = $c->req->param('cross_wishlist_upload_female_trial_id');
     my $male_trial_id = $c->req->param('cross_wishlist_upload_male_trial_id');
 
-#    print STDERR "FEMALE TRIAL ID =".Dumper($female_trial_id)."\n";
-#    print STDERR "MALE TRIAL ID =".Dumper($male_trial_id)."\n";
+#    $logger->error("FEMALE TRIAL ID =".Dumper($female_trial_id)."");
+#    $logger->error("MALE TRIAL ID =".Dumper($male_trial_id)."");
 
     my $dbh = $c->dbc->dbh;
     my $upload = $c->req->upload('wishlist_file');
@@ -1016,7 +1018,7 @@ sub create_wishlist_by_uploading_POST : Args(0) {
     $parser = CXGN::Pedigree::ParseUpload->new(chado_schema => $chado_schema, filename => $archived_filename_with_path);
     $parser->load_plugin($upload_type);
     $parsed_data = $parser->parse();
-    #print STDERR "Dumper of parsed data:\t" . Dumper($parsed_data) . "\n";
+    #$logger->error("Dumper of parsed data:\t" . Dumper($parsed_data) . "");
 
     if (!$parsed_data){
         my $return_error = '';
@@ -1025,7 +1027,7 @@ sub create_wishlist_by_uploading_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1037,7 +1039,7 @@ sub create_wishlist_by_uploading_POST : Args(0) {
 
     my $wishlist_ref = $parsed_data->{'wishlist'};
     my @wishlist = @$wishlist_ref;
-#    print STDERR "WISHLIST ARRAY =".Dumper($parsed_data)."\n";
+#    $logger->error("WISHLIST ARRAY =".Dumper($parsed_data)."");
     my %selected_cross_hash;
     my %selected_females;
     my %selected_males;
@@ -1046,7 +1048,7 @@ sub create_wishlist_by_uploading_POST : Args(0) {
         $selected_females{$_->{female_id}}++;
         $selected_males{$_->{male_id}}++;
     }
-#    print STDERR "CROSS HASH =".Dumper(\%selected_cross_hash)."\n";
+#    $logger->error("CROSS HASH =".Dumper(\%selected_cross_hash)."");
 
     my %ordered_wishlist;
     foreach my $female_id (keys %selected_cross_hash){
@@ -1057,11 +1059,11 @@ sub create_wishlist_by_uploading_POST : Args(0) {
             }
         }
     }
-#    print STDERR "ORDERED WISHLIST =".Dumper(\%ordered_wishlist)."\n";
+#    $logger->error("ORDERED WISHLIST =".Dumper(\%ordered_wishlist)."");
 
     my $female_trial_layout = CXGN::Trial::TrialLayout->new({ schema => $chado_schema, trial_id => $female_trial_id, experiment_type=>'field_layout' });
     my $design_layout = $female_trial_layout->get_design();
-#    print STDERR "LAYOUT =".Dumper($design_layout)."\n";
+#    $logger->error("LAYOUT =".Dumper($design_layout)."");
 
     my @selected_plot_ids;
     my %female_accessions_in_trial;
@@ -1085,11 +1087,11 @@ sub create_wishlist_by_uploading_POST : Args(0) {
             }
         }
     }
-    #    print STDERR "SELECTED PLOT IDS =".Dumper(\@selected_plot_ids)."\n";
+    #    $logger->error("SELECTED PLOT IDS =".Dumper(\@selected_plot_ids)."");
 
     my @wishlist_female_accessions = keys %ordered_wishlist;
     my @accessions_not_in_trial = grep {not $female_accessions_in_trial{$_}} @wishlist_female_accessions;
-#    print STDERR "ACCESSIONS NOT IN TRIAL =".Dumper(\@accessions_not_in_trial)."\n";
+#    $logger->error("ACCESSIONS NOT IN TRIAL =".Dumper(\@accessions_not_in_trial)."");
 
     if (scalar(@accessions_not_in_trial) > 0){
         my $trial_error = "The following accessions are not in the provided female trial: ".join(',',@accessions_not_in_trial);

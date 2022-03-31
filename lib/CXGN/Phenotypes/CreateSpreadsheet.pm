@@ -33,6 +33,8 @@ use Spreadsheet::WriteExcel;
 use CXGN::Trait;
 use CXGN::List::Transform;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
 		 is       => 'rw',
 		 isa      => 'DBIx::Class::Schema',
@@ -101,7 +103,7 @@ sub create {
     my $transform = $lt->transform($schema, "traits_2_trait_ids", \@trait_list);
 
     if (@{$transform->{missing}}>0) { 
-	print STDERR "Warning: Some traits could not be found. ".join(",",@{$transform->{missing}})."\n";
+	$logger->warn("Warning: Some traits could not be found. ".join(",",@{$transform->{missing}})."");
     }
     my @trait_ids = @{$transform->{transform}};
     
@@ -116,7 +118,7 @@ sub create {
 	    $ws->write(6, $i+6, $cvinfo{$trait_list[$i]}->display_name());
 	}
 	else { 
-	    print STDERR "Skipping output of trait $trait_list[$i] because it does not exist\n";
+	    $logger->debug("Skipping output of trait $trait_list[$i] because it does not exist");
 	}
     
 	my $plot_count = scalar(keys(%design));

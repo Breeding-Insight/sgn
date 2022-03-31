@@ -9,6 +9,8 @@ use Data::Dumper;
 use JSON::Any;
 use CXGN::Dataset;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 __PACKAGE__->config(
     default   => 'application/json',
@@ -49,7 +51,7 @@ sub store_dataset :Path('/ajax/dataset/save') Args(0) {
     $dataset->description($dataset_description);
 
     foreach my $type (qw | trials accessions years locations plots traits breeding_programs genotyping_protocols trial_types trial_designs category_order |) {
-#	print STDERR "Storing data: $type. $data{$type}\n";
+#	$logger->error("Storing data: $type. $data{$type}");
 
 	my $json = $c->req->param($type);
 	if ($json) {
@@ -111,12 +113,12 @@ sub set_datasets_public :Path('/ajax/dataset/set_public') Args(1) {
             people_schema => $c->dbic_schema("CXGN::People::Schema"),
             sp_dataset_id=> $dataset_id,
         });
-    print STDERR "Dataset owner: ".$dataset->sp_person_id.", logged in: $logged_in_user\n";
+    $logger->debug("Dataset owner: ".$dataset->sp_person_id.", logged in: $logged_in_user");
     if ($dataset->sp_person_id() != $logged_in_user) {
         $c->stash->{rest} = { error => "Only the owner can change a dataset" };
         return;
     }
-    print STDERR "set public dataset_id $dataset_id\n";
+    $logger->debug("set public dataset_id $dataset_id");
     my $error = $dataset->set_dataset_public();
 
     if ($error) {
@@ -162,7 +164,7 @@ sub delete_dataset :Path('/ajax/dataset/delete') Args(1) {
 	    sp_dataset_id=> $dataset_id,
 	});
 
-#    print STDERR "Dataset owner: ".$dataset->sp_person_id.", logged in: $logged_in_user\n";
+#    $logger->error("Dataset owner: ".$dataset->sp_person_id.", logged in: $logged_in_user");
     if ($dataset->sp_person_id() != $logged_in_user) {
 	$c->stash->{rest} = { error => "Only the owner can delete a dataset" };
 	return;

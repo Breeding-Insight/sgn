@@ -28,6 +28,7 @@ use CXGN::Genotype::DownloadFactory;
 
 BEGIN { extends 'Catalyst::Controller' }
 with 'Catalyst::Component::ApplicationAttribute';
+my $logger = Log::Log4perl->get_logger();
 
 has 'schema' => (
     is       => 'rw',
@@ -185,7 +186,7 @@ sub view_stock : Chained('get_stock') PathPart('view') Args(0) {
 	    $c->throw_404( "No stock/accession exists for that identifier." );
 	}
 
-	print STDERR "Checkpoint 2: Elapsed ".(time() - $time)."\n";
+	$logger->debug("Checkpoint 2: Elapsed ".(time() - $time)."");
 
 	my $props = $self->_stockprops($stock);
 	# print message if the stock is visible only to certain user roles
@@ -209,7 +210,7 @@ sub view_stock : Chained('get_stock') PathPart('view') Args(0) {
 	    return;
 	}
 
-	print STDERR "Checkpoint 3: Elapsed ".(time() - $time)."\n";
+	$logger->debug("Checkpoint 3: Elapsed ".(time() - $time)."");
 
 	# print message if the stock is obsolete
 	my $obsolete = $stock->get_is_obsolete();
@@ -249,7 +250,7 @@ sub view_stock : Chained('get_stock') PathPart('view') Args(0) {
 	my $editable_stockprops = $c->get_conf('editable_stock_props');
 	$editable_stockprops .= ",PUI,organization";
 
-	print STDERR "Checkpoint 4: Elapsed ".(time() - $time)."\n";
+	$logger->debug("Checkpoint 4: Elapsed ".(time() - $time)."");
 	################
 	$c->stash(
 	    template => '/stock/index.mas',

@@ -181,7 +181,7 @@ sub get_cvtermprop_hash {
 	while (my $r = $prop_rs->next()){
 		push @{ $prop_hash->{$r->get_column('name')} }, $r->get_column('value');
 	}
-	#print STDERR Dumper $prop_hash;
+	#$logger->error(Dumper($prop_hash));
 	return $prop_hash;
 }
 

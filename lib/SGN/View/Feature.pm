@@ -13,6 +13,7 @@ use Bio::Seq;
 use CXGN::Tools::Text qw/commify_number/;
 use CXGN::Tools::Identifiers;
 
+my $logger = Log::Log4perl->get_logger();
 
 our @EXPORT_OK = qw/
     related_stats feature_table
@@ -156,7 +157,7 @@ sub location_list_html {
 }
 sub location_list {
     my ($feature, $featurelocs) = @_;
-    print STDERR "\n\nLOCATON LIST\n\n";
+    $logger->debug("\n\nLOCATON LIST\n");
     return map { ($_->srcfeature ? $_->srcfeature->name : '<span class="ghosted">null</span>') . ':' . ($_->fmin+1) . '..' . $_->fmax }
         ( #$featurelocs ? $featurelocs->all
           #             : $feature->featureloc_features->all );

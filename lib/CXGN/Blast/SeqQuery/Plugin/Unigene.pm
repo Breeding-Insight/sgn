@@ -3,6 +3,8 @@ package CXGN::Blast::SeqQuery::Plugin::Unigene;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "unigene identifiers";
 }
@@ -92,7 +94,7 @@ sub process {
       }
     }
     my $sequence =  join "\n", @seqs;
-    print STDERR "SEQUENCE = $sequence\n";
+    $logger->debug("SEQUENCE = $sequence");
 
     return $sequence;
     

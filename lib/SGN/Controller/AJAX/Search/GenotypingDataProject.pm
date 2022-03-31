@@ -18,6 +18,8 @@ use JSON;
 use CXGN::People::Login;
 use CXGN::Trial::Search;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -55,7 +57,7 @@ sub genotyping_data_project_search_GET : Args(0) {
             $_->{genotyping_facility}
           ];
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     $c->stash->{rest} = { data => \@result };
 }

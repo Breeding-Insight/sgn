@@ -6,6 +6,8 @@ use Moose;
 use URI::FromHash 'uri';
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -33,7 +35,7 @@ sub graphical_filtering :Path('/tools/graphicalfiltering') {
       $ajaxRequestString .= "trial_id=".$trial_id."&";
     }
   }
-  print STDERR $ajaxRequestString;
+  $logger->error($ajaxRequestString);
   $c->stash->{ajaxRequestString} = $ajaxRequestString;
 
   $c->stash->{template} = '/tools/graphicalfiltering/index.mas';

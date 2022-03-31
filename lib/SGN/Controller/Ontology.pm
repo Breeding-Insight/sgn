@@ -12,6 +12,7 @@ use Moose;
 
 BEGIN { extends 'Catalyst::Controller' };
 with 'Catalyst::Component::ApplicationAttribute';
+my $logger = Log::Log4perl->get_logger();
 
 
 sub onto_browser : Path('/tools/onto') :Args(0) {
@@ -22,7 +23,7 @@ sub onto_browser : Path('/tools/onto') :Args(0) {
     my @namespaces = split ",", $root_nodes;
     foreach my $n (@namespaces) {
 	$n =~ s/\s*(\w+)\s*\(.*\)/$1/g;
-	print STDERR "Adding node $n\n";
+	$logger->debug("Adding node $n");
     }
     #$c->stash->{root_nodes} = $c->req->param("root_nodes");
     $c->stash->{root_nodes} = join " ", @namespaces;
@@ -50,15 +51,15 @@ sub compose_trait : Path('/tools/compose') :Args(0) {
     foreach my $name (@composable_cvs) {
         $name =~ s/^\s+|\s+$//g; # remove whitespace
         if ($name eq 'time' || $name eq 'tod' || $name eq 'toy' || $name eq 'gen' || $name eq 'evt' ) {
-            print STDERR "Skipping time-related cv\n";
+            $logger->debug("Skipping time-related cv");
             next;
         }
         my $cv_type = $name."_ontology";
-        #print STDERR "cv_type = $cv_type\n";
+        #$logger->error("cv_type = $cv_type");
 
 
         my @root_nodes = $onto->get_root_nodes($cv_type);
-        #print STDERR Dumper \@root_nodes;
+        #$logger->error(Dumper(\@root_nodes));
         if (scalar @root_nodes > 1) {
             #create simple selectbox of root_nodes
             my $id = $name."_root_select";

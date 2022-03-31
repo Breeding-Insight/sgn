@@ -31,6 +31,8 @@ use CXGN::Trial;
 use JSON;
 use CXGN::Stock::Accession;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -89,7 +91,7 @@ sub get_genotype_qc_info {
         $limit_clause
         $offset_clause;";
 
-    print STDERR Dumper $q;
+    $logger->error(Dumper($q));
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute();
 
@@ -138,7 +140,7 @@ sub get_genotype_qc_info {
         $protocolprop_hash{$protocol_id}++;
         $total_count = $full_count;
     }
-    print STDERR "CXGN::Genotype::Search has genotypeprop_ids $total_count\n";
+    $logger->debug("CXGN::Genotype::Search has genotypeprop_ids $total_count");
 
     my @found_genotypeprop_ids = keys %genotypeprop_hash;
     my @genotypeprop_hash_select_arr;
@@ -159,7 +161,7 @@ sub get_genotype_qc_info {
             }
         }
     }
-    print STDERR "CXGN::Genotype::Search has genotypeprops\n";
+    $logger->debug("CXGN::Genotype::Search has genotypeprops");
 
     my @found_protocolprop_ids = keys %protocolprop_hash;
     my @protocolprop_marker_hash_select_arr;
@@ -202,7 +204,7 @@ sub get_genotype_qc_info {
             }
         }
     }
-    print STDERR "CXGN::Genotype::Search has protocolprops\n";
+    $logger->debug("CXGN::Genotype::Search has protocolprops");
 
     foreach (@genotypeprop_array) {
         my $info = $genotypeprop_hash{$_};
@@ -216,7 +218,7 @@ sub get_genotype_qc_info {
         push @data, $info;
     }
 
-    #print STDERR Dumper \@data;
+    #$logger->error(Dumper(\@data));
     return ($total_count, \@data);
 }
 

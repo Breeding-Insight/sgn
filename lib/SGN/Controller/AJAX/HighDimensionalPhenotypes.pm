@@ -23,6 +23,8 @@ use CXGN::Phenotypes::StorePhenotypes;
 use CXGN::Phenotypes::HighDimensionalPhenotypesSearch;
 use CXGN::Phenotypes::HighDimensionalPhenotypesRelationshipMatrix;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -35,7 +37,7 @@ sub high_dimensional_phenotypes_nirs_upload_verify : Path('/ajax/highdimensional
 sub high_dimensional_phenotypes_nirs_upload_verify_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -177,12 +179,12 @@ sub high_dimensional_phenotypes_nirs_upload_verify_POST : Args(0) {
     my $json = JSON->new->utf8->canonical();
     my $filter_data_input_json = $json->encode(\@filter_input);
     open(my $F, '>', $filter_json_filepath);
-        print STDERR Dumper $filter_json_filepath;
+        $logger->error(Dumper($filter_json_filepath));
         print $F $filter_data_input_json;
     close($F);
 
     my $cmd_s = "Rscript ".$c->config->{basepath} . "/R/Nirs/nirs_upload_filter_aggregate.R '$filter_json_filepath' '$output_csv_filepath' '$output_raw_csv_filepath' '$output_plot_filepath' '$output_outliers_filepath' ";
-    print STDERR $cmd_s;
+    $logger->error($cmd_s);
     my $cmd_status = system($cmd_s);
 
     my $parsed_file_agg = $parser->parse($validate_type, $output_csv_filepath, $timestamp_included, $data_level, $schema, $archived_image_zipfile_with_path, $user_id, $c, $protocol_id, $nd_protocol_filename);
@@ -241,10 +243,10 @@ sub high_dimensional_phenotypes_nirs_upload_verify_POST : Args(0) {
     }
     push @success_status, "Aggregated file data verified. Plot names and trait names are valid.";
 
-    # print STDERR Dumper \@success_status;
-    # print STDERR Dumper \@warning_status;
-    # print STDERR Dumper \@error_status;
-    # print STDERR Dumper $output_plot_filepath_string;
+    # $logger->error(Dumper(\@success_status));
+    # $logger->error(Dumper(\@warning_status));
+    # $logger->error(Dumper(\@error_status));
+    # $logger->error(Dumper($output_plot_filepath_string));
     $c->stash->{rest} = {success => \@success_status, warning => \@warning_status, error => \@error_status, figure => $output_plot_filepath_string};
 }
 
@@ -388,12 +390,12 @@ sub high_dimensional_phenotypes_nirs_upload_store_POST : Args(0) {
     my $json = JSON->new->utf8->canonical();
     my $filter_data_input_json = $json->encode(\@filter_input);
     open(my $F, '>', $filter_json_filepath);
-        print STDERR Dumper $filter_json_filepath;
+        $logger->error(Dumper($filter_json_filepath));
         print $F $filter_data_input_json;
     close($F);
 
     my $cmd_s = "Rscript ".$c->config->{basepath} . "/R/Nirs/nirs_upload_filter_aggregate.R '$filter_json_filepath' '$output_csv_filepath' '$output_raw_csv_filepath' '$output_plot_filepath' '$output_outliers_filepath' ";
-    print STDERR $cmd_s;
+    $logger->error($cmd_s);
     my $cmd_status = system($cmd_s);
 
     my %parsed_data_agg;
@@ -538,7 +540,7 @@ sub high_dimensional_phenotypes_transcriptomics_upload_verify : Path('/ajax/high
 sub high_dimensional_phenotypes_transcriptomics_upload_verify_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -707,10 +709,10 @@ sub high_dimensional_phenotypes_transcriptomics_upload_verify_POST : Args(0) {
     }
     push @success_status, "File data verified. Plot names and trait names are valid.";
 
-    # print STDERR Dumper \@success_status;
-    # print STDERR Dumper \@warning_status;
-    # print STDERR Dumper \@error_status;
-    # print STDERR Dumper $output_plot_filepath_string;
+    # $logger->error(Dumper(\@success_status));
+    # $logger->error(Dumper(\@warning_status));
+    # $logger->error(Dumper(\@error_status));
+    # $logger->error(Dumper($output_plot_filepath_string));
     $c->stash->{rest} = {success => \@success_status, warning => \@warning_status, error => \@error_status};
 }
 
@@ -935,7 +937,7 @@ sub high_dimensional_phenotypes_metabolomics_upload_verify : Path('/ajax/highdim
 sub high_dimensional_phenotypes_metabolomics_upload_verify_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
@@ -1117,10 +1119,10 @@ sub high_dimensional_phenotypes_metabolomics_upload_verify_POST : Args(0) {
     }
     push @success_status, "File data verified. Plot names and trait names are valid.";
 
-    # print STDERR Dumper \@success_status;
-    # print STDERR Dumper \@warning_status;
-    # print STDERR Dumper \@error_status;
-    # print STDERR Dumper $output_plot_filepath_string;
+    # $logger->error(Dumper(\@success_status));
+    # $logger->error(Dumper(\@warning_status));
+    # $logger->error(Dumper(\@error_status));
+    # $logger->error(Dumper($output_plot_filepath_string));
     $c->stash->{rest} = {success => \@success_status, warning => \@warning_status, error => \@error_status};
 }
 
@@ -1402,9 +1404,9 @@ sub high_dimensional_phenotypes_download_file_POST : Args(0) {
         $c->detach();
     }
 
-    # print STDERR Dumper $data_matrix;
-    # print STDERR Dumper $identifier_metadata;
-    # print STDERR Dumper $identifier_names;
+    # $logger->error(Dumper($data_matrix));
+    # $logger->error(Dumper($identifier_metadata));
+    # $logger->error(Dumper($identifier_names));
 
     if ($data_matrix->{error}) {
         $c->stash->{rest} = {error => $data_matrix->{error}};
@@ -1568,10 +1570,10 @@ sub high_dimensional_phenotypes_download_relationship_matrix_file_POST : Args(0)
         $temp_data_file,
         $download_file_tempfile
     );
-    # print STDERR Dumper $relationship_matrix_data;
-    # print STDERR Dumper $data_matrix;
-    # print STDERR Dumper $identifier_metadata;
-    # print STDERR Dumper $identifier_names;
+    # $logger->error(Dumper($relationship_matrix_data));
+    # $logger->error(Dumper($data_matrix));
+    # $logger->error(Dumper($identifier_metadata));
+    # $logger->error(Dumper($identifier_names));
 
     $c->stash->{rest} = {download_file_link => $download_file_link, error => $error};
 }

@@ -45,6 +45,8 @@ use CXGN::Genomic::GSS;
 package CXGN::Bulk::BACEndRaw;
 use base "CXGN::Bulk";
 
+my $logger = Log::Log4perl->get_logger();
+
 sub new
 {
     my $class = shift;
@@ -183,7 +185,7 @@ sub process_ids
       my $qualvalue = $gss->qual;
 
 
-      print STDERR "GENBANK ACCESSION:". ref($clone->genbank_accession($chado)) ."\n"; 
+      $logger->debug("GENBANK ACCESSION:". ref($clone->genbank_accession($chado)) ."");
 #       # check which parameters were selected
 #       my @use_flags = @{$self}{qw/ bac_id
 # 				   clone_type
@@ -220,9 +222,9 @@ sub process_ids
 
       my @data_array = ();
 
-      print STDERR "OUTPUT FIELDS: ". (join "\t", @output_fields)."\n\n";
+      $logger->debug("OUTPUT FIELDS: ". (join "\t", @output_fields)."\n");
       foreach my $selected_field (@output_fields) { 
-	  print STDERR "PUSHING $selected_field = $field_vals{$selected_field}\n";
+	  $logger->debug("PUSHING $selected_field = $field_vals{$selected_field}");
 	  push @data_array, $field_vals{$selected_field};
       }
 
@@ -246,7 +248,7 @@ sub process_ids
       # print query results to dumpfile
       my $linecolumns = join("\t", @data_array)."\n";
       print $dump_fh $linecolumns ;
-      print STDERR "LINE: ". $linecolumns;
+      $logger->error("LINE: ". $linecolumns);
 
 
     }

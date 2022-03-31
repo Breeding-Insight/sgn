@@ -56,6 +56,8 @@ use HTML::Entities;
 use URI::Encode qw(uri_encode uri_decode);
 use Sort::Key::Natural qw(natsort);
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller::REST' }
 
@@ -160,7 +162,7 @@ sub upload_cross_file_POST : Args(0) {
     $parser = CXGN::Pedigree::ParseUpload->new(chado_schema => $chado_schema, filename => $archived_filename_with_path, cross_additional_info => $cross_additional_info);
     $parser->load_plugin($upload_type);
     $parsed_data = $parser->parse();
-    #print STDERR "Dumper of parsed data:\t" . Dumper($parsed_data) . "\n";
+    #$logger->error("Dumper of parsed data:\t" . Dumper($parsed_data) . "");
 
     if (!$parsed_data){
         my $return_error = '';
@@ -169,7 +171,7 @@ sub upload_cross_file_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -245,38 +247,38 @@ sub add_cross_POST :Args(0) {
     my $cross_combination = $c->req->param('cross_combination');
     $cross_name =~ s/^\s+|\s+$//g; #trim whitespace from front and end.
 
-    print STDERR "CROSS COMBINATION=".Dumper($cross_combination)."\n";
+    $logger->debug("CROSS COMBINATION=".Dumper($cross_combination)."");
 
     if (!$c->user()) {
-        print STDERR "User not logged in... not adding a cross.\n";
+        $logger->debug("User not logged in... not adding a cross.");
         $c->stash->{rest} = {error => "You need to be logged in to add a cross." };
         return;
     }
 
     if (!any { $_ eq "curator" || $_ eq "submitter" } ($c->user()->roles)  ) {
-        print STDERR "User does not have sufficient privileges.\n";
+        $logger->debug("User does not have sufficient privileges.");
         $c->stash->{rest} = {error =>  "you have insufficient privileges to add a cross." };
         return;
     }
 
     if ($cross_type eq "polycross") {
-        print STDERR "Handling a polycross\n";
+        $logger->debug("Handling a polycross");
         my @maternal_parents = split (',', $c->req->param('maternal_parents'));
-        print STDERR "Maternal parents array:" . @maternal_parents . "\n Maternal parents with ref:" . \@maternal_parents . "\n Maternal parents with dumper:". Dumper(@maternal_parents) . "\n";
+        $logger->debug("Maternal parents array:" . @maternal_parents . "\n Maternal parents with ref:" . \@maternal_parents . "\n Maternal parents with dumper:". Dumper(@maternal_parents) . "");
         my $paternal = $cross_name . '_population';
         my $population_add = CXGN::Pedigree::AddPopulations->new({ schema => $chado_schema, name => $paternal, members =>  \@maternal_parents} );
         $population_add->add_population();
         $cross_type = 'polycross';
-        print STDERR "Scalar maternatal paretns:" . scalar @maternal_parents;
+        $logger->error("Scalar maternatal paretns:" . scalar @maternal_parents);
         for (my $i = 0; $i < scalar @maternal_parents; $i++) {
             my $maternal = $maternal_parents[$i];
             my $polycross_name = $cross_name . '_' . $maternal;
-            print STDERR "First polycross to add is $polycross_name with amternal $maternal and paternal $paternal\n";
+            $logger->debug("First polycross to add is $polycross_name with amternal $maternal and paternal $paternal");
             my $success = $self->add_individual_cross($c, $chado_schema, $polycross_name, $cross_type, $crossing_trial_id, $female_plot_id, $male_plot_id, $maternal, $paternal);
             if (!$success) {
                 return;
             }
-            print STDERR "polycross addition  $polycross_name worked successfully\n";
+            $logger->debug("polycross addition  $polycross_name worked successfully");
         }
     }
     elsif ($cross_type eq "reciprocal") {
@@ -559,7 +561,7 @@ sub get_cross_tissue_culture_summary :Path('/ajax/cross/tissue_culture_summary')
         push @all_rows, [@each_row];
         @each_row =();
     }
-#    print STDERR "SORTED EMBRYO IDS =".Dumper(\@sorted_embryo_ids)."\n";
+#    $logger->error("SORTED EMBRYO IDS =".Dumper(\@sorted_embryo_ids)."");
     $c->stash->{rest} = { data => \@all_rows };
 }
 
@@ -626,9 +628,9 @@ sub cross_property_save :Path('/cross/property/save') Args(1) {
     my $type = $c->req->param("type");
     my $value = $c->req->param("value");
     my $data_type = $c->req->param("data_type");
-#    print STDERR "DATA TYPE =".Dumper($data_type)."\n";
-#    print STDERR "TYPE =".Dumper($type)."\n";
-#    print STDERR "VALUE =".Dumper($value)."\n";
+#    $logger->error("DATA TYPE =".Dumper($data_type)."");
+#    $logger->error("TYPE =".Dumper($type)."");
+#    $logger->error("VALUE =".Dumper($value)."");
 
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $cross_name = $schema->resultset("Stock::Stock")->find({stock_id => $cross_id})->uniquename();
@@ -674,7 +676,7 @@ sub add_more_progeny :Path('/cross/progeny/add') Args(1) {
 	push @progeny_names, $basename. (sprintf "%03d", $n + $start_number -1);
     }
 
-    #print STDERR Dumper(\@progeny_names);
+    #$logger->error(Dumper(\@progeny_names));
 
     my $chado_schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
@@ -882,7 +884,7 @@ sub add_crossingtrial_POST :Args(0){
     my ($self, $c) = @_;
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $dbh = $c->dbc->dbh;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $crossingtrial_name = $c->req->param('crossingtrial_name');
     my $breeding_program_id = $c->req->param('crossingtrial_program_id');
     my $location = $c->req->param('crossingtrial_location');
@@ -897,13 +899,13 @@ sub add_crossingtrial_POST :Args(0){
     }
 
     if (!$c->user()){
-        print STDERR "User not logged in... not adding a crossingtrial.\n";
+        $logger->debug("User not logged in... not adding a crossingtrial.");
         $c->stash->{rest} = {error => "You need to be logged in to add a crossingtrial."};
         return;
     }
 
     if (!any { $_ eq "curator" || $_ eq "submitter" } ($c->user()->roles)){
-        print STDERR "User does not have sufficient privileges.\n";
+        $logger->debug("User does not have sufficient privileges.");
         $c->stash->{rest} = {error =>  "you have insufficient privileges to add a crossingtrial." };
         return;
     }
@@ -1012,7 +1014,7 @@ sub upload_progenies_POST : Args(0) {
     $parser = CXGN::Pedigree::ParseUpload->new(chado_schema => $chado_schema, filename => $archived_filename_with_path);
     $parser->load_plugin($upload_type);
     $parsed_data = $parser->parse();
-    #print STDERR "Dumper of parsed data:\t" . Dumper($parsed_data) . "\n";
+    #$logger->error("Dumper of parsed data:\t" . Dumper($parsed_data) . "");
 
     if (!$parsed_data){
         my $return_error = '';
@@ -1021,7 +1023,7 @@ sub upload_progenies_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1065,11 +1067,11 @@ sub upload_progenies_POST : Args(0) {
     });
 
     my $file_id = $file_row->file_id();
-#    print STDERR "FILE ID =".Dumper($file_id)."\n";
+#    $logger->error("FILE ID =".Dumper($file_id)."");
     foreach my $cross_name (@all_crosses) {
         my $cross_experiment_type = CXGN::Cross->new({schema => $chado_schema, cross_name => $cross_name});
         my $experiment_id = $cross_experiment_type->get_nd_experiment_id_with_type_cross_experiment();
-#        print STDERR "ND EXPERIMENT ID =".Dumper($experiment_id)."\n";
+#        $logger->error("ND EXPERIMENT ID =".Dumper($experiment_id)."");
         my $nd_experiment_file = $phenome_schema->resultset("NdExperimentMdFiles")->create({
             nd_experiment_id => $experiment_id,
             file_id => $file_id,
@@ -1153,7 +1155,7 @@ sub validate_upload_existing_progenies_POST : Args(0) {
     $parser = CXGN::Pedigree::ParseUpload->new(chado_schema => $chado_schema, filename => $archived_filename_with_path);
     $parser->load_plugin($upload_type);
     $parsed_data = $parser->parse();
-    #print STDERR "Dumper of parsed data:\t" . Dumper($parsed_data) . "\n";
+    #$logger->error("Dumper of parsed data:\t" . Dumper($parsed_data) . "");
 
         my $return_error = '';
         my $existing_pedigree = '';
@@ -1161,7 +1163,7 @@ sub validate_upload_existing_progenies_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1181,8 +1183,8 @@ sub store_upload_existing_progenies : Path('/ajax/cross/store_upload_existing_pr
     my $c = shift;
     my $archived_filename_with_path = $c->req->param('archived_file_name');
     my $user_id = $c->req->param('user_id');
-#    print STDERR "ARCHIVED FILE NAME =".Dumper($archived_filename_with_path)."\n";
-#    print STDERR "USER ID =".Dumper($user_id)."\n";
+#    $logger->error("ARCHIVED FILE NAME =".Dumper($archived_filename_with_path)."");
+#    $logger->error("USER ID =".Dumper($user_id)."");
     my $overwrite_pedigrees = $c->req->param('overwrite_pedigrees') ne 'false' ? $c->req->param('overwrite_pedigrees') : 0;
     my $chado_schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
@@ -1238,11 +1240,11 @@ sub store_upload_existing_progenies : Path('/ajax/cross/store_upload_existing_pr
     });
 
     my $file_id = $file_row->file_id();
-#    print STDERR "FILE ID =".Dumper($file_id)."\n";
+#    $logger->error("FILE ID =".Dumper($file_id)."");
     foreach my $cross_name (@all_crosses) {
         my $cross_experiment_type = CXGN::Cross->new({schema => $chado_schema, cross_name => $cross_name});
         my $experiment_id = $cross_experiment_type->get_nd_experiment_id_with_type_cross_experiment();
-#        print STDERR "ND EXPERIMENT ID =".Dumper($experiment_id)."\n";
+#        $logger->error("ND EXPERIMENT ID =".Dumper($experiment_id)."");
         my $nd_experiment_file = $phenome_schema->resultset("NdExperimentMdFiles")->create({
             nd_experiment_id => $experiment_id,
             file_id => $file_id,
@@ -1277,9 +1279,9 @@ sub upload_info_POST : Args(0) {
         $upload_type = 'AdditionalInfoExcel';
         $data_type = 'cross_additional_info';
     }
-#    print STDERR "INFO UPLOAD =".Dumper($cross_info_upload)."\n";
-#    print STDERR "ADDITIONAL INFO UPLOAD =".Dumper($additional_info_upload)."\n";
-#    print STDERR "DATA TYPE =".Dumper($data_type)."\n";
+#    $logger->error("INFO UPLOAD =".Dumper($cross_info_upload)."");
+#    $logger->error("ADDITIONAL INFO UPLOAD =".Dumper($additional_info_upload)."");
+#    $logger->error("DATA TYPE =".Dumper($data_type)."");
 
     my $parser;
     my $parsed_data;
@@ -1351,7 +1353,7 @@ sub upload_info_POST : Args(0) {
     $parser = CXGN::Pedigree::ParseUpload->new(chado_schema => $chado_schema, filename => $archived_filename_with_path, cross_properties => $cross_properties, cross_additional_info => $cross_additional_info);
     $parser->load_plugin($upload_type);
     $parsed_data = $parser->parse();
-#    print STDERR "Dumper of parsed data:\t" . Dumper($parsed_data) . "\n";
+#    $logger->error("Dumper of parsed data:\t" . Dumper($parsed_data) . "");
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -1360,7 +1362,7 @@ sub upload_info_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1396,7 +1398,7 @@ sub upload_info_POST : Args(0) {
         }
     }
 
-#    print STDERR "FILE =".Dumper($archived_filename_with_path)."\n";
+#    $logger->error("FILE =".Dumper($archived_filename_with_path)."");
     my $md_row = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
     $md_row->insert();
     my $upload_file = CXGN::UploadFile->new();
@@ -1411,11 +1413,11 @@ sub upload_info_POST : Args(0) {
     });
 
     my $file_id = $file_row->file_id();
-#    print STDERR "FILE ID =".Dumper($file_id)."\n";
+#    $logger->error("FILE ID =".Dumper($file_id)."");
     foreach my $cross_name (@all_crosses) {
         my $cross_experiment_type = CXGN::Cross->new({schema => $chado_schema, cross_name => $cross_name});
         my $experiment_id = $cross_experiment_type->get_nd_experiment_id_with_type_cross_experiment();
-#        print STDERR "ND EXPERIMENT ID =".Dumper($experiment_id)."\n";
+#        $logger->error("ND EXPERIMENT ID =".Dumper($experiment_id)."");
         my $nd_experiment_file = $phenome_schema->resultset("NdExperimentMdFiles")->create({
             nd_experiment_id => $experiment_id,
             file_id => $file_id,
@@ -1500,7 +1502,7 @@ sub upload_family_names_POST : Args(0) {
     $parser = CXGN::Pedigree::ParseUpload->new(chado_schema => $chado_schema, filename => $archived_filename_with_path);
     $parser->load_plugin('FamilyNameExcel');
     $parsed_data = $parser->parse();
-    #print STDERR "Dumper of parsed data:\t" . Dumper($parsed_data) . "\n";
+    #$logger->error("Dumper of parsed data:\t" . Dumper($parsed_data) . "");
 
     if (!$parsed_data){
         my $return_error = '';
@@ -1509,7 +1511,7 @@ sub upload_family_names_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1551,7 +1553,7 @@ sub upload_family_names_POST : Args(0) {
         }
     }
 
-#    print STDERR "FILE =".Dumper($archived_filename_with_path)."\n";
+#    $logger->error("FILE =".Dumper($archived_filename_with_path)."");
     my $md_row = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
     $md_row->insert();
     my $upload_file = CXGN::UploadFile->new();
@@ -1566,11 +1568,11 @@ sub upload_family_names_POST : Args(0) {
     });
 
     my $file_id = $file_row->file_id();
-#    print STDERR "FILE ID =".Dumper($file_id)."\n";
+#    $logger->error("FILE ID =".Dumper($file_id)."");
     foreach my $cross_name (@all_crosses) {
         my $cross_experiment_type = CXGN::Cross->new({schema => $chado_schema, cross_name => $cross_name});
         my $experiment_id = $cross_experiment_type->get_nd_experiment_id_with_type_cross_experiment();
-#        print STDERR "ND EXPERIMENT ID =".Dumper($experiment_id)."\n";
+#        $logger->error("ND EXPERIMENT ID =".Dumper($experiment_id)."");
         my $nd_experiment_file = $phenome_schema->resultset("NdExperimentMdFiles")->create({
             nd_experiment_id => $experiment_id,
             file_id => $file_id,
@@ -1607,7 +1609,7 @@ sub delete_cross_POST : Args(0) {
 
     my $error = $cross->delete();
 
-    print STDERR "ERROR = $error\n";
+    $logger->error("ERROR = $error");
 
     if ($error) {
 	$c->stash->{rest} = { error => "An error occurred attempting to delete a cross. ($@)" };
@@ -1691,7 +1693,7 @@ sub upload_intercross_file_POST : Args(0) {
     $parser = CXGN::Pedigree::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('IntercrossCSV');
     $parsed_data = $parser->parse();
-#    print STDERR "PARSED DATA =". Dumper($parsed_data)."\n";
+#    $logger->error("PARSED DATA =". Dumper($parsed_data)."");
 
     if (!$parsed_data){
         my $return_error = '';
@@ -1700,7 +1702,7 @@ sub upload_intercross_file_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -1731,11 +1733,11 @@ sub upload_intercross_file_POST : Args(0) {
                 if (none {$_ eq $intercross_identifier} @existing_identifier_list) {
                     push @new_cross_identifiers, $intercross_identifier;
                 }
-#                print STDERR "NEW CROSS IDENTIFIER_1 =".Dumper(\@new_cross_identifiers)."\n";
+#                $logger->error("NEW CROSS IDENTIFIER_1 =".Dumper(\@new_cross_identifiers)."");
             }
         } else {
             @new_cross_identifiers = @intercross_identifier_list;
-#            print STDERR "NEW CROSS IDENTIFIER_2 =".Dumper(\@new_cross_identifiers)."\n";
+#            $logger->error("NEW CROSS IDENTIFIER_2 =".Dumper(\@new_cross_identifiers)."");
 
         }
 
@@ -1757,11 +1759,11 @@ sub upload_intercross_file_POST : Args(0) {
             } else {
                 $generated_cross_unique_id = $crossing_experiment_name.'_'.'0';
             }
-#            print STDERR "STARTING GENERATED CROSS UNIQUE ID =".Dumper($generated_cross_unique_id)."\n";
+#            $logger->error("STARTING GENERATED CROSS UNIQUE ID =".Dumper($generated_cross_unique_id)."");
 
             foreach my $new_identifier (@new_cross_identifiers) {
                 $generated_cross_unique_id =~ s/(\d+)$/$1 + 1/e;
-#                print STDERR "GENERATED CROSS UNIQUE ID =".Dumper($generated_cross_unique_id)."\n";
+#                $logger->error("GENERATED CROSS UNIQUE ID =".Dumper($generated_cross_unique_id)."");
                 my $validate_new_cross_rs = $schema->resultset("Stock::Stock")->search({uniquename=> $generated_cross_unique_id});
                 if ($validate_new_cross_rs->count() > 0) {
                     $c->stash->{rest} = {error_string => "Error creating new cross unique id",};

@@ -6,6 +6,7 @@ use CXGN::Stock::StockLookup;
 use SGN::Model::Cvterm;
 use Data::Dumper;
 use CXGN::List::Validate;
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
     my $self = shift;
@@ -359,7 +360,7 @@ sub _parse_with_plugin {
         if ($acc_synonyms_lookup{$accession_name}){
             my @accession_names = keys %{$acc_synonyms_lookup{$accession_name}};
             if (scalar(@accession_names)>1){
-                print STDERR "There is more than one uniquename for this synonym $accession_name. this should not happen!\n";
+                $logger->warn("There is more than one uniquename for this synonym $accession_name. this should not happen!");
             }
             $accession_stock_id = $acc_synonyms_lookup{$accession_name}->{$accession_names[0]};
             $accession_name = $accession_names[0];
@@ -393,7 +394,7 @@ sub _parse_with_plugin {
         };
 
     }
-    #print STDERR Dumper \%parsed_seedlots;
+    #$logger->error(Dumper(\%parsed_seedlots));
 
     $self->_set_parsed_data(\%parsed_seedlots);
     return 1;

@@ -8,6 +8,8 @@ BEGIN { extends 'Catalyst::Controller::REST' }
 use Data::Dumper;
 use JSON::Any;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 __PACKAGE__->config(
     default   => 'application/json',
@@ -22,7 +24,7 @@ sub locus_search :Path('/ajax/search/loci') Args(0) {
     
     my $params = $c->req->params() || {};
 
-    #print STDERR "PARAMS: ".Dumper($params);
+    #$logger->error("PARAMS: ".Dumper($params));
     
     my %query;
 
@@ -164,7 +166,7 @@ sub locus_search :Path('/ajax/search/loci') Args(0) {
 
     my $records_total = $rs->count();
     
-    #print STDERR "RECORDS TOTAL: $records_total\n";
+    #$logger->error("RECORDS TOTAL: $records_total");
     ## then get the data
     #
     my $rs2 = $c->dbic_schema("CXGN::Phenome::Schema")->resultset("Locus")->search(   

@@ -17,6 +17,8 @@ use CXGN::List;
 use JSON::XS;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 
@@ -26,7 +28,7 @@ sub trial_init : Chained('/') PathPart('breeders/trial') CaptureArgs(1) {
     my $trial_id = shift;
 
     $c->stash->{trial_id} = $trial_id;
-    print STDERR "TRIAL ID = $trial_id\n";
+    $logger->debug("TRIAL ID = $trial_id");
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     $c->stash->{schema} = $schema;
@@ -51,12 +53,12 @@ sub old_trial_url : Path('/breeders_toolbox/trial') Args(1) {
 }
 
 sub trial_info : Chained('trial_init') PathPart('') Args(0) {
-    #print STDERR "Check 1: ".localtime()."\n";
-    print STDERR "TRIAL INIT...\n\n";
     my $self = shift;
+    #$logger->error("Check 1: ".localtime()."");
+    $logger->debug("TRIAL INIT...\n");
     my $c = shift;
     my $format = $c->req->param("format");
-    #print STDERR $format;
+    #$logger->error($format);
     my $user = $c->user();
     if (!$user) {
 	$c->res->redirect( uri( path => '/user/login', query => { goto_url => $c->req->uri->path_query } ) );
@@ -133,7 +135,7 @@ sub trial_info : Chained('trial_init') PathPart('') Args(0) {
     $c->stash->{design_name} = $design_type;
     $c->stash->{genotyping_facility} = $trial->get_genotyping_facility;
 
-    #  print STDERR "TRIAL TYPE DATA = $trial_type_data->[1]\n\n";
+    #  $logger->error("TRIAL TYPE DATA = $trial_type_data->[1]\n");
 
     if ($design_type eq "genotyping_plate") {
         $c->stash->{plate_id} = $c->stash->{trial_id};
@@ -175,7 +177,7 @@ sub trial_info : Chained('trial_init') PathPart('') Args(0) {
         $c->stash->{template} = '/breeders_toolbox/drone_run_project.mas';
     }
     elsif ($trial_type_name eq "crossing_trial"){
-        print STDERR "It's a crossing trial!\n\n";
+        $logger->debug("It's a crossing trial!\n");
         my $program_name = $breeding_program_data->[0]->[1];
         my $locations = JSON::XS->new->decode($program_object->get_all_locations_by_breeding_program());
         my @locations_by_program;
@@ -200,7 +202,7 @@ sub trial_info : Chained('trial_init') PathPart('') Args(0) {
         $c->stash->{template} = '/breeders_toolbox/trial.mas';
     }
 
-    print STDERR "End Load Trial Detail Page: ".localtime()."\n";
+    $logger->debug("End Load Trial Detail Page: ".localtime()."");
 
 }
 
@@ -265,7 +267,7 @@ sub trial_download : Chained('trial_init') PathPart('download') Args(1) {
     my $self = shift;
     my $c = shift;
     my $what = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->debug(Dumper $c->req->params());
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
 
     my $user = $c->user();
@@ -361,7 +363,7 @@ sub trial_download : Chained('trial_init') PathPart('download') Args(1) {
     $rel_file = $rel_file . ".$format";
     my $tempfile = $c->config->{basepath}."/".$rel_file;
 
-    print STDERR "TEMPFILE : $tempfile\n";
+    $logger->debug("TEMPFILE : $tempfile");
 
     my $download = CXGN::Trial::Download->new({
         bcs_schema => $schema,
@@ -398,7 +400,7 @@ sub trial_download : Chained('trial_init') PathPart('download') Args(1) {
 sub trials_download_layouts : Path('/breeders/trials/download/layout') Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger-debug(Dumper $c->req->params());
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $user = $c->user();
     if (!$user) {
@@ -434,7 +436,7 @@ sub trials_download_layouts : Path('/breeders/trials/download/layout') Args(0) {
     $rel_file = $rel_file . ".$format";
     my $tempfile = $c->config->{basepath}."/".$rel_file;
 
-    print STDERR "TEMPFILE : $tempfile\n";
+    $logger->debug("TEMPFILE : $tempfile");
 
     my $trial_download_args = {
         bcs_schema => $schema,

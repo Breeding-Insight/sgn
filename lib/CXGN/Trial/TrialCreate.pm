@@ -41,7 +41,7 @@ Will do the following:
     try {
         $trial_create->save_trial();
     } catch {
-        print STDERR "ERROR SAVING TRIAL!\n";
+        $logger->error("ERROR SAVING TRIAL!");
     };
 
     FOR GENOTYPING PLATES:
@@ -69,7 +69,7 @@ Will do the following:
     try {
         $ct->save_trial();
     } catch {
-        print STDERR "ERROR SAVING TRIAL!\n";
+        $logger->error("ERROR SAVING TRIAL!");
     };
 
 ---------------------------------------------------------------------------------
@@ -134,6 +134,8 @@ use CXGN::Trial;
 use SGN::Model::Cvterm;
 use CXGN::Trial::TrialDesignStore;
 use Data::Dumper;
+
+my $logger = Log::Log4perl->get_logger();
 
 has 'chado_schema' => (
 		 is       => 'rw',
@@ -221,17 +223,17 @@ sub get_breeding_program_id {
   my $self = shift;
   my $breeding_program_ref = $self->get_chado_schema->resultset('Project::Project')->find({name=>$self->get_program});
   if (!$breeding_program_ref ) {
-      print STDERR "UNDEF breeding program " . $self->get_program . "\n\n";
+      $logger->debug("UNDEF breeding program " . $self->get_program . "\n");
       return ;
   }
   my $breeding_program_id = $breeding_program_ref->project_id();
-  #print STDERR "get_breeding_program _id returning $breeding_program_id";
+  #$logger->error("get_breeding_program _id returning $breeding_program_id");
   return $breeding_program_id;
 }
 
 
 sub save_trial {
-    print STDERR "Check 4.1: ".localtime();
+    $logger->error("Check 4.1: ".localtime());
     my $self = shift;
     my $chado_schema = $self->get_chado_schema();
     my %design = %{$self->get_design()};
@@ -244,17 +246,17 @@ sub save_trial {
     if (! $self->has_trial_id()) {
 
 	if (!$trial_name) {
-		print STDERR "Trial not saved: Can't create trial without a trial name\n";
+		$logger->error("Trial not saved: Can't create trial without a trial name");
 		return { error => "Trial not saved: Can't create trial without a trial name" };
 	}
 
     if ($self->trial_name_already_exists()) {
-		print STDERR "Can't create trial: Trial name already exists\n";
+		$logger->error("Can't create trial: Trial name already exists");
 		return { error => "Trial not saved: Trial name already exists" };
 	}
 
 	if (!$self->get_breeding_program_id()) {
-		print STDERR "Can't create trial: Breeding program does not exist\n";
+		$logger->error("Can't create trial: Breeding program does not exist");
 		return { error => "Trial not saved: breeding program does not exist" };
 	}
 
@@ -264,7 +266,7 @@ sub save_trial {
 	#my $owner_sp_person_id;
 	#$owner_sp_person_id = CXGN::People::Person->get_person_by_username($dbh, $user_name); #add person id as an option.
 	#if (!$owner_sp_person_id) {
-	#	print STDERR "Can't create trial: User/owner not found\n";
+	#	$logger->error("Can't create trial: User/owner not found");
 	#	die "no owner $user_name" ;
 	#}
     }
@@ -273,7 +275,7 @@ sub save_trial {
 	$geolocation_lookup->set_location_name($self->get_trial_location());
 	$geolocation = $geolocation_lookup->get_geolocation();
 	if (!$geolocation) {
-		print STDERR "Can't create trial: Location not found: ".$self->get_trial_location()."\n";
+		$logger->error("Can't create trial: Location not found: ".$self->get_trial_location()."");
 		return { error => "Trial not saved: location not found" };
 	}
 
@@ -315,22 +317,22 @@ sub save_trial {
     });
 
     $t->set_trial_owner($self->get_owner_id);
-    #print STDERR "TRIAL TYPE = ".ref($t)."!!!!\n";
+    #$logger->error("TRIAL TYPE = ".ref($t)."!!!!");
     my $nd_experiment_type_id;
     if ($self->get_is_genotyping()) {
-        print STDERR "Generating a genotyping trial...\n";
+        $logger->debug("Generating a genotyping trial...");
         $nd_experiment_type_id = SGN::Model::Cvterm->get_cvterm_row($chado_schema, 'genotyping_layout', 'experiment_type')->cvterm_id();
     }
     elsif ($self->get_is_analysis()) {
-        print STDERR "Generating an analysis trial...\n";
+        $logger->debug("Generating an analysis trial...");
         $nd_experiment_type_id = SGN::Model::Cvterm->get_cvterm_row($chado_schema, , 'analysis_experiment', 'experiment_type')->cvterm_id();
     }
     elsif ($self->get_is_sampling_trial()) {
-        print STDERR "Generating a sampling trial...\n";
+        $logger->debug("Generating a sampling trial...");
         $nd_experiment_type_id = SGN::Model::Cvterm->get_cvterm_row($chado_schema, , 'sampling_layout', 'experiment_type')->cvterm_id();
     }
     else {
-        print STDERR "Generating a phenotyping trial...\n";
+        $logger->debug("Generating a phenotyping trial...");
         $nd_experiment_type_id = SGN::Model::Cvterm->get_cvterm_row($chado_schema, , 'field_layout', 'experiment_type')->cvterm_id();
     }
     my $nd_experiment = $chado_schema->resultset('NaturalDiversity::NdExperiment')
@@ -341,7 +343,7 @@ sub save_trial {
 
 
     if ($self->get_is_genotyping()) {
-        #print STDERR "Storing user_id and project_name provided by the IGD spreadksheet for later recovery in the spreadsheet download... ".(join ",", ($self->get_genotyping_user_id(), $self->get_genotyping_project_name()))."\n";
+        #$logger->error("Storing user_id and project_name provided by the IGD spreadksheet for later recovery in the spreadsheet download... ".(join ",", ($self->get_genotyping_user_id(), $self->get_genotyping_project_name()))."");
         $nd_experiment->create_nd_experimentprops({
             $genotyping_user_cvterm->name() => $self->get_genotyping_user_id(),
             $genotyping_project_name_cvterm->name() => $self->get_genotyping_project_name(),
@@ -445,7 +447,7 @@ sub save_trial {
         $project->create_projectprops({ $has_plants_cvterm->name() => 'varies' });
     }
 
-    print STDERR "NOW CALLING TRIAl DESIGN STORE...\n";
+    $logger->debug("NOW CALLING TRIAl DESIGN STORE...");
     my $trial_design_store = CXGN::Trial::TrialDesignStore->new({
         bcs_schema => $chado_schema,
         trial_id => $project->project_id(),
@@ -465,13 +467,13 @@ sub save_trial {
     my $error;
     my $validate_design_error = $trial_design_store->validate_design();
     if ($validate_design_error) {
-        print STDERR "ERROR: $validate_design_error\n";
+        $logger->error("ERROR: $validate_design_error");
         return { error => "Error validating trial design: $validate_design_error." };
     } else {
 	try {
 	    $error = $trial_design_store->store();
 	} catch {
-	    print STDERR "ERROR store: $_\n";
+	    $logger->error("ERROR store: $_");
 	    $error = $_;
 	};
     }

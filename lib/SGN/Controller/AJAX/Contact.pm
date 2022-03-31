@@ -21,6 +21,8 @@ use Data::Dumper;
 use LWP::UserAgent;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -61,7 +63,7 @@ sub submit_contact_form_POST : Args(0) {
     if ($resp->is_success) {
         my $message = $resp->decoded_content;
         my $message_hash = decode_json $message;
-        #print STDERR Dumper $message_hash;
+        #$logger->error(Dumper($message_hash));
         if ($message_hash->{id}){
             $c->stash->{rest} = {success => 1};
         } else {

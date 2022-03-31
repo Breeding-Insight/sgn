@@ -14,6 +14,8 @@ use CXGN::List::Transform;
 
 extends 'CXGN::BrAPI::v1::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
     my $self = shift;
     my $params = shift;
@@ -70,7 +72,7 @@ sub search {
         }
     );
     my ($data, $unique_traits) = $phenotypes_search->search();
-    # print STDERR Dumper $data;
+    # $logger->error(Dumper($data));
 
     my @data_window;
     my $total_count = 0;

@@ -5,6 +5,7 @@ use Spreadsheet::ParseExcel;
 use CXGN::Stock::StockLookup;
 use SGN::Model::Cvterm;
 use Data::Dumper;
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
     my $self = shift;
@@ -281,8 +282,8 @@ sub _validate_with_plugin {
 
 
 sub _parse_with_plugin {
-    print STDERR "Parsing sampling trial file upload\n";
     my $self = shift;
+    $logger->debug("Parsing sampling trial file upload");
     my $filename = $self->get_filename();
     my $schema = $self->get_chado_schema();
     my $parser   = Spreadsheet::ParseExcel->new();
@@ -374,7 +375,7 @@ sub _parse_with_plugin {
         $design{$key}->{volume} = $volume;
     }
 
-    #print STDERR Dumper \%design;
+    #$logger->error(Dumper(\%design));
     $self->_set_parsed_data(\%design);
 
     return 1;

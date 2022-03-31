@@ -7,6 +7,7 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use CXGN::List::Validate;
 use Scalar::Util qw(looks_like_number);
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
     my $self = shift;
@@ -24,7 +25,7 @@ sub _validate_with_plugin {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
@@ -34,7 +35,7 @@ sub _validate_with_plugin {
         @columns = $csv->fields();
     } else {
         $parse_result{'error'} = "Could not parse header row.";
-        print STDERR "Could not parse header.\n";
+        $logger->error("Could not parse header.");
         return \%parse_result;
     }
 
@@ -43,7 +44,7 @@ sub _validate_with_plugin {
     if ( $columns[0] ne "plot_name" &&
         $columns[1] ne "accession_name" ) {
             $parse_result{'error'} = 'File contents incorrect. Header row must contain:  "plot_name","accession_name"';
-            print STDERR "File contents incorrect.\n";
+            $logger->error("File contents incorrect.");
             return \%parse_result;
     }
 
@@ -55,13 +56,13 @@ sub _validate_with_plugin {
             @columns = $csv->fields();
         } else {
             $parse_result{'error'} = "Could not parse row $row.";
-            print STDERR "Could not parse row $row.\n";
+            $logger->error("Could not parse row $row.");
             return \%parse_result;
         }
 
         if (scalar(@columns) != $num_cols){
             $parse_result{'error'} = 'All lines must have same number of columns as header! Error on row: '.$row;
-            print STDERR "Line $row does not have complete columns.\n";
+            $logger->error("Line $row does not have complete columns.");
             return \%parse_result;
         }
 

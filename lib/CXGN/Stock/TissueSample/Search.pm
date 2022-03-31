@@ -37,6 +37,8 @@ use Data::Dumper;
 use SGN::Model::Cvterm;
 use CXGN::Stock::TissueSample;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -233,7 +235,7 @@ sub search {
             row_number => $s->row_number
         };
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     return (\@result, $records_total);
 }

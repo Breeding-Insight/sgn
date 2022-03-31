@@ -5,6 +5,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use Text::CSV;
 
+my $logger = Log::Log4perl->get_logger();
+
 # Check that all sample IDs are in the database already
 sub _validate_with_plugin {
     my $self = shift;
@@ -139,7 +141,7 @@ sub _validate_with_plugin {
     }
 
     my $number_observation_units = scalar(@observation_unit_names);
-    print STDERR "Number observation units: $number_observation_units...\n";
+    $logger->debug("Number observation units: $number_observation_units...");
 
     my $stock_type = $self->get_observation_unit_type_name;
     my @observation_units_names_trim;
@@ -185,7 +187,7 @@ sub _validate_with_plugin {
     foreach (@missing_stocks){
         if (!$self->get_create_missing_observation_units_as_accessions){
             push @missing_stocks_return, $_;
-            print STDERR "WARNING! Observation unit name $_ not found for stock type $stock_type. You can pass an option to automatically create accessions.\n";
+            $logger->warn("WARNING! Observation unit name $_ not found for stock type $stock_type. You can pass an option to automatically create accessions.");
         } else {
             my $stock = $schema->resultset("Stock::Stock")->create({
                 organism_id => $organism_id,
@@ -222,7 +224,7 @@ sub _parse_with_plugin {
     my @error_messages;
     my %errors;
 
-    print STDERR "Reading VCF to parse\n";
+    $logger->debug("Reading VCF to parse");
 
     my %protocolprop_info;
     $protocolprop_info{'header_information_lines'} = [];
@@ -282,7 +284,7 @@ sub _parse_with_plugin {
             }
 
         close($F);
-        #print STDERR Dumper \%marker_info_lookup;
+        #$logger->error(Dumper(\%marker_info_lookup));
         $protocolprop_info{'markers'} = \%marker_info;
     }
 

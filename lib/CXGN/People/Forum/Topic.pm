@@ -8,6 +8,7 @@ package CXGN::People::Forum::Topic;
 
 use base qw | CXGN::People::Forum |;
 use strict;
+my $logger = Log::Log4perl->get_logger();
 
 =head2 function new()
 
@@ -70,7 +71,7 @@ sub new_page_comment {
 	$self->fetch_topic($topic_id);
     }
     else { 
-	#print STDERR "Couldn't find topic...\n";
+	#$logger->error("Couldn't find topic...");
     }
 
     return $self;
@@ -145,7 +146,7 @@ sub fetch_topic {
 
 sub store {
 	my $self = shift;
-	#print STDERR "Storing Topic...".$self->get_topic_name()."\n";
+	#$logger->error("Storing Topic...".$self->get_topic_name()."");
 	if ($self->get_forum_topic_id()) { 
 		#
 		# update db
@@ -455,7 +456,7 @@ sub set_topic_sort_order {
 	$self->{topic_sort_order}=$sort_order;
     }
     else { 
-	print STDERR "[Topic.pm] set_topic_sort_order $sort_order is not a legal sort order. Set to default (asc)\n"; 
+	$logger->debug("[Topic.pm] set_topic_sort_order $sort_order is not a legal sort order. Set to default (asc)");
 	$self->{topic_sort_order}="asc";
     }
 }

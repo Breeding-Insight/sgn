@@ -3,6 +3,8 @@ package CXGN::Blast::SeqQuery::Plugin::TomatoGenomeIds;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "tomato genome identifiers";
 }
@@ -31,13 +33,13 @@ sub validate {
     
     my @missing = ();
     foreach my $id (@ids) { 
-	print STDERR "Validating $id... ";
+	$logger->error("Validating $id... ");
 	my $rs = $schema->resultset("Sequence::Feature")->search( { type_id=>$rna_id, name => { ilike => "$id".'.%.1' } } );
 	if ($rs->count() ==0) { 
-	    print STDERR " not found.\n";
+	    $logger->debug(" not found.");
 	    push @missing, $id;
 	}
-	else { print STDERR "OK\n"; }
+	else { $logger->debug("OK"); }
 
     }
     if (@missing) { 
@@ -57,7 +59,7 @@ sub process {
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $rna_id = $schema->resultset("Cv::Cvterm")->find( { name=>'mRNA' })->cvterm_id();
-    print STDERR "RNA: $rna_id\n";
+    $logger->debug("RNA: $rna_id");
     my @seqs = ();
     foreach my $id (@ids) { 
 	my $rs = $schema->resultset("Sequence::Feature")->search( { type_id=>$rna_id, name => { ilike => "$id".'.%.1' } } );
@@ -70,7 +72,7 @@ sub process {
 	}
     }
     my $sequence =  join "\n", @seqs;
-    print STDERR "SEQUENCE = $sequence\n";
+    $logger->debug("SEQUENCE = $sequence");
 
     return $sequence;
     

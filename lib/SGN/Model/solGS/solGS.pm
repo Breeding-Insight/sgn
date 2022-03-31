@@ -41,6 +41,8 @@ use CXGN::Phenotypes::PhenotypeMatrix;
 
 extends 'Catalyst::Model';
 
+my $logger = Log::Log4perl->get_logger();
+
 
 __PACKAGE__->mk_accessors(qw/context schema/);
 
@@ -78,7 +80,7 @@ sub search_trait {
 
     while ( my $tr = $sth->fetchrow_array())
     {
-        print STDERR "\ntrait: $trait - tr: $tr\n";
+        $logger->debug("\ntrait: $trait - tr: $tr");
 	push @traits, $tr;
     }
 

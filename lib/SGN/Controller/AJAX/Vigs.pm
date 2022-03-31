@@ -13,6 +13,8 @@ use Data::Dumper;
 use File::Temp qw | tempfile |; 
 use CXGN::Graphics::VigsGraph;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -61,7 +63,7 @@ sub run_bowtie2 :Path('/tools/vigs/result') :Args(0) {
 		$sequence =~ s/\.\d//;
 		$sequence =~ s/\.\d//;
 		
-		# print STDERR "seq: $sequence\n";
+		# $logger->error("seq: $sequence");
 		
 		# get databases path from the configuration file
 		my $db_path = $c->config->{vigs_db_path};
@@ -74,7 +76,7 @@ sub run_bowtie2 :Path('/tools/vigs/result') :Args(0) {
 		foreach my $db_path (@tmp_dbs) {
 			# $db_path =~ s/\.rev\.1\.bt2//;
 			$db_path =~ s/\.rev\.1\.ebwt//;
-			# print STDERR "DB: $db_path\n";
+			# $logger->error("DB: $db_path");
 			
 			my $fs = Bio::BLAST2::Database->open(full_file_basename => "$db_path",);
 			
@@ -84,7 +86,7 @@ sub run_bowtie2 :Path('/tools/vigs/result') :Args(0) {
 				last;
 			}
 		}
-		# print STDERR "seq: $sequence\n";
+		# $logger->error("seq: $sequence");
 		
 		if ($sequence =~ tr/acgtACGT/acgtACGT/ < 30) {
 			push ( @errors , "Your input sequence is not valid: $pasted_gene_name\n");
@@ -151,7 +153,7 @@ sub run_bowtie2 :Path('/tools/vigs/result') :Args(0) {
     if (! -e $query_file) { die "Query file failed to be created."; }
 
     # get arguments to Run Bowtie2
-    # print STDERR "DATABASE SELECTED: $db_id\n";
+    # $logger->error("DATABASE SELECTED: $db_id");
     
     my $basename = $c->config->{vigs_db_path};
     my $database = $db_id;
@@ -177,7 +179,7 @@ sub run_bowtie2 :Path('/tools/vigs/result') :Args(0) {
 	# 	" -S ".$query_file.".bt2.out",
 	# );
 	
-    # print STDERR "Bowtie2 COMMAND: ".(join " ",@command)."\n";
+    # $logger->error("Bowtie2 COMMAND: ".(join " ",@command)."");
     # my $err = system(@command);
 	 
 	# bowtie command allowing 2 missmatch
@@ -250,7 +252,7 @@ sub view :Path('/tools/vigs/view') Args(0) {
 		my $expr_path = $c->path_to($expr_dir);
     
 		$expr_hash = get_expression_hash($expr_path);
-		# print STDERR "hash header: ".Dumper($$expr_hash{"header"})."\n";
+		# $logger->error("hash header: ".Dumper($$expr_hash{"header"})."");
     }
 
     $seq_filename = File::Spec->catfile($c->config->{cluster_shared_tempdir}, $seq_filename);
@@ -296,7 +298,7 @@ sub view :Path('/tools/vigs/view') Args(0) {
 			$counter++;
 			@regions = $vg->longest_vigs_sequence($coverage, $seq_length);
 		
-			print STDERR "score: $regions[1], loop iteration: $counter, coverage: $coverage\n";
+			$logger->debug("score: $regions[1], loop iteration: $counter, coverage: $coverage");
 			
 			if ($counter >= 3) {
 				last;

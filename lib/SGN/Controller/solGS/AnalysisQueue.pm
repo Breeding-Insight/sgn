@@ -13,6 +13,8 @@ use Carp qw/ carp confess croak /;
 use Scalar::Util 'reftype';
 use URI;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller' }
 
 
@@ -1059,7 +1061,7 @@ sub run_analysis {
 		else
 		{
 		    $c->stash->{status} = 'Error: Unknown job';
-		    print STDERR "\n Uknown job.\n";
+		    $logger->debug("\n Uknown job.");
 		}
     };
 

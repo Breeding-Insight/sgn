@@ -173,6 +173,7 @@ use CXGN::People::Person;
 use DateTime;
 
 with 'MooseX::Object::Pluggable';
+my $logger = Log::Log4perl->get_logger();
 
 
 has 'bcs_schema' => (
@@ -246,7 +247,7 @@ sub BUILD {
 # sub download {
 #     my $self = shift;
 
-#     print STDERR "Format: ".$self->format()."\n";
+#     $logger->error("Format: ".$self->format()."");
 #     eval {
 # 	$self->load_plugin($self->format());
 #     };
@@ -268,7 +269,7 @@ sub trial_download_log {
 	return;
     }
     else {
-	print STDERR "Note: set config variable trial_download_logfile to obtain a log of downloaded trials.\n";
+	$logger->debug("Note: set config variable trial_download_logfile to obtain a log of downloaded trials.");
     }
 
     my $now = DateTime->now();

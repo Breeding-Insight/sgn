@@ -42,6 +42,8 @@ use CXGN::Accession;
 use CXGN::Stock::Seedlot::Maintenance;
 use Spreadsheet::WriteExcel;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub breeder_download : Path('/breeders/download/') Args(0) {
     my $self = shift;
     my $c = shift;
@@ -184,7 +186,7 @@ sub breeder_download : Path('/breeders/download/') Args(0) {
 
 sub _parse_list_from_json {
     my $list_json = shift;
-    #print STDERR Dumper $list_json;
+    #$logger->error(Dumper($list_json));
     my $json = new JSON;
     if ($list_json) {
        # my $decoded_list = $json->allow_nonref->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($list_json);
@@ -236,23 +238,23 @@ sub download_phenotypes_action : Path('/breeders/trials/phenotype/download') Arg
     my $phenotype_max_value = $c->req->param("phenotype_max_value") && $c->req->param("phenotype_max_value") ne 'null' ? $c->req->param("phenotype_max_value") : "";
 
     my @trait_list;
-    if ($trait_list && $trait_list ne 'null') { print STDERR "trait_list: ".Dumper $trait_list."\n"; @trait_list = @{_parse_list_from_json($trait_list)}; }
+    if ($trait_list && $trait_list ne 'null') { $logger->debug("trait_list: ".Dumper $trait_list.""); @trait_list = @{_parse_list_from_json($trait_list)}; }
     my @trait_component_list;
-    if ($trait_component_list && $trait_component_list ne 'null') { print STDERR "trait_component_list: ".Dumper $trait_component_list."\n"; @trait_component_list = @{_parse_list_from_json($trait_component_list)}; }
+    if ($trait_component_list && $trait_component_list ne 'null') { $logger->debug("trait_component_list: ".Dumper $trait_component_list.""); @trait_component_list = @{_parse_list_from_json($trait_component_list)}; }
     my @trait_contains_list;
-    if ($trait_contains && $trait_contains ne 'null') { print STDERR "trait_contains: ".Dumper $trait_contains."\n"; @trait_contains_list = @{_parse_list_from_json($trait_contains)}; }
+    if ($trait_contains && $trait_contains ne 'null') { $logger->debug("trait_contains: ".Dumper $trait_contains.""); @trait_contains_list = @{_parse_list_from_json($trait_contains)}; }
     my @year_list;
-    if ($year_list && $year_list ne 'null') { print STDERR "year list: ".Dumper $year_list."\n"; @year_list = @{_parse_list_from_json($year_list)}; }
+    if ($year_list && $year_list ne 'null') { $logger->debug("year list: ".Dumper $year_list.""); @year_list = @{_parse_list_from_json($year_list)}; }
     my @location_list;
-    if ($location_list && $location_list ne 'null') { print STDERR "location list: ".Dumper $location_list."\n"; @location_list = @{_parse_list_from_json($location_list)}; }
+    if ($location_list && $location_list ne 'null') { $logger->debug("location list: ".Dumper $location_list.""); @location_list = @{_parse_list_from_json($location_list)}; }
     my @trial_list;
-    if ($trial_list && $trial_list ne 'null') { print STDERR "trial list: ".Dumper $trial_list."\n"; @trial_list = @{_parse_list_from_json($trial_list)}; }
+    if ($trial_list && $trial_list ne 'null') { $logger->debug("trial list: ".Dumper $trial_list.""); @trial_list = @{_parse_list_from_json($trial_list)}; }
     my @accession_list;
-    if ($accession_list && $accession_list ne 'null') { print STDERR "accession list: ".Dumper $accession_list."\n";@accession_list = @{_parse_list_from_json($accession_list)}; }
+    if ($accession_list && $accession_list ne 'null') { $logger->debug("accession list: ".Dumper $accession_list."");@accession_list = @{_parse_list_from_json($accession_list)}; }
     my @plot_list;
-    if ($plot_list && $plot_list ne 'null') { print STDERR "plot list: ".Dumper $plot_list."\n"; @plot_list = @{_parse_list_from_json($plot_list)}; }
+    if ($plot_list && $plot_list ne 'null') { $logger->debug("plot list: ".Dumper $plot_list.""); @plot_list = @{_parse_list_from_json($plot_list)}; }
     my @plant_list;
-    if ($plant_list && $plant_list ne 'null') { print STDERR "plant list: ".Dumper $plant_list."\n"; @plant_list = @{_parse_list_from_json($plant_list)}; }
+    if ($plant_list && $plant_list ne 'null') { $logger->debug("plant list: ".Dumper $plant_list.""); @plant_list = @{_parse_list_from_json($plant_list)}; }
 
     #Input list arguments can be arrays of integer ids or strings; however, when fed to CXGN::Trial::Download, they must be arrayrefs of integer ids
     my @trait_list_int;
@@ -354,8 +356,8 @@ sub download_phenotypes_action : Path('/breeders/trials/phenotype/download') Arg
     $rel_file = $rel_file . ".$format";
     my $tempfile = $c->config->{basepath}."/".$rel_file;
 
-    print STDERR "TEMPFILE : $tempfile\n";
-    print STDERR "Plugin is $plugin\n";
+    $logger->debug("TEMPFILE : $tempfile");
+    $logger->debug("Plugin is $plugin");
     #List arguments should be arrayrefs of integer ids
     my $download = CXGN::Trial::Download->new({
         bcs_schema => $schema,
@@ -463,7 +465,7 @@ sub download_action : Path('/breeders/download_action') Args(0) {
     my $exclude_phenotype_outlier = $c->req->param("exclude_phenotype_outlier") || 0;
     my $timestamp_included = $c->req->param("timestamp") || 0;
     my $dl_cookie = "download".$dl_token;
-    print STDERR "Token is: $dl_token\n";
+    $logger->debug("Token is: $dl_token");
 
     my $accession_data;
     if ($accession_list_id) {
@@ -653,7 +655,7 @@ sub download_accession_properties_action : Path('/breeders/download_accession_pr
     my $dl_token = $c->req->param("accession_properties_download_token") || "no_token";
     my $dl_cookie = "download".$dl_token;
     if ( !$accession_list_id ) {
-        print STDERR "ERROR: No accession list id provided to download accession properties action";
+        $logger->error("ERROR: No accession list id provided to download accession properties action");
         return;
     }
 
@@ -843,7 +845,7 @@ sub download_pedigree_action : Path('/breeders/download_pedigree_action') {
     my $ped_format = $c->req->param("ped_format");
     my $dl_token = $c->req->param("pedigree_download_token") || "no_token";
     my $dl_cookie = "download".$dl_token;
-    print STDERR "Token is: $dl_token\n";
+    $logger->debug("Token is: $dl_token");
 
     my ($tempfile, $uri) = $c->tempfile(TEMPLATE => "pedigree_download_XXXXX", UNLINK=> 0);
 
@@ -913,7 +915,7 @@ sub download_seedlot_maintenance_events_action : Path('/breeders/download_seedlo
     my $dl_token = $c->req->param("seedlot_maintenance_events_download_token") || "no_token";
     my $dl_cookie = "download".$dl_token;
     if ( !$seedlot_list_id ) {
-        print STDERR "ERROR: No seedlot list id provided to download seedlot maintenance events action";
+        $logger->error("ERROR: No seedlot list id provided to download seedlot maintenance events action");
         return;
     }
 
@@ -979,7 +981,7 @@ sub download_seedlot_maintenance_events_action : Path('/breeders/download_seedlo
 #Used from wizard page and manage download page for downloading gbs from accessions
 sub download_gbs_action : Path('/breeders/download_gbs_action') {
     my ($self, $c) = @_;
-    # print STDERR Dumper $c->req->params();
+    # $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema", "sgn_chado");
     my $people_schema = $c->dbic_schema("CXGN::People::Schema");
     my $format = $c->req->param("format") || "list_id";
@@ -1093,7 +1095,7 @@ sub download_gbs_action : Path('/breeders/download_gbs_action') {
 #Used from wizard page for downloading genetic relationship matrix (GRM)
 sub download_grm_action : Path('/breeders/download_grm_action') {
     my ($self, $c) = @_;
-    # print STDERR Dumper $c->req->params();
+    # $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema", "sgn_chado");
     my $people_schema = $c->dbic_schema("CXGN::People::Schema");
     my $download_format = $c->req->param("download_format") || 'matrix';
@@ -1169,7 +1171,7 @@ sub download_grm_action : Path('/breeders/download_grm_action') {
 #Used from wizard page for downloading genome wide association study (GWAS) results and plots
 sub download_gwas_action : Path('/breeders/download_gwas_action') {
     my ($self, $c) = @_;
-    # print STDERR Dumper $c->req->params();
+    # $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema", "sgn_chado");
     my $people_schema = $c->dbic_schema("CXGN::People::Schema");
     my $minor_allele_frequency = $c->req->param("minor_allele_frequency") ? $c->req->param("minor_allele_frequency") + 0 : 0.05;
@@ -1373,7 +1375,7 @@ sub trial_download_log {
 
     if (! $c->user) {
       return;
-      print STDERR "Can't find user id, skipping download logging\n";
+      $logger->debug("Can't find user id, skipping download logging");
     }
     if ($c->config->{trial_download_logfile}) {
       my $logfile = $c->config->{trial_download_logfile};
@@ -1385,10 +1387,10 @@ sub trial_download_log {
             $now->year()."-".$now->month()."-".$now->day()." ".$now->hour().":".$now->minute()));
       print $F "\n";
       close($F);
-      print STDERR "Download logged in $logfile\n";
+      $logger->debug("Download logged in $logfile");
     }
     else {
-      print STDERR "Note: set config variable trial_download_logfile to obtain a log of downloaded trials.\n";
+      $logger->debug("Note: set config variable trial_download_logfile to obtain a log of downloaded trials.");
     }
 }
 
@@ -1461,7 +1463,7 @@ sub download_sequencing_facility_spreadsheet : Path( '/breeders/genotyping/sprea
 
     # # replace accession names with igd_synonyms
     # #
-    # print STDERR "Converting accession names to igd_synonyms...\n";
+    # $logger->error("Converting accession names to igd_synonyms...");
     # foreach my $k (sort wellsort (keys %{$layout})) {
     # 	my $q = "SELECT value FROM stock JOIN stockprop using(stock_id) JOIN cvterm ON (stockprop.type_id=cvterm.cvterm_id) WHERE cvterm.name='igd_synonym' AND stock.uniquename = ?";
     # 	my $h = $c->dbc->dbh()->prepare($q);

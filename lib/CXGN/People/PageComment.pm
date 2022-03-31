@@ -36,6 +36,7 @@ use CXGN::People;
 use CXGN::People::Forum;
 
 use base qw | CXGN::DB::Object |;
+my $logger = Log::Log4perl->get_logger();
 
 =head2 constructor new()
 
@@ -68,7 +69,7 @@ sub new {
 #    my $page= CXGN::Page->new("", "Lukas");
     $self->set_user_id(CXGN::Login->new($self->get_dbh())->has_session());
     $self->set_refering_page($referer);
-    #print STDERR "Referer: ".($self->get_refering_page())."\n";
+    #$logger->error("Referer: ".($self->get_refering_page())."");
 			     
     @{$self->{posts}}= ();
     $self->fetch_page_comments();
@@ -91,20 +92,20 @@ sub fetch_page_comments {
     # fetch the page comments using a function in the Topic class
     #
     my $self = shift;
-    #print STDERR "TYPE: ".$self->get_type.", ID: ".$self->get_id()."\n";
+    #$logger->error("TYPE: ".$self->get_type.", ID: ".$self->get_id()."");
     my $topic = CXGN::People::Forum::Topic->new_page_comment($self->get_dbh(), $self->get_type(), $self->get_id());
-    #print STDERR "TOPIC ID: ".$topic->get_forum_topic_id()."\n";
+    #$logger->error("TOPIC ID: ".$topic->get_forum_topic_id()."");
         
     $self->set_topic($topic);
     if ($self->get_topic()->get_forum_topic_id()) { 
-	#print STDERR "Topic_id: ".$self->get_topic()->get_forum_topic_id()."\n";
+	#$logger->error("Topic_id: ".$self->get_topic()->get_forum_topic_id()."");
 	my @posts = $self->get_topic()->get_all_posts();
-#	foreach my $p (@posts) { print STDERR "POSTS: ".($p->get_subject())."\n"; }
+#	foreach my $p (@posts) { $logger->error("POSTS: ".($p->get_subject()).""); }
 	$self->set_posts(@posts);
 	
     }
     else { 
-	#print STDERR "No topic could be found corresponding to type=".$self->get_type()." and id=".$self->get_id()."\n";
+	#$logger->error("No topic could be found corresponding to type=".$self->get_type()." and id=".$self->get_id()."");
     }
     
 }

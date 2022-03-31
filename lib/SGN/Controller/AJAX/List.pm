@@ -14,6 +14,8 @@ use CXGN::List::Desynonymize;
 use CXGN::Cross;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST'; }
 
 __PACKAGE__->config(
@@ -432,7 +434,7 @@ sub add_cross_progeny : Path('/list/add_cross_progeny') Args(0) {
     my $self = shift;
     my $c = shift;
     my $cross_id_list = decode_json($c->req->param("cross_id_list"));
-    #print STDERR Dumper $cross_id_list;
+    #$logger->error(Dumper($cross_id_list));
     my $list_id = $c->req->param("list_id");
 
     my $list = CXGN::List->new( { dbh=>$c->dbc->dbh(), list_id => $list_id });
@@ -458,7 +460,7 @@ sub add_cross_progeny : Path('/list/add_cross_progeny') Args(0) {
         }
         $response{'count'} += $r->{count};
     }
-    #print STDERR Dumper \%response;
+    #$logger->error(Dumper(\%response));
     $c->stash->{rest} = { duplicates => $response{'duplicates'} };
     $c->stash->{rest}->{success} = { count => $response{'count'} };
 }
@@ -489,7 +491,7 @@ sub add_bulk : Path('/list/add/bulk') Args(0) {
     my $count = 0;
 
     my $response = $list->add_bulk(\@elements);
-    #print STDERR Dumper $response;
+    #$logger->error(Dumper($response));
 
     if ($response->{error}) {
         $c->stash->{rest} = { error => $response->{error}};
@@ -548,7 +550,7 @@ sub exists_list_action : Path('/list/exists') Args(0) {
 
     my $list_info = CXGN::List::exists_list($c->dbc->dbh(), $name, $user_id);
 
-    print STDERR "List info is ".Dumper($list_info);
+    $logger->error("List info is ".Dumper($list_info));
 	$c->stash->{rest} = $list_info;
 
 }
@@ -836,7 +838,7 @@ sub update_element_action :Path('/list/item/update') Args(0) {
     my $error = $self->check_user($c, $list_id);
 
     if ($content) {
-        print STDERR "update ".$list_id." ".$item_id." ".$content."\n";
+        $logger->debug("update ".$list_id." ".$item_id." ".$content."");
 
         if ($error) {
             $c->stash->{rest} = { error => $error };
@@ -902,7 +904,7 @@ sub retrieve_list : Private {
     }
     my $list_elements_with_ids = $list->retrieve_elements_with_ids($list_id);
 
-    #print STDERR "LIST ELEMENTS WITH IDS: ".Dumper($list_elements_with_ids);
+    #$logger->error("LIST ELEMENTS WITH IDS: ".Dumper($list_elements_with_ids));
     return $list_elements_with_ids;
 }
 
@@ -1056,13 +1058,13 @@ sub adjust_case : Path('/ajax/list/adjust_case') Args(0) {
     my $lt = CXGN::List::Transform->new();
     my $elements = $list->elements();
 
-    print STDERR "Elements: ".Dumper($elements);
+    $logger->error("Elements: ".Dumper($elements));
     
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
 	
     my $data = $lt->transform($schema, 'accessions_2_accession_case', $elements);
 
-    print STDERR "Converted data: ".Dumper($data);
+    $logger->error("Converted data: ".Dumper($data));
 
     if (! $data) {
 	$c->stash->{rest} = { error => "No data!" };
@@ -1072,9 +1074,9 @@ sub adjust_case : Path('/ajax/list/adjust_case') Args(0) {
     my $replace_count = 0;
    
     foreach my $item (@$elements) {
-	print STDERR "Replacing element $item...\n";
+	$logger->debug("Replacing element $item...");
 	if ($data->{mapping}->{$item}) {
-	    print STDERR "  with $data->{mapping}->{$item}...\n";
+	    $logger->debug("  with $data->{mapping}->{$item}...");
 	    my $error = $list->replace_by_name($item, $data->{mapping}->{$item});
 	    if ($error) {
 		$error_message .= "Error: $item not replaced. ";
@@ -1121,15 +1123,15 @@ sub adjust_synonyms :Path('/ajax/list/adjust_synonyms') Args(0) {
 
     my $lt = CXGN::List::Transform->new();
     my $elements = $list->elements();
-    print STDERR "Elements: ".Dumper($elements);
+    $logger->error("Elements: ".Dumper($elements));
     
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
 	
     my $data = $lt->transform($schema, 'synonyms2accession_uniquename', $elements);
 
-    print STDERR "Converted data: ".Dumper($data);
+    $logger->error("Converted data: ".Dumper($data));
 
-    print STDERR Dumper($data);
+    $logger->error(Dumper($data));
     
     if (! $data) {
 	$c->stash->{rest} = { error => "No data!" };
@@ -1139,9 +1141,9 @@ sub adjust_synonyms :Path('/ajax/list/adjust_synonyms') Args(0) {
     my $replace_count = 0;
    
     foreach my $item (@$elements) {
-	print STDERR "Replacing element $item...\n";
+	$logger->debug("Replacing element $item...");
 	if ($data->{mapping}->{$item}) {
-	    print STDERR "  with $data->{mapping}->{$item}...\n";
+	    $logger->debug("  with $data->{mapping}->{$item}...");
 	    my $error = $list->replace_by_name($item, $data->{mapping}->{$item});
 	    if ($error) {
 		$error_message .= "Error: $item not replaced. ";

@@ -59,11 +59,13 @@ sub new
 
 =cut
 
+my $logger = Log::Log4perl->get_logger();
+
 sub process_parameters {
     my $self = shift;
 
     #do some simple parameter checking
-    print STDERR "IDS (ESTs) $self->{ids}\n\n";
+    $logger->debug("IDS (ESTs) $self->{ids}\n");
     return 0 if ($self->{idType} eq "");
     #return 0 if ($self->{ids_string} !~ /\w/);
 

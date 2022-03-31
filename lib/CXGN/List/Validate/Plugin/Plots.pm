@@ -3,6 +3,8 @@ package CXGN::List::Validate::Plugin::Plots;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "plots";
 }
@@ -14,7 +16,7 @@ sub validate {
 
     my $type_id = $schema->resultset("Cv::Cvterm")->search({ name=>"plot" })->first->cvterm_id();
 
-    #print STDERR "PLOT TYPE ID $type_id\n";
+    #$logger->error("PLOT TYPE ID $type_id");
 
     my @missing = ();
     foreach my $l (@$list) {

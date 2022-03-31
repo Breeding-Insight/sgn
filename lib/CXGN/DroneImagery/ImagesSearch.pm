@@ -44,6 +44,8 @@ use SGN::Model::Cvterm;
 use CXGN::Calendar;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -441,7 +443,7 @@ sub search {
         GROUP BY(drone_run_band.project_id, drone_run_band.name, drone_run_band.description, drone_run_band_type.value, drone_run_band_rotate_angle.value, drone_run_band_cropped_polygon.value, drone_run_band_removed_background_tgi_threshold.value, drone_run_band_removed_background_vari_threshold.value, drone_run_band_removed_background_ndvi_threshold.value, drone_run_band_removed_background_threshold.value, drone_run_band_plot_polygons.value, drone_run.project_id, drone_run.name, drone_run.description, drone_run_type.value, drone_run_date.value, drone_run_averaged_temperature_gdd.value, drone_run_related_time_cvterm_json.value, drone_run_indicator.value, drone_run_phenotypes_indicator.value, drone_run_processed.value, drone_run_processed_extended.value, drone_run_processed_vi.value, study.name, study.project_id, study.description, folder.name, folder.project_id, folder.description, trial_type_name.cvterm_id, trial_type_name.name, year.value, location.value, breeding_program.name, breeding_program.project_id, breeding_program.description, harvest_date.value, planting_date.value, design.value, project_image_type.cvterm_id, project_image_type.name, md_image.image_id, md_image.description, md_image.original_filename, md_image.sp_person_id, md_image.create_date, md_image.modified_date, md_image.md5sum, image_person.username, image_person.first_name, image_person.last_name, stock.stock_id, stock.uniquename, stock.type_id, stock_image.stock_image_id)
         ORDER BY study.name, md_image.image_id;";
 
-    #print STDERR Dumper $q;
+    #$logger->error(Dumper($q));
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute();
 
@@ -513,7 +515,7 @@ sub search {
         };
         $total_count = $full_count;
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     return (\@result, $total_count);
 }

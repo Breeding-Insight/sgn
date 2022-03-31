@@ -6,6 +6,7 @@ use MooseX::FollowPBP;
 use Moose::Util::TypeConstraints;
 
 with 'MooseX::Object::Pluggable';
+my $logger = Log::Log4perl->get_logger();
 
 
 has 'chado_schema' => (
@@ -74,26 +75,26 @@ sub parse {
 
     if (!$self->_validate_with_plugin()) {
         my $errors = $self->get_parse_errors();
-        #print STDERR "\nCould not validate genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."\n";
+        #$logger->error("\nCould not validate genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."");
         return;
     }
 
     if (!$self->_parse_with_plugin()) {
         my $errors = $self->get_parse_errors();
-        #print STDERR "\nCould not parse genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."\n";
+        #$logger->error("\nCould not parse genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."");
         return;
     }
 
     if (!$self->_has_parsed_data()) {
         my $errors = $self->get_parse_errors();
-        #print STDERR "\nNo parsed data for genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."\n";
+        #$logger->error("\nNo parsed data for genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."");
         return;
     } else {
         return $self->_parsed_data();
     }
 
     my $errors = $self->get_parse_errors();
-    #print STDERR "\nError parsing genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."\n";
+    #$logger->error("\nError parsing genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."");
     return;
 }
 
@@ -102,13 +103,13 @@ sub parse_with_iterator {
 
     if (!$self->_validate_with_plugin()) {
         my $errors = $self->get_parse_errors();
-        #print STDERR "\nCould not validate genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."\n";
+        #$logger->error("\nCould not validate genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."");
         return;
     }
 
     if (!$self->_parse_with_plugin()) {
         my $errors = $self->get_parse_errors();
-        #print STDERR "\nCould not parse genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."\n";
+        #$logger->error("\nCould not parse genotypes file: ".$self->get_filename()."\nError:".Dumper($errors)."");
         return 1;
     }
 }

@@ -7,11 +7,13 @@ use Data::Dumper;
 
 extends 'CXGN::Trial::TrialLayout::AbstractLayout';
 
+my $logger = Log::Log4perl->get_logger();
+
 
 sub BUILD {
     my $self = shift;
 
-    print STDERR "BUILD CXGN::Trial::TrialLayout::SamplingTrial...\n";
+    $logger->debug("BUILD CXGN::Trial::TrialLayout::SamplingTrial...");
 
     $self->set_source_primary_stock_types( [ "accession" ] );
     $self->set_source_stock_types( [ "accession" ] );
@@ -33,7 +35,7 @@ sub retrieve_plot_info {
      my $plot = shift;
      my $design = shift;
 
-     # print STDERR "DESIGN INFO = ".Dumper($design);
+     # $logger->error("DESIGN INFO = ".Dumper($design));
 
      $self->SUPER::retrieve_plot_info($plot, $design);
 
@@ -44,7 +46,7 @@ sub retrieve_plot_info {
 	 $plot_number = $row->value();
      }
 
-     if (! $plot_number) { print STDERR "NO PLOT NUMBER AVAILABLE!!!!\n"; }
+     if (! $plot_number) { $logger->debug("NO PLOT NUMBER AVAILABLE!!!!"); }
 
      my $project = $self->get_project();
 
@@ -56,32 +58,32 @@ sub retrieve_plot_info {
 	 # was $accession_cvterm_id, $plot_cvterm_id, $plant_cvterm_id, $tissue_cvterm_id, $subplot_cvterm_id
 
 
-     print STDERR "Now dealing with metadata... [".$source_rs->count()."]\n";
+     $logger->debug("Now dealing with metadata... [".$source_rs->count()."]");
      while (my $r=$source_rs->next){
-	 print STDERR "TYPE= ".$r->type_id()."\n";
+	 $logger->debug("TYPE= ".$r->type_id()."");
 	 if ($r->type_id == $self->cvterm_id('accession')){
-	     print STDERR "Dealing with accession metadata.\n";
+	     $logger->debug("Dealing with accession metadata.");
 	     $design->{$plot_number}->{"source_accession_id"} = $r->stock_id;
 	     $design->{$plot_number}->{"source_accession_name"} = $r->uniquename;
 	     $design->{$plot_number}->{"source_observation_unit_name"} = $r->uniquename;
 	     $design->{$plot_number}->{"source_observation_unit_id"} = $r->stock_id;
 	 }
 	 if ($r->type_id == $self->cvterm_id('plot')){
-	     print STDERR "Dealing with plot metadata.\n";
+	     $logger->debug("Dealing with plot metadata.");
 	     $design->{$plot_number}->{"source_plot_id"} = $r->stock_id;
 	     $design->{$plot_number}->{"source_plot_name"} = $r->uniquename;
 	     $design->{$plot_number}->{"source_observation_unit_name"} = $r->uniquename;
 	     $design->{$plot_number}->{"source_observation_unit_id"} = $r->stock_id;
 	 }
 	 if ($r->type_id == $self->cvterm_id('plant')){
-	     print STDERR "Dealing with plant metadata\n";
+	     $logger->debug("Dealing with plant metadata");
 	     $design->{$plot_number}->{"source_plant_id"} = $r->stock_id;
 	     $design->{$plot_number}->{"source_plant_name"} = $r->uniquename;
 	     $design->{$plot_number}->{"source_observation_unit_name"} = $r->uniquename;
 	     $design->{$plot_number}->{"source_observation_unit_id"} = $r->stock_id;
 	 }
 	 if ($r->type_id == $self->cvterm_id('tissue_sample')){
-	     print STDERR "Dealing with tieeus metadata\n";
+	     $logger->debug("Dealing with tieeus metadata");
 	      $design->{$plot_number}->{"source_tissue_id"} = $r->stock_id;
 	      $design->{$plot_number}->{"source_tissue_name"} = $r->uniquename;
 	      $design->{$plot_number}->{"source_observation_unit_name"} = $r->uniquename;

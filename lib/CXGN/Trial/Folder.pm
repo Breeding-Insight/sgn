@@ -8,6 +8,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
 	is => 'rw',
 	required => 1,
@@ -300,12 +302,12 @@ sub _get_children {
 		if ($self->folder_type() eq "breeding_program") {
 			if ($folder->project_parent()) {
 				if ($folder->project_parent()->name() eq $self->name()) {
-					#print STDERR "Pushing ".$folder->name().$folder->folder_type."\n";
+					#$logger->error("Pushing ".$folder->name().$folder->folder_type."");
 					push @child_folders, $folder;
 				}
 			}
 		} else {
-			#print STDERR "parent is not a breeding program... pushing ".$folder->name().$folder->folder_type."...\n";
+			#$logger->error("parent is not a breeding program... pushing ".$folder->name().$folder->folder_type."...");
 			push @child_folders, $folder;
 		}
 	}
@@ -322,7 +324,7 @@ sub fast_children {
     my $parent_type = shift;
     my (@folder_contents, %children);
 
-    #print STDERR "Running get children for project ".$self->{'name'}." at time ".localtime()."\n";
+    #$logger->error("Running get children for project ".$self->{'name'}." at time ".localtime()."");
 
     if ($parent_type eq 'breeding_program') {
         my $rs = $schema->resultset("Project::Project")->search_related(
@@ -357,7 +359,7 @@ sub fast_children {
         }
     }
 
-    #print STDERR "Finished running get children for project ".$self->{'name'}." at time ".localtime()."\n";  #Children are: ".Dumper(%children);
+    #$logger->error("Finished running get children for project ".$self->{'name'}." at time ".localtime()."");  #Children are: ".Dumper(%children);
 	return %children
 }
 
@@ -404,14 +406,14 @@ sub associate_parent {
 	my $parent_row = $self->bcs_schema()->resultset("Project::Project")->find( { project_id => $parent_id } );
 
 	if (!$parent_row) {
-		print STDERR "The folder specified as parent does not exist";
+		$logger->error("The folder specified as parent does not exist");
 		return;
 	}
 
 	my $parentprop_row = $self->bcs_schema()->resultset("Project::Projectprop")->find( { project_id => $parent_id,  type_id => { -in => [ $folder_cvterm_id, $breeding_program_trial_relationship_id ] } } );
 
 	if (!$parentprop_row) {
-		print STDERR "The specified parent folder is not of type folder or breeding program. Ignoring.";
+		$logger->error("The specified parent folder is not of type folder or breeding program. Ignoring.");
 		return;
 	}
 
@@ -428,7 +430,7 @@ sub associate_parent {
 
 	my $parent_is_child = check_if_folder_is_child_in_tree($self->bcs_schema, $parent_id, $self->children());
 	if ($parent_is_child) {
-		print STDERR 'Parent '.$parent_id.' is child in tree of folder '.$self->folder_id()."\n";
+		$logger->debug('Parent '.$parent_id.' is child in tree of folder '.$self->folder_id()."");
 		my $parent_folder = CXGN::Trial::Folder->new({
 			bcs_schema => $self->bcs_schema,
 			folder_id => $parent_id
@@ -448,7 +450,7 @@ sub remove_parents {
 
 	if ($project_rels->count() > 0) {
 		while (my $p = $project_rels->next()) {
-			print STDERR $p->subject_project_id." : ".$p->object_project_id." : Removing parent folder association...\n";
+			$logger->debug($p->subject_project_id." : ".$p->object_project_id." : Removing parent folder association...");
 			$p->delete();
 		}
 	}
@@ -464,7 +466,7 @@ sub check_if_folder_is_child_in_tree {
 		if ($child_folder_id == $folder_id) {
 			return 1;
 		} else{
-			#print STDERR $child_folder_id."\n";
+			#$logger->error($child_folder_id."");
 			my $child_folder = CXGN::Trial::Folder->new({
 				bcs_schema => $schema,
 				folder_id => $child_folder_id
@@ -481,7 +483,7 @@ sub associate_breeding_program {
     my $breeding_program_id = shift;
 
     if (!$breeding_program_id) {
-	print STDERR "No breeding_program_id provided. Ignoring association.\n";
+	$logger->debug("No breeding_program_id provided. Ignoring association.");
 	return;
     }
 
@@ -491,7 +493,7 @@ sub associate_breeding_program {
 	});
 
     if (! $project_rel_row) {
-	#print STDERR "Creating folder association with breeding program id= $breeding_program_id, folder_id = ".$self->folder_id().", type_id = ".$self->breeding_program_trial_relationship_id()."\n";
+	#$logger->error("Creating folder association with breeding program id= $breeding_program_id, folder_id = ".$self->folder_id().", type_id = ".$self->breeding_program_trial_relationship_id()."");
 	$project_rel_row = $self->bcs_schema()->resultset('Project::ProjectRelationship')->create(
 	    {
 		object_project_id => $breeding_program_id,
@@ -559,7 +561,7 @@ sub get_jstree_html {
     my $schema = shift;
     my $parent_type = shift;
     my $project_type_of_interest = shift // 'trial';
-    #print STDERR "Running get js tree html on project ".$self->{'name'}." at time ".localtime()."\n";
+    #$logger->error("Running get js tree html on project ".$self->{'name'}." at time ".localtime()."");
     my ($folder_type_of_interest, $local_type_of_interest, $html);
 
     if ($project_type_of_interest eq 'trial') {
@@ -579,10 +581,10 @@ sub get_jstree_html {
     $html .= "<ul>";
 
     my %children = fast_children($self, $schema, $parent_type);
-    # print STDERR Dumper \%children;
+    # $logger->error(Dumper(\%children));
     if (%children) {
         foreach my $child (sort keys %children) {
-            #print STDERR "Working on child ".$children{$child}->{'name'}."\n";
+            #$logger->error("Working on child ".$children{$child}->{'name'}."");
 
             if ($project_type_of_interest eq 'trial' && $children{$child}->{'analysis_experiment'}) {
                 $html .= _jstree_li_html($schema, 'analyses', $children{$child}->{'id'}, $children{$child}->{'name'})."</li>";
@@ -611,7 +613,7 @@ sub get_jstree_html {
         }
     }
     $html .= '</ul></li>';
-    #print STDERR "Finished, returning with html at time ".localtime()."\n";
+    #$logger->error("Finished, returning with html at time ".localtime()."");
     return $html;
 }
 

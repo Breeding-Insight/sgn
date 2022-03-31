@@ -9,6 +9,8 @@ use CXGN::List::Validate;
 use CXGN::BreedersToolbox::StocksFuzzySearch;
 use CXGN::BreedersToolbox::OrganismFuzzySearch;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub _validate_with_plugin {
     my $self = shift;
 
@@ -412,7 +414,7 @@ sub _parse_with_plugin {
         fuzzy_organisms => $fuzzy_organisms,
         absent_organisms => $absent_organisms
     );
-    print STDERR "\n\nAccessionsXLS parsed results :\n".Data::Dumper::Dumper(%return_data)."\n\n";             
+    $logger->debug("\n\nAccessionsXLS parsed results :\n".Data::Dumper::Dumper(%return_data)."\n");
 
     $self->_set_parsed_data(\%return_data);
     return 1;

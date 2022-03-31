@@ -3,6 +3,8 @@ package CXGN::List::Validate::Plugin::Populations;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "populations";
 }
@@ -14,7 +16,7 @@ sub validate {
 
     my $type_id = $schema->resultset("Cv::Cvterm")->search({ name=>"population" })->first->cvterm_id();
 
-    #print STDERR "Population TYPE ID $type_id\n";
+    #$logger->error("Population TYPE ID $type_id");
 
     my @missing = ();
     foreach my $l (@$list) {

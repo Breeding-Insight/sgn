@@ -58,6 +58,8 @@ use File::Temp 'tempfile';
 use File::Copy;
 use POSIX;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -216,7 +218,7 @@ sub get_gwas {
 
     my $number_system_cores = `getconf _NPROCESSORS_ONLN` or die "Could not get number of system cores!\n";
     chomp($number_system_cores);
-    print STDERR "NUMCORES $number_system_cores\n";
+    $logger->debug("NUMCORES $number_system_cores");
 
     my $phenotypes_search = CXGN::Phenotypes::SearchFactory->instantiate(
         'MaterializedViewTable',
@@ -279,7 +281,7 @@ sub get_gwas {
     if (scalar(@all_marker_objects) > 10000) {
 	my $page = CXGN::Page->new();
 	$page->message_page('GWAS Error', 'Please choose less than 10,000 markers');
-        print STDERR "Error: for GWAS please choose less than 10,000 markers";
+        $logger->error("Error: for GWAS please choose less than 10,000 markers");
     }
 
     no warnings 'uninitialized';
@@ -295,7 +297,7 @@ sub get_gwas {
         if (scalar(@all_individual_accessions_stock_ids) > 100) {
 	    my $page = CXGN::Page->new();
             $page->message_page('GWAS Error', 'Please choose less than 100 accessions');
-            print STDERR "Error: for GWAS please choose less than 100 accessions";
+            $logger->error("Error: for GWAS please choose less than 100 accessions");
         }
         foreach (@$accession_list) {
             my $dataset = CXGN::Dataset::Cache->new({
@@ -356,7 +358,7 @@ sub get_gwas {
     }
     # IN this case of a hybrid evaluation where the parents of the accessions planted in a plot are genotyped
     elsif ($get_grm_for_parental_accessions && $accession_list && scalar(@$accession_list)>0) {
-        print STDERR "COMPUTING GENOTYPE FROM PARENTS FOR ACCESSIONS\n";
+        $logger->debug("COMPUTING GENOTYPE FROM PARENTS FOR ACCESSIONS");
         my $accession_list_string = join ',', @$accession_list;
         my $q = "SELECT accession.stock_id, female_parent.stock_id, male_parent.stock_id
             FROM stock AS accession
@@ -376,9 +378,9 @@ sub get_gwas {
             push @male_stock_ids_found, $male_parent_stock_id;
         }
 
-        # print STDERR Dumper \@accession_stock_ids_found;
-        # print STDERR Dumper \@female_stock_ids_found;
-        # print STDERR Dumper \@male_stock_ids_found;
+        # $logger->error(Dumper(\@accession_stock_ids_found));
+        # $logger->error(Dumper(\@female_stock_ids_found));
+        # $logger->error(Dumper(\@male_stock_ids_found));
 
         @all_individual_accessions_stock_ids = @accession_stock_ids_found;
 
@@ -467,9 +469,9 @@ sub get_gwas {
     $transpose_cmd->is_cluster(1);
     $transpose_cmd->wait;
 
-    # print STDERR Dumper \@all_marker_names;
-    # print STDERR Dumper \@individuals_stock_ids;
-    # print STDERR Dumper \@dosage_matrix;
+    # $logger->error(Dumper(\@all_marker_names));
+    # $logger->error(Dumper(\@individuals_stock_ids));
+    # $logger->error(Dumper(\@dosage_matrix));
 
     my $maf = $self->minor_allele_frequency();
     my $marker_filter = $self->marker_filter();
@@ -505,7 +507,7 @@ sub get_gwas {
         $cmd .= 'write.table(gwas_results, file=\''.$gwas_tempfile.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');
         "';
     }
-    print STDERR Dumper $cmd;
+    $logger->error(Dumper($cmd));
 
     # Do the GWAS on the cluster
     my $gwas_cmd = CXGN::Tools::Run->new(
@@ -534,7 +536,7 @@ sub grm_cache_key {
     my $self = shift;
     my $datatype = shift;
 
-    #print STDERR Dumper($self->_get_dataref());
+    #$logger->error(Dumper($self->_get_dataref()));
     my $json = JSON->new();
     #preserve order of hash keys to get same text
     $json = $json->canonical();

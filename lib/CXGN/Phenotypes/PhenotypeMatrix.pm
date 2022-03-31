@@ -44,6 +44,8 @@ use SGN::Model::Cvterm;
 use CXGN::Stock::StockLookup;
 use CXGN::Phenotypes::SearchFactory;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -151,7 +153,7 @@ sub get_phenotype_matrix {
     my $include_pedigree_parents = $self->include_pedigree_parents();
     my $include_timestamp = $self->include_timestamp;
 
-    print STDERR "GET PHENOMATRIX ".$self->search_type."\n";
+    $logger->debug("GET PHENOMATRIX ".$self->search_type."");
 
     my $phenotypes_search = CXGN::Phenotypes::SearchFactory->instantiate(
         $self->search_type,
@@ -183,8 +185,8 @@ sub get_phenotype_matrix {
     if ($self->search_type eq 'MaterializedViewTable'){
         ($data, $unique_traits) = $phenotypes_search->search();
 
-        print STDERR "No of lines retrieved: ".scalar(@$data)."\n";
-        print STDERR "Construct Pheno Matrix Start:".localtime."\n";
+        $logger->debug("No of lines retrieved: ".scalar(@$data)."");
+        $logger->debug("Construct Pheno Matrix Start:".localtime."");
 
         my @line = @metadata_headers;
         push @line, ('plantedSeedlotStockDbId', 'plantedSeedlotStockUniquename', 'plantedSeedlotCurrentCount', 'plantedSeedlotCurrentWeightGram', 'plantedSeedlotBoxName', 'plantedSeedlotTransactionCount', 'plantedSeedlotTransactionWeight', 'plantedSeedlotTransactionDescription', 'availableGermplasmSeedlotUniquenames');
@@ -226,7 +228,7 @@ sub get_phenotype_matrix {
             }
 
             my $observations = $obs_unit->{observations};
-#            print STDERR "OBSERVATIONS =".Dumper($observations)."\n";
+#            $logger->error("OBSERVATIONS =".Dumper($observations)."");
             my $include_timestamp = $self->include_timestamp;
             my %trait_observations;
             foreach (@$observations){
@@ -250,13 +252,13 @@ sub get_phenotype_matrix {
         }
     } else {
         $data = $phenotypes_search->search();
-#        print STDERR "DOWNLOAD DATA =".Dumper($data)."\n";
+#        $logger->error("DOWNLOAD DATA =".Dumper($data)."");
 
         my %obsunit_data;
         my %traits;
 
-        print STDERR "No of lines retrieved: ".scalar(@$data)."\n";
-        print STDERR "Construct Pheno Matrix Start:".localtime."\n";
+        $logger->debug("No of lines retrieved: ".scalar(@$data)."");
+        $logger->debug("Construct Pheno Matrix Start:".localtime."");
         my @unique_obsunit_list = ();
         my %seen_obsunits;
 
@@ -324,8 +326,8 @@ sub get_phenotype_matrix {
                 $traits{$cvterm}++;
             }
         }
-        #print STDERR Dumper \%plot_data;
-        #print STDERR Dumper \%traits;
+        #$logger->error(Dumper(\%plot_data));
+        #$logger->error(Dumper(\%traits));
 
         my @line = @metadata_headers;
 
@@ -347,8 +349,8 @@ sub get_phenotype_matrix {
         }
     }
 
-    #print STDERR Dumper \@info;
-    print STDERR "Construct Pheno Matrix End:".localtime."\n";
+    #$logger->error(Dumper(\@info));
+    $logger->debug("Construct Pheno Matrix End:".localtime."");
     return @info;
 }
 

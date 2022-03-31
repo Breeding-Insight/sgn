@@ -8,6 +8,8 @@ use URI::FromHash 'uri';
 use JSON;
 use CXGN::BreederSearch;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' };
 
 __PACKAGE__->config(
@@ -56,7 +58,7 @@ sub list_analytics_protocols_by_user_table :Path('/ajax/analytics_protocols/by_u
         ];
     }
 
-    #print STDERR Dumper(\@table);
+    #$logger->error(Dumper(\@table));
     $c->stash->{rest} = { data => \@table };
 }
 
@@ -86,7 +88,7 @@ sub list_analytics_protocols_result_files :Path('/ajax/analytics_protocols/resul
         JOIN nd_experiment_protocol using(nd_experiment_id)
         JOIN nd_protocol using(nd_protocol_id)
         WHERE nd_protocol.nd_protocol_id=$analytics_protocol_id AND nd_experiment.type_id=$analytics_experiment_type_cvterm_id;";
-    print STDERR $q."\n";
+    $logger->debug($q."");
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute();
     my @table;

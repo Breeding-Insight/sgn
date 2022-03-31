@@ -22,6 +22,8 @@ use DateTime;
 use CXGN::Phenotypes::HighDimensionalPhenotypesSearch;
 use CXGN::Phenotypes::StorePhenotypes;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -55,7 +57,7 @@ sub generate_spectral_plot_POST : Args(0) {
         $query_associated_stocks,
         $high_dimensional_phenotype_identifier_list
     );
-    # print STDERR Dumper $data_matrix;
+    # $logger->error(Dumper($data_matrix));
 
     if ($data_matrix->{error}) {
         $c->stash->{rest} = {error => $data_matrix->{error}};
@@ -73,7 +75,7 @@ sub generate_spectral_plot_POST : Args(0) {
             };
         }
     }
-    # print STDERR Dumper \@training_data_input;
+    # $logger->error(Dumper(\@training_data_input));
 
     if (scalar(@training_data_input) < 5) {
         $c->stash->{rest} = { error => "Not enough data! Need atleast 5 samples with a phenotype and spectra! Maybe choose a different device type?"};
@@ -90,12 +92,12 @@ sub generate_spectral_plot_POST : Args(0) {
     my $json = JSON->new->utf8->canonical();
     my $training_data_input_json = $json->encode(\@training_data_input);
     open(my $train_json_outfile, '>', $filter_json_filepath);
-        print STDERR Dumper $filter_json_filepath;
+        $logger->error(Dumper($filter_json_filepath));
         print $train_json_outfile $training_data_input_json;
     close($train_json_outfile);
 
     my $cmd_s = "Rscript ".$c->config->{basepath} . "/R/Nirs/nirs_visualize_spectra.R '$filter_json_filepath' '$output_plot_filepath' ";
-    print STDERR $cmd_s;
+    $logger->error($cmd_s);
     my $cmd_status = system($cmd_s);
 
     $c->stash->{rest} = {figure => $output_plot_filepath_string};
@@ -109,7 +111,7 @@ sub generate_results_POST : Args(0) {
     my $people_schema = $c->dbic_schema("CXGN::People::Schema");
     my $schema = $c->dbic_schema("Bio::Chado::Schema", "sgn_chado");
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
 
     my $format_id = $c->req->param('format');
     my $cv_scheme = $c->req->param('cv');
@@ -180,7 +182,7 @@ sub generate_results_POST : Args(0) {
             }
         }
     }
-    # print STDERR Dumper \%training_pheno_data;
+    # $logger->error(Dumper(\%training_pheno_data));
 
     my %testing_pheno_data;
     if ($test_dataset_id) {
@@ -190,7 +192,7 @@ sub generate_results_POST : Args(0) {
             sp_dataset_id => $test_dataset_id,
         });
         my ($test_pheno_data, $test_unique_traits) = $test_dataset->retrieve_phenotypes_ref();
-        # print STDERR Dumper $test_pheno_data;
+        # $logger->error(Dumper($test_pheno_data));
 
         foreach my $d ($test_pheno_data) {
             my $obsunit_id = $d->{observationunit_stock_id};
@@ -249,7 +251,7 @@ sub generate_results_POST : Args(0) {
         JOIN phenome.nd_experiment_md_json USING(nd_experiment_id)
         JOIN metadata.md_json USING(json_id)
         WHERE stock.stock_id IN ($stock_ids_sql) AND metadata.md_json.json_type = 'nirs_spectra' AND metadata.md_json.json->>'device_type' = ? ;";
-    print STDERR Dumper $nirs_training_q;
+    $logger->error(Dumper($nirs_training_q));
     my $nirs_training_h = $dbh->prepare($nirs_training_q);
     $nirs_training_h->execute($format_id);
     while (my ($stock_uniquename, $stock_id, $spectra) = $nirs_training_h->fetchrow_array()) {
@@ -261,8 +263,8 @@ sub generate_results_POST : Args(0) {
             $testing_pheno_data{$stock_id}->{spectra} = $spectra;
         }
     }
-    # print STDERR Dumper \%training_pheno_data;
-    # print STDERR Dumper \%testing_pheno_data;
+    # $logger->error(Dumper(\%training_pheno_data));
+    # $logger->error(Dumper(\%testing_pheno_data));
 
     my @training_data_input;
     while ( my ($stock_id, $o) = each %training_pheno_data) {
@@ -279,7 +281,7 @@ sub generate_results_POST : Args(0) {
             };
         }
     }
-    # print STDERR Dumper \@training_data_input;
+    # $logger->error(Dumper(\@training_data_input));
 
     if (scalar(@training_data_input) < 10) {
         $c->stash->{rest} = { error => "Not enough data! Need atleast 10 samples with a phenotype and spectra! Maybe choose a different device type?"};
@@ -289,7 +291,7 @@ sub generate_results_POST : Args(0) {
     my $json = JSON->new->utf8->canonical();
     my $training_data_input_json = $json->encode(\@training_data_input);
     open(my $train_json_outfile, '>', $train_json_filepath);
-        print STDERR Dumper $train_json_filepath;
+        $logger->error(Dumper($train_json_filepath));
         print $train_json_outfile $training_data_input_json;
     close($train_json_outfile);
 
@@ -317,7 +319,7 @@ sub generate_results_POST : Args(0) {
         $testing_data_input_json = $json->encode(\@testing_data_input);
 
         open(my $test_json_outfile, '>', $test_json_filepath);
-            print STDERR Dumper $test_json_filepath;
+            $logger->error(Dumper($test_json_filepath));
             print $test_json_outfile $testing_data_input_json;
         close($test_json_outfile);
     }
@@ -335,7 +337,7 @@ sub generate_results_POST : Args(0) {
     #         max_cluster_jobs => 1_000_000_000,
     #     });
     #
-    #     # print STDERR Dumper $pheno_filepath;
+    #     # $logger->error(Dumper($pheno_filepath));
     #
     # # my $job;
     # $cmd->run_cluster(
@@ -360,7 +362,7 @@ sub generate_results_POST : Args(0) {
     # $cmd->wait;
 
     my $cmd_s = "Rscript ".$c->config->{basepath} . "/R/Nirs/nirs.R '$seltrait' '$preprocessing_boolean' '$niter_id' '$algo_id' '$tune_id' '$rf_var_imp' '$cv_scheme' '$train_json_filepath' '$test_json_filepath' 'TRUE' '$output_model_filepath' '$output_table2_filepath' '$output_figure2_filepath' '$output_table_filepath' '$output_figure_filepath' ";
-    print STDERR $cmd_s;
+    $logger->error($cmd_s);
     my $cmd_status = system($cmd_s);
 
     my @aux_files = (
@@ -380,7 +382,7 @@ sub generate_results_POST : Args(0) {
     open(my $fh, '<', $output_table_filepath)
         or die "Could not open file '$output_table_filepath' $!";
 
-        print STDERR "Opened $output_table_filepath\n";
+        $logger->debug("Opened $output_table_filepath");
         while(my $l = <$fh>) {
             $performance_output .= $l;
         }
@@ -419,7 +421,7 @@ sub generate_predictions_POST : Args(0) {
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
     my $schema = $c->dbic_schema("Bio::Chado::Schema", "sgn_chado");
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
 
     my $model_id = $c->req->param('model_id');
     my $dataset_id = $c->req->param('dataset_id');
@@ -431,7 +433,7 @@ sub generate_predictions_POST : Args(0) {
         nd_protocol_id=>$model_id
     });
     my $saved_model_object = $m->get_model();
-    print STDERR Dumper $saved_model_object;
+    $logger->error(Dumper($saved_model_object));
     my $trait_name = $saved_model_object->{model_properties}->{trait_name};
     my $trait_id = $saved_model_object->{model_properties}->{trait_id};
     my $format_id = $saved_model_object->{model_properties}->{format};
@@ -450,7 +452,7 @@ sub generate_predictions_POST : Args(0) {
         sp_dataset_id => $dataset_id,
     });
     my ($training_pheno_data, $train_unique_traits) = $training_dataset->retrieve_phenotypes_ref();
-    # print STDERR Dumper $training_pheno_data;
+    # $logger->error(Dumper($training_pheno_data));
 
     my $tissue_relationship_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'tissue_sample_of', 'stock_relationship')->cvterm_id();
     my $plot_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'plot', 'stock_type')->cvterm_id();
@@ -508,7 +510,7 @@ sub generate_predictions_POST : Args(0) {
             $training_pheno_data{$stock_id}->{spectra} = $spectra;
         }
     }
-    # print STDERR Dumper \%training_pheno_data;
+    # $logger->error(Dumper(\%training_pheno_data));
 
     my %seen_field_trial_ids;
     my %seen_plot_ids;
@@ -534,7 +536,7 @@ sub generate_predictions_POST : Args(0) {
     }
 
     my %layout_obs;
-    print STDERR Dumper $obs_unit_type_name;
+    $logger->error(Dumper($obs_unit_type_name));
     foreach (@field_trial_ids_seen) {
         my $field_layout = CXGN::Trial->new({bcs_schema => $schema, trial_id => $_})->get_layout->get_design;
         while (my($plot_number, $o) = each %$field_layout) {
@@ -579,12 +581,12 @@ sub generate_predictions_POST : Args(0) {
 
     my $training_data_input_json = encode_json \@training_data_input;
     open(my $train_json_outfile, '>', $input_json_filepath);
-        print STDERR Dumper $input_json_filepath;
+        $logger->error(Dumper($input_json_filepath));
         print $train_json_outfile $training_data_input_json;
     close($train_json_outfile);
 
     my $cmd_s = "Rscript ".$c->config->{basepath} . "/R/Nirs/predict_NIRS.R '$input_json_filepath' '$performance_file' '$model_file' $algorithm '$output_results_filepath' ";
-    print STDERR $cmd_s;
+    $logger->error($cmd_s);
     my $cmd_status = system($cmd_s);
 
     my $csv = Text::CSV->new({ sep_char => "," });
@@ -593,7 +595,7 @@ sub generate_predictions_POST : Args(0) {
     my %result_predictions;
     my %seen_plot_names;
     open(my $fh, '<', $output_results_filepath) or die "Could not open file '$output_results_filepath' $!";
-        print STDERR "Opened $output_results_filepath\n";
+        $logger->debug("Opened $output_results_filepath");
         my $header = <$fh>;
         my @header_cols;
         if ($csv->parse($header)) {

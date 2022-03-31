@@ -28,6 +28,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'chado_schema' => (
 	    is       => 'rw',
 		isa      => 'DBIx::Class::Schema',
@@ -50,7 +52,7 @@ sub add_samples {
         #get cross (stock of type cross)
         my $cross_stock = $self->_get_cross($self->get_cross_name());
         if (!$cross_stock) {
-            print STDERR "Cross could not be found\n";
+            $logger->error("Cross could not be found");
             return;
         }
 
@@ -65,7 +67,7 @@ sub add_samples {
             $samples_json_string = _generate_property_hash($self->get_key, $self->get_value, $samples_json_hash);
             $previous_stockprop_rs->first->update({value=>$samples_json_string});
         } elsif ($previous_stockprop_rs->count > 1) {
-            print STDERR "More than one found!\n";
+            $logger->error("More than one found!");
             return;
         } else {
             $samples_json_string = _generate_property_hash($self->get_key, $self->get_value, $samples_json_hash);
@@ -82,7 +84,7 @@ sub add_samples {
     };
 
     if ($transaction_error) {
-        print STDERR "Transaction error storing tissue samples for cross: $transaction_error\n";
+        $logger->error("Transaction error storing tissue samples for cross: $transaction_error");
         return;
     }
 
@@ -95,7 +97,7 @@ sub _generate_property_hash {
     my $value = shift;
     my $samples_json_hash = shift;
     $samples_json_hash->{$key} = $value;
-    #print STDERR Dumper $cross_json_hash;
+    #$logger->error(Dumper($cross_json_hash));
     my $samples_json_string = encode_json $samples_json_hash;
     return $samples_json_string;
 }
@@ -113,7 +115,7 @@ sub _get_cross {
     $stock = $stock_lookup->get_cross_exact();
 
     if (!$stock) {
-        print STDERR "Cross name does not exist\n";
+        $logger->error("Cross name does not exist");
         return;
     }
     return $stock;

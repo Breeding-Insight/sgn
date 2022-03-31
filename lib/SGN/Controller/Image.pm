@@ -9,6 +9,8 @@ use CXGN::Login;
 
 use URI::FromHash 'uri';
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub view :Path('/image/view/') Args(1) {
@@ -56,7 +58,7 @@ sub confirm :Path('/image/confirm') {
         or $c->throw( public_message => 'No image file uploaded.', is_client_error => 1 );
     my $filename = $upload->filename();
     my $tempfile = $upload->tempname();
-    #print STDERR "FILENAME: $filename TEMPNAME: $tempfile\n";
+    #$logger->error("FILENAME: $filename TEMPNAME: $tempfile");
 
     if (! -e $tempfile) {
         die "No tempfile $tempfile\n";
@@ -117,7 +119,7 @@ sub store :Path('/image/store') {
 
     # set some image attributes...
     # the image owner...
-    #print STDERR "Setting the submitter information in the image object...\n";
+    #$logger->error("Setting the submitter information in the image object...");
 
     $image->set_name($filename);
 
@@ -144,7 +146,7 @@ sub image_display_order :Path('/image/display_order') Args(0) {
     $c->stash->{id} = $c->req->param("id");
     $c->stash->{display_order} = $c->req->param("display_order");
     
-    print STDERR "image_id = ".$c->stash->{image_id}."\n";
+    $logger->debug("image_id = ".$c->stash->{image_id}."");
     
     $c->stash->{template} = '/image/display_order.mas';
 }
@@ -165,7 +167,7 @@ sub validate_image_filename :Private {
     my $test_fn = $fn;
     $test_fn =~ s/[^$OK_CHARS]/_/go;
     if ( $fn ne $test_fn ) {
-        #print STDERR "Upload Attempt with bad shell characters: $fn \n";
+        #$logger->error("Upload Attempt with bad shell characters: $fn ");
         return "Invalid characters found in filename, must not contain
         characters <b>\& ; : \` \' \\ \| \* \? ~ ^ < > ( ) [ ] { } \$</b>" ;
     }
@@ -173,10 +175,10 @@ sub validate_image_filename :Private {
     my $ext;
     if ($fn =~ m/^(.*)(\.\S{1,4})\r*$/) {
         $ext = lc ($2);
-        #print STDERR "Upload Attempt with disallowed filename extension: $fn Extension: $ext\n";
+        #$logger->error("Upload Attempt with disallowed filename extension: $fn Extension: $ext");
         return "File Type must be one of: .png, .jpg, .jpeg, .gif, .pdf, .ps, or .eps" unless exists $file_types{$ext};
     } else {
-        #print STDERR "Upload Attempt with filename extension we could not parse: $fn \n";
+        #$logger->error("Upload Attempt with filename extension we could not parse: $fn ");
         return "File Type must be one of: .png, .jpg, .jpeg, .gif, .pdf, .ps, or .eps";
     }
 

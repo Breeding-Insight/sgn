@@ -4,13 +4,14 @@ package CXGN::GenotypeIOmain;
 use Moose;
 
 with 'MooseX::Object::Pluggable';
+my $logger = Log::Log4perl->get_logger();
 
-sub init { 
-    print STDERR "GenotypeIOmain init CALLED\n";
+sub init {
+    $logger->debug("GenotypeIOmain init CALLED");
 }
 
-sub next { 
-    print STDERR "GenotypeIOmain NEXT CALLED\n";
+sub next {
+    $logger->debug("GenotypeIOmain NEXT CALLED");
 }
 
 

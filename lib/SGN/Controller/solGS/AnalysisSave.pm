@@ -16,6 +16,8 @@ use Storable qw/ nstore retrieve /;
 use Try::Tiny;
 use URI;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' };
 
 __PACKAGE__->config(
@@ -50,7 +52,7 @@ sub result_details :Path('/solgs/analysis/result/details') Args() {
 
 		if ($@)
 		{
-			print STDERR "\n$@\n";
+			$logger->debug("\n$@");
 			$c->stash->{rest}{error} = 'Something went wrong structuring the analysis result';
 		}
 		else

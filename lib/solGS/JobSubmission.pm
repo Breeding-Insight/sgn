@@ -11,6 +11,7 @@ use solGS::queryJobs;
 
 with 'MooseX::Getopt';
 with 'MooseX::Runnable';
+my $logger = Log::Log4perl->get_logger();
 
 
 has "prerequisite_jobs" => (
@@ -169,7 +170,7 @@ sub submit_job {
      ###my $config = $self->config_file;
      ###$config = retrieve($config);
 
-     print STDERR "submitting job... $args->{cmd}\n";
+     $logger->debug("submitting job... $args->{cmd}");
 
     eval
      {
@@ -182,15 +183,15 @@ sub submit_job {
 
 	if (!$args->{background_job})
 	{
-	    print STDERR "\n WAITING job to finish\n";
+	    $logger->debug("\n WAITING job to finish");
 	    $job->wait();
-	    print STDERR "\n job COMPLETED\n";
+	    $logger->debug("\n job COMPLETED");
 	}
      };
 
      if ($@)
      {
-     	print STDERR "An error occurred submitting job $args->{cmd} \n$@\n";
+     	$logger->error("An error occurred submitting job $args->{cmd} \n$@");
      }
 
      return $job;

@@ -25,6 +25,8 @@ use SGN::Image;
 use CXGN::List::Validate;
 use File::Basename qw | basename dirname|;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "phenotype spreadsheet associated_images";
 }
@@ -50,7 +52,7 @@ sub validate {
     $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
         $parse_result{'error'} = $parser->error();
-        print STDERR "validate error: ".$parser->error()."\n";
+        $logger->error("validate error: ".$parser->error()."");
         return \%parse_result;
     }
 
@@ -59,13 +61,13 @@ sub validate {
     my ( $col_min, $col_max ) = $worksheet->col_range();
     if (($col_max - $col_min)  < 1 || ($row_max - $row_min) < 1 ) { #must have header with at least observationunit_name and one trait, as well as one row of phenotypes
         $parse_result{'error'} = "Spreadsheet is less than 2 columns or 2 rows.";
-        print STDERR "Spreadsheet is missing header\n";
+        $logger->error("Spreadsheet is missing header");
         return \%parse_result;
     }
 
     if ($worksheet->get_cell(0,0)->value() ne 'observationunit_name' && $worksheet->get_cell(0,1)->value() ne 'observationvariable_name' && $worksheet->get_cell(0,2)->value() ne 'phenotype_value' && $worksheet->get_cell(0,3)->value() ne 'phenotype_timestamp' && $worksheet->get_cell(0,4)->value() ne 'image_name' && $worksheet->get_cell(0,5)->value() ne 'username') {
         $parse_result{'error'} = "Header row must be 'observationunit_name, observationvariable_name, phenotype_value, phenotype_timestamp, image_name, username'. It may help to recreate your spreadsheet from the website.";
-        print STDERR "Header not correct\n";
+        $logger->error("Header not correct");
         return \%parse_result;
     }
 
@@ -79,7 +81,7 @@ sub validate {
         my $filename = basename($file_member->fileName());
         $image_zip_contents{$filename}++;
     }
-    #print STDERR Dumper \%image_zip_contents;
+    #$logger->error(Dumper(\%image_zip_contents));
 
     #StorePhenotypes verify checks that observationunitnames and observationvariablenames are in database.
     my %observationunits_seen;
@@ -167,7 +169,7 @@ sub parse {
     $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
         $parse_result{'error'} = $parser->error();
-        print STDERR "validate error: ".$parser->error()."\n";
+        $logger->error("validate error: ".$parser->error()."");
         return \%parse_result;
     }
 
@@ -237,7 +239,7 @@ sub parse {
     $parse_result{'data'} = \%data;
     $parse_result{'units'} = \@observation_units;
     $parse_result{'variables'} = \@observation_variables;
-    #print STDERR Dumper \%parse_result;
+    #$logger->error(Dumper(\%parse_result));
 
     return \%parse_result;
 }

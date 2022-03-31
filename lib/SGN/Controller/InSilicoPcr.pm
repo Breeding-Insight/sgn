@@ -19,6 +19,8 @@ use CXGN::Tools::Run;
 use Bio::Seq;
 use CXGN::Page::FormattingHelpers qw/ html_break_string/;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -120,8 +122,8 @@ sub run_pcr_blast :Path('/tools/pcr_results') :Args(0) {
   	$rprimer = _reverse_complement($rprimer);
   }
 
-  # print STDERR "fprimer: $fprimer, rprimer: $rprimer\n";
-  # print STDERR "DB id: $blast_db_id\n";
+  # $logger->error("fprimer: $fprimer, rprimer: $rprimer");
+  # $logger->error("DB id: $blast_db_id");
   
   #validating productLength
   if ($productLength <= 0 or $productLength !~ /^[\d]*$/g) {
@@ -156,15 +158,15 @@ sub run_pcr_blast :Path('/tools/pcr_results') :Args(0) {
   	DIR=> $blast_tmp_output,
 	);
   
-  print STDERR "Opening file for sequence ($seqfile)... ";
+  $logger->error("Opening file for sequence ($seqfile)... ");
   open(my $FH, ">", $seqfile) || die "Can't open file for query ($seqfile)\n";
   print $FH $sequence if $sequence;
   close($FH);
 
   my $jobid = basename($seqfile);
-  print STDERR "JOB ID CREATED: $jobid\n";
+  $logger->debug("JOB ID CREATED: $jobid");
 
-  print STDERR "Done.\n";
+  $logger->debug("Done.");
 
 
 
@@ -192,12 +194,12 @@ sub run_pcr_blast :Path('/tools/pcr_results') :Args(0) {
   
   # create blast command
   my $blast_cmd = "blastn -query $seqfile -db $basename -word_size $word_size -outfmt 6 -dust $filter -evalue $evalue -out $result_file";
-	
-  print STDERR "COMMAND: $blast_cmd\n";
+
+  $logger->debug("COMMAND: $blast_cmd");
   my $blast_error = system($blast_cmd);
   
-  if ($blast_error) { 
-    print STDERR "An error occurred! $blast_error\n";
+  if ($blast_error) {
+    $logger->debug("An error occurred! $blast_error");
     $c->stash->{rest} = { error => $blast_error };
   }
   
@@ -207,9 +209,9 @@ sub run_pcr_blast :Path('/tools/pcr_results') :Args(0) {
   my ($pcr_seq,$gel_url) = _blast_to_pcr($result_file,$params,$gel_img_tempdir,$basename);
   
   
-  # print STDERR "result_file: ".read_file($result_file)."\n";
-  print STDERR "gel_img_tempdir: $gel_img_tempdir\n";
-  print STDERR "gel_url: ".$pcr_img_path."/".$gel_url."\n";
+  # $logger->error("result_file: ".read_file($result_file)."");
+  $logger->debug("gel_img_tempdir: $gel_img_tempdir");
+  $logger->debug("gel_url: ".$pcr_img_path."/".$gel_url."");
   
   $c->stash->{blast_res} = read_file($result_file);
   $c->stash->{pcr_seq} = $pcr_seq;
@@ -222,7 +224,7 @@ sub _blast_to_pcr {
   my $params = shift;
   my $gel_img_tempdir = shift;
   my $basename = shift;
-  
+
   #Parsing the blast m8 result file
 
   #Report parsing method was taken from /util/blast_result_handle.pl by Aure 
@@ -245,7 +247,7 @@ sub _blast_to_pcr {
       push (@fprimer_ids , $line) if ($data[0] eq 'FORWARD-PRIMER');
       push (@rprimer_ids , $line) if ($data[0] eq 'REVERSE-PRIMER');
 
-      # print STDERR "$data[1]\n";
+      # $logger->error("$data[1]");
       
       $query_id{$line}=$data[0];
       $subject_id{$line}=$data[1];
@@ -271,12 +273,12 @@ sub _blast_to_pcr {
   my @pcr_results; #is an array of array references [forward Primer # , reverse primer #, + or - for parent orientation] 
 
   foreach my $forward (@fprimer_ids){
-    
-    print STDERR "fwd: ".$subject_id{$forward}."\t".$s_start{$forward}."\t".$align_length{$forward}."\t".$mismatches {$forward}."\n";
-   # print STDERR "params: product length: ".$params->{productLength}."\tmm: ".$params->{allowedMismatches}."\tfwd length: ".$params->{flength}."\trev length: ".$params->{rlength}."\n";
+
+    $logger->debug("fwd: ".$subject_id{$forward}."\t".$s_start{$forward}."\t".$align_length{$forward}."\t".$mismatches {$forward}."");
+   # $logger->error("params: product length: ".$params->{productLength}."\tmm: ".$params->{allowedMismatches}."\tfwd length: ".$params->{flength}."\trev length: ".$params->{rlength}."");
     
     foreach my $reverse (@rprimer_ids){
-	print STDERR "rev: ".$subject_id{$reverse}."\t".$s_start{$reverse}."\t".$align_length{$reverse}."\t".$mismatches {$reverse}."\n";
+      $logger->debug("rev: ".$subject_id{$reverse}."\t".$s_start{$reverse}."\t".$align_length{$reverse}."\t".$mismatches {$reverse}."");
       
 	if ($subject_id{$forward} eq $subject_id{$reverse}    #both on the same subject seq
 	    and  $s_start{$reverse}- $s_start{$forward}<= $params->{productLength} #product Length is within user's choice
@@ -285,9 +287,9 @@ sub _blast_to_pcr {
 	    and  $align_length{$forward} == $params->{flength}  #primers match exact length
 	    and  $align_length {$reverse} == $params->{rlength}
 	    ) {
-	    print STDERR "\ninside the if\n";
-	    print STDERR "orientation fwd: ".$orientation{$forward}." s_end fwd: ".$s_end{$forward}."\n";
-	    print STDERR "orientation rev: ".$orientation{$reverse}." s_end rev: ".$s_end{$reverse}."\n";
+      $logger->debug("\ninside the if");
+      $logger->debug("orientation fwd: ".$orientation{$forward}." s_end fwd: ".$s_end{$forward}."");
+      $logger->debug("orientation rev: ".$orientation{$reverse}." s_end rev: ".$s_end{$reverse}."");
 	    
 	    #if the product is in the + strand of parent seq add a + sign in the array
 	    
@@ -295,7 +297,7 @@ sub _blast_to_pcr {
 		 and  $orientation{$reverse} eq '-'     #reverse is on the - strand b/c its a complement
 		 and  $s_end{$forward} < $s_end{$reverse}  #end of forward located upstream of beginning of reverse 
 		){
-		# print STDERR "first if";
+		# $logger->error("first if");
           	push (@pcr_results , [$forward,$reverse, '+']) ;
 	    }
 	    
@@ -305,11 +307,11 @@ sub _blast_to_pcr {
 		    and  $s_end{$forward} > $s_end{$reverse}  #end of forward located downstream of beginning of reverse
 		)
 	    {
-		# print STDERR "scond if\n";
+		# $logger->error("scond if");
                 push (@pcr_results , [$forward,$reverse, '-']);
 	    }	
 	    else {
-		# print STDERR "\nin else\n";
+		# $logger->error("\nin else");
 	    }
 	}
     }#end of the 4each loop
@@ -329,7 +331,7 @@ sub _blast_to_pcr {
   
   
   if (scalar(@pcr_results) ==  0 ){
-    print STDERR "No PCR Product Found\n";
+    $logger->debug("No PCR Product Found");
     
     $pcr_seq = "No PCR Product Found";
     my $pcr_img_name = "insilicopcr_no_result.png";
@@ -345,10 +347,10 @@ sub _blast_to_pcr {
       $find_id = $subject_id{$result->[0]};
       $find_seq = $fs->get_sequence($find_id);
       # $find_seq = $bdb->get_sequence($find_id);
-      # print STDERR "id: $find_id\n";
-      # print STDERR "seq: $find_seq\n";
+      # $logger->error("id: $find_id");
+      # $logger->error("seq: $find_seq");
   
-      # print STDERR "s_sstart1: ".$s_start{$result->[1]}." s_start0: ".$s_start{$result->[0]}." res2: ".$result->[2]."\n";
+      # $logger->error("s_sstart1: ".$s_start{$result->[1]}." s_start0: ".$s_start{$result->[0]}." res2: ".$result->[2]."");
 
     	#finding the pcr result sequence
     	$find_subseq = $find_seq->subseq($s_start{$result->[0]},$s_start{$result->[1]}) if $result->[2] eq '+';

@@ -2,6 +2,8 @@ package CXGN::List::Transform::Plugin::Accessions2AccessionCase;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "accessions_2_accession_case";
 }
@@ -33,7 +35,7 @@ sub transform {
     my @duplicated = ();
     my %mapping;
 
-    print STDERR "Transforming case of list.\n";
+    $logger->debug("Transforming case of list.");
     
     my $type_id = $schema->resultset("Cv::Cvterm")->search( { name=>'accession' })->first()->cvterm_id();
 
@@ -44,18 +46,18 @@ sub transform {
 	    my $count = $rs->count();
 	    
 	    if ($count == 0) {
-		print STDERR "Missing item: $item\n";
+		$logger->debug("Missing item: $item");
 		push @missing, $item;
 	    }
 	    
 	    if ($count == 1) {
 		my $row = $rs->next();
 		if ($item eq $row->uniquename()) {
-		    print STDERR "Found match  match: $item\n";
+		    $logger->debug("Found match  match: $item");
 		    push @found_ids, $item;
 		}
 		else { 
-		    print STDERR "Item '$item' needs to be converted to '".$row->uniquename()."'\n";
+		    $logger->debug("Item '$item' needs to be converted to '".$row->uniquename()."'");
 		    push @found_ids, $row->uniquename();
 		    $mapping{$item} = $row->uniquename();
 		}
@@ -64,9 +66,9 @@ sub transform {
 	    my %duplicates;
 	    
 	    if ($count > 1) {
-		print STDERR "DUPLICATE DETECTED!\n";
+		$logger->debug("DUPLICATE DETECTED!");
 		while (my $row = $rs->next()) {
-		    print STDERR "DUPLICATED: $item, ".$row->uniquename()."\n";
+		    $logger->debug("DUPLICATED: $item, ".$row->uniquename()."");
 		    push @{$duplicates{$item}}, $row->uniquename();
 		}
 		push @duplicated, \%duplicates;

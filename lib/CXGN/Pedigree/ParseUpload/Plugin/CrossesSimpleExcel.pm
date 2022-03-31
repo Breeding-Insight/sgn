@@ -7,6 +7,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use CXGN::List::Validate;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub _validate_with_plugin {
     my $self = shift;
     my $filename = $self->get_filename();
@@ -18,7 +20,7 @@ sub _validate_with_plugin {
     my $parser   = Spreadsheet::ParseExcel->new();
     my $excel_obj;
     my $worksheet;
-#    print STDERR "ADDITIONAL INFO =".Dumper($cross_additional_info)."\n";
+#    $logger->error("ADDITIONAL INFO =".Dumper($cross_additional_info)."");
 
     #currently supported cross types
     $supported_cross_types{'biparental'} = 1; #both parents required
@@ -312,7 +314,7 @@ sub _parse_with_plugin {
 
     }
 
-#    print STDERR "ADDITIONAL INFO HASH =".Dumper(\%cross_additional_info)."\n";
+#    $logger->error("ADDITIONAL INFO HASH =".Dumper(\%cross_additional_info)."");
     $parsed_result{'additional_info'} = \%cross_additional_info;
 
     $parsed_result{'crosses'} = \@pedigrees;

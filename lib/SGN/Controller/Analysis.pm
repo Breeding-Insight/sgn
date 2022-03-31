@@ -5,6 +5,8 @@ use Moose;
 use URI::FromHash 'uri';
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller' };
 
 sub view_analyses :Path('/analyses') Args(0) {
@@ -39,7 +41,7 @@ sub analysis_detail :Path('/analyses') Args(1) {
         $c->detach();
     }
 
-    print STDERR "Viewing analysis with id $analysis_id\n";
+    $logger->debug("Viewing analysis with id $analysis_id");
 
     my $a = CXGN::Analysis->new({
         bcs_schema => $bcs_schema,
@@ -85,7 +87,7 @@ sub analysis_model_detail :Path('/analyses_model') Args(1) {
         $c->detach();
     }
 
-    print STDERR "Viewing analysis model with id $model_id\n";
+    $logger->debug("Viewing analysis model with id $model_id");
 
     my $m = CXGN::AnalysisModel::GetModel->new({
         bcs_schema=>$bcs_schema,
@@ -94,7 +96,7 @@ sub analysis_model_detail :Path('/analyses_model') Args(1) {
         nd_protocol_id=>$model_id
     });
     my $saved_model_object = $m->get_model();
-    #print STDERR Dumper $saved_model_object;
+    #$logger->error(Dumper($saved_model_object));
 
     if (!$saved_model_object->{model_id}) {
         $c->stash->{template} = '/generic_message.mas';

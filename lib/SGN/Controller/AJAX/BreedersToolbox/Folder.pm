@@ -5,6 +5,8 @@ use Moose;
 use List::MoreUtils qw | any |;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -152,7 +154,7 @@ sub check_privileges {
     my $c = shift;
 
     if (!$c->user()) {
-        print STDERR "User not logged in... not uploading coordinates.\n";
+        $logger->debug("User not logged in... not uploading coordinates.");
         $c->stash->{rest} = {error => "You need to be logged in." };
         $c->detach;
     }

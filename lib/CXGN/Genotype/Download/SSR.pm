@@ -27,6 +27,8 @@ use CXGN::Genotype::Search;
 use CXGN::Stock::StockLookup;
 use DateTime;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -75,7 +77,7 @@ sub download {
         protocol_id_list=>$protocol_id_list,
     });
     my $result = $genotypes_search->get_pcr_genotype_info();
-#    print STDERR "PCR DOWNLOAD RESULTS =".Dumper($result)."\n";
+#    $logger->error("PCR DOWNLOAD RESULTS =".Dumper($result)."");
 
     my $protocol_genotype_data = $result->{'protocol_genotype_data'};
     my @protocol_genotype_data_array = @$protocol_genotype_data;
@@ -116,11 +118,11 @@ sub download {
 
         push @results, [@each_result];
     }
-#    print STDERR "HEADERS =".Dumper(\@headers);
-#    print STDERR "RESULTS =".Dumper(\@results)."\n";
+#    $logger->error("HEADERS =".Dumper(\@headers));
+#    $logger->error("RESULTS =".Dumper(\@results)."");
     push @lines, [@headers];
     push @lines, @results;
-    print STDERR "LINES =".Dumper(@lines)."\n";
+    $logger->debug("LINES =".Dumper(@lines)."");
 
     no warnings 'uninitialized';
     open(my $F, ">", $self->filename()) || die "Can't open file ".$self->filename();

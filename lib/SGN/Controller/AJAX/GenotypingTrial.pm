@@ -12,6 +12,8 @@ use CXGN::Login;
 use CXGN::Genotype::Protocol;
 use CXGN::Genotype::CreatePlateOrder;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -32,7 +34,7 @@ sub generate_genotype_trial_POST : Args(0) {
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $plate_info = decode_json $c->req->param("plate_data");
-    #print STDERR Dumper $plate_info;
+    #$logger->error(Dumper($plate_info));
 
     if ( !$plate_info->{elements} || !$plate_info->{genotyping_facility_submit} || !$plate_info->{project_name} || !$plate_info->{description} || !$plate_info->{location} || !$plate_info->{year} || !$plate_info->{name} || !$plate_info->{breeding_program} || !$plate_info->{genotyping_facility} || !$plate_info->{sample_type} || !$plate_info->{plate_format} ) {
         $c->stash->{rest} = { error => "Please provide all parameters in the plate information section" };
@@ -70,7 +72,7 @@ sub generate_genotype_trial_POST : Args(0) {
 
     if ($@) {
         $c->stash->{rest} = { error => "Design failed. Error: $@" };
-        print STDERR "Design failed because of $@\n";
+        $logger->error("Design failed because of $@");
         $c->detach();
     }
 
@@ -92,7 +94,7 @@ sub generate_genotype_trial_POST : Args(0) {
         $_->{notes} = $plate_info->{well_notes};
         $_->{ncbi_taxonomy_id} = $plate_info->{ncbi_taxonomy_id};
     }
-    #print STDERR Dumper($design);
+    #$logger->error(Dumper($design));
 
     $c->stash->{rest} = {success => 1, design=>$design};
 }
@@ -161,7 +163,7 @@ sub parse_genotype_trial_file_POST : Args(0) {
     my $error;
 
     if ($upload_original_name =~ /\s/ || $upload_original_name =~ /\// || $upload_original_name =~ /\\/ ) {
-        print STDERR "File name must not have spaces or slashes.\n";
+        $logger->error("File name must not have spaces or slashes.");
         $c->stash->{rest} = {error => "Uploaded file name must not contain spaces or slashes." };
         return;
     }
@@ -234,7 +236,7 @@ sub parse_genotype_trial_file_POST : Args(0) {
         }
         else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error=$return_error.$error_string."<br>";
@@ -244,7 +246,7 @@ sub parse_genotype_trial_file_POST : Args(0) {
         $c->stash->{rest} = {error_string => $return_error, missing_accessions => $parse_errors->{'missing_accessions'}};
         return;
     }
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     #Turn parased data into same format as generate_genotype_trial above
     my %design;
@@ -309,7 +311,7 @@ sub store_genotype_trial_POST : Args(0) {
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $plate_info = decode_json $c->req->param("plate_data");
-    #print STDERR Dumper $plate_info;
+    #$logger->error(Dumper($plate_info));
 
     if ( !$plate_info->{design} || !$plate_info->{genotyping_facility_submit} || !$plate_info->{project_name} || !$plate_info->{description} || !$plate_info->{location} || !$plate_info->{year} || !$plate_info->{name} || !$plate_info->{breeding_program} || !$plate_info->{genotyping_facility} || !$plate_info->{sample_type} || !$plate_info->{plate_format} ) {
         $c->stash->{rest} = { error => "Please provide all parameters in the plate information section" };
@@ -345,9 +347,9 @@ sub store_genotype_trial_POST : Args(0) {
         $field_trial_ids{$r->get_column('trial_id')}++;
     }
     my @field_trial_ids = keys %field_trial_ids;
-    #print STDERR Dumper \@field_trial_ids;
+    #$logger->error(Dumper(\@field_trial_ids));
 
-    print STDERR "Creating the genotyping plate...\n";
+    $logger->debug("Creating the genotyping plate...");
 
     my $message;
     my $coderef = sub {
@@ -380,7 +382,7 @@ sub store_genotype_trial_POST : Args(0) {
     try {
         $schema->txn_do($coderef);
     } catch {
-        print STDERR "Transaction Error: $_\n";
+        $logger->error("Transaction Error: $_");
         $c->stash->{rest} = {error => "Error saving genotyping plate in the database: $_"};
         $c->detach;
     };
@@ -393,7 +395,7 @@ sub store_genotype_trial_POST : Args(0) {
         $c->stash->{rest} = {error => "Error saving genotyping plate in the database: $error"};
         $c->detach;
     }
-    #print STDERR Dumper(%message);
+    #$logger->error(Dumper(%message));
 
     my $dbh = $c->dbc->dbh();
     my $bs = CXGN::BreederSearch->new( { dbh=>$dbh, dbname=>$c->config->{dbname}, } );
@@ -401,7 +403,7 @@ sub store_genotype_trial_POST : Args(0) {
 
     my $saved_layout = CXGN::Trial::TrialLayout->new({schema => $schema, trial_id => $message->{trial_id}, experiment_type=>'genotyping_layout'});
     my $saved_design = $saved_layout->get_design();
-    #print STDERR Dumper $saved_design;
+    #$logger->error(Dumper($saved_design));
 
     my @brapi_samples;
     foreach (values %$saved_design){
@@ -485,7 +487,7 @@ sub get_genotyping_data_projects_GET : Args(0) {
         );
         push @result, \@res;
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     $c->stash->{rest} = { data => \@result };
 }
@@ -530,7 +532,7 @@ sub get_genotyping_data_protocols_GET : Args(0) {
         );
         push @result, \@res;
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     $c->stash->{rest} = { data => \@result };
 }
@@ -550,7 +552,7 @@ sub create_plate_order_POST : Args(0) {
     my $organism_name = $plate_info->{organism_name};
     my $add_requirements = $plate_info->{requeriments};
 
-    print STDERR Dumper $plate_info;
+    $logger->error(Dumper($plate_info));
 
     my $submit_samples = CXGN::Genotype::CreatePlateOrder->new({
         bcs_schema=>$schema,

@@ -9,6 +9,8 @@ use Data::Dumper;
 use JSON::Any;
 use CXGN::Searches::People;
 
+my $logger = Log::Log4perl->get_logger();
+
 __PACKAGE__->config(
     default   => 'application/json',
     stash_key => 'rest',
@@ -56,13 +58,13 @@ sub people_search :Path('/ajax/search/people') Args(0) {
     
     my $params = $c->req->params() || {};
 
-    #print STDERR "PARAMS: ".Dumper($params);
+    #$logger->error("PARAMS: ".Dumper($params));
 
     my %query;
 
     foreach my $k ( qw |  first_name last_name organization country | ) { 
 	if (exists($params->{$k}) && $params->{$k}) { 
-	    print STDERR "transferring $k $params->{$k}\n";
+	    $logger->debug("transferring $k $params->{$k}");
 	    $query{$k} = { 'ilike' => '%'.$params->{$k}.'%' };
 	}
     }
@@ -75,7 +77,7 @@ sub people_search :Path('/ajax/search/people') Args(0) {
 
     my $page = int($start / $rows)+1;
 
-    print STDERR "Runnin query...".Dumper(\%query)."\n";
+    $logger->debug("Runnin query...".Dumper(\%query)."");
 
     # get the count first
     #
@@ -83,7 +85,7 @@ sub people_search :Path('/ajax/search/people') Args(0) {
     
     my $records_total = $rs->count();
 
-    print STDERR "RECORDS TOTAL: $records_total\n";
+    $logger->debug("RECORDS TOTAL: $records_total");
     # then get the data
     #
     my $rs2 = $c->dbic_schema("CXGN::People::Schema")->resultset("SpPerson")->search( { %query, disabled=>undef, censor => 0 }, { page => $page, rows => $rows, order_by => 'last_name' } );
@@ -94,7 +96,7 @@ sub people_search :Path('/ajax/search/people') Args(0) {
 	push @result, [ '<a href="/solpeople/personal-info.pl?sp_person_id='.$p->sp_person_id().'">'.$p->last_name()."</a>", $p->first_name(), $p->organization(), $p->country() ];
     }
 
-    #print STDERR "RESULTS: ".Dumper(\@result);
+    #$logger->error("RESULTS: ".Dumper(\@result));
 
     $c->stash->{rest} = { data => [ @result ], draw => $draw, recordsTotal => $records_total,  recordsFiltered => $records_total };
     

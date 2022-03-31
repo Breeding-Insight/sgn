@@ -52,6 +52,8 @@ use base "CXGN::Bulk";
 
 =cut
 
+my $logger = Log::Log4perl->get_logger();
+
 sub process_parameters {
     my $self = shift;
 
@@ -93,7 +95,7 @@ sub process_parameters {
 
     my @ids = $self->check_ids();
     if (!@ids) {
-	print STDERR "No legal ids found. Returning...\n";
+	$logger->debug("No legal ids found. Returning...");
 	return 0;
     }
     $self->debug("IDs to be processed:");

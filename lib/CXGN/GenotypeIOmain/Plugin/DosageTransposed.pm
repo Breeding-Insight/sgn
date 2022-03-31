@@ -4,6 +4,7 @@ package CXGN::GenotypeIOmain::Plugin::DosageTransposed;
 use Moose::Role;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
 
 has 'file' => (isa => 'Str',
 	       is => 'rw',
@@ -41,11 +42,11 @@ sub init {
 
     my $header = <$F>;
     chomp($header);
-    #print STDERR "HEADER = $header\n";
+    #$logger->error("HEADER = $header");
     my @markers = split /\t/, $header;
 
     if ($args->{fix_r_headers} && $header !~/^\t/) {  # the file from R has no empty first cell, don't shift!
-	print STDERR "R headers: Fixing missing offset.\n";
+	$logger->debug("R headers: Fixing missing offset.");
     }
     else { 
 	shift(@markers); # remove first column header (for accession column)
@@ -60,7 +61,7 @@ sub init {
 
     $self->accessions(\@accessions);
     $self->markers(\@markers);
-    #print STDERR Dumper(\@markers);
+    #$logger->error(Dumper(\@markers));
     close($F);
     
     #open($F, "<", $args->{file}) || die "Can't open file $args->{file}\n";

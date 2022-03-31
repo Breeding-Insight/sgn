@@ -29,6 +29,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'chado_schema' => (
 	    is       => 'rw',
 		isa      => 'DBIx::Class::Schema',
@@ -51,18 +53,18 @@ sub add_info {
         #get cross (stock of type cross)
         my $cross_stock = $self->_get_cross($self->get_cross_name());
         if (!$cross_stock) {
-            print STDERR "Cross could not be found\n";
+            $logger->debug("Cross could not be found");
             return;
         }
 
         # get cvterm of cross info type (crossing_metadata_json or cross_additional_info)
         my $cross_info_type = $self->get_data_type();
-#        print STDERR "DATA TYPE =".Dumper($cross_info_type)."\n";
+#        $logger->error("DATA TYPE =".Dumper($cross_info_type)."");
         my $cross_info_cvterm;
         if (($cross_info_type eq 'crossing_metadata_json') || ($cross_info_type eq 'cross_additional_info')) {
 			$cross_info_cvterm = SGN::Model::Cvterm->get_cvterm_row($schema, $cross_info_type, 'stock_property');
         } else {
-			print STDERR "Invalid type"."\n";
+			$logger->error("Invalid type"."");
             return;
         }
 
@@ -75,13 +77,13 @@ sub add_info {
             $cross_json_string = _generate_property_hash($self->get_key, $self->get_value, $cross_json_hash);
             $previous_stockprop_rs->first->update({value=>$cross_json_string});
         } elsif ($previous_stockprop_rs->count > 1) {
-            print STDERR "More than one found!\n";
+            $logger->debug("More than one found!");
             return;
         } else {
             $cross_json_string = _generate_property_hash($self->get_key, $self->get_value, $cross_json_hash);
             $cross_stock->create_stockprops({$cross_info_cvterm->name() => $cross_json_string});
         }
-#        print STDERR "CROSS JSON STRING =".Dumper($cross_json_string)."\n";
+#        $logger->error("CROSS JSON STRING =".Dumper($cross_json_string)."");
     };
 
     #try to add all cross info in a transaction
@@ -92,7 +94,7 @@ sub add_info {
     };
 
     if ($transaction_error) {
-        print STDERR "Transaction error storing information for cross: $transaction_error\n";
+        $logger->error("Transaction error storing information for cross: $transaction_error");
         return;
     }
 
@@ -104,7 +106,7 @@ sub _generate_property_hash {
     my $value = shift;
     my $cross_json_hash = shift;
     $cross_json_hash->{$key} = $value;
-    #print STDERR Dumper $cross_json_hash;
+    #$logger->error(Dumper($cross_json_hash));
     my $cross_json_string = encode_json $cross_json_hash;
     return $cross_json_string;
 }
@@ -122,7 +124,7 @@ sub _get_cross {
     $stock = $stock_lookup->get_cross_exact();
 
     if (!$stock) {
-        print STDERR "Cross name does not exist\n";
+        $logger->error("Cross name does not exist");
         return;
     }
     return $stock;

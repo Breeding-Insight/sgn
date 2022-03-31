@@ -27,6 +27,8 @@ use CXGN::Stock::StockLookup;
 use SGN::Model::Cvterm;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'chado_schema' => (
 		 is       => 'rw',
@@ -131,10 +133,10 @@ sub add_family_name {
 				type_id => $cross_member_of_cvterm_id,
             });
 
-#           print STDERR "CROSS FEMALE ID =".Dumper($cross_female_id)."\n";
-#			print STDERR "CROSS MALE ID =".Dumper($cross_male_id)."\n";
-#			print STDERR "FAMILY FEMALE ID =".Dumper($family_female_id)."\n";
-#			print STDERR "FAMILY MALE ID =".Dumper($family_male_id)."\n";
+#           $logger->error("CROSS FEMALE ID =".Dumper($cross_female_id)."");
+#			$logger->error("CROSS MALE ID =".Dumper($cross_male_id)."");
+#			$logger->error("FAMILY FEMALE ID =".Dumper($family_female_id)."");
+#			$logger->error("FAMILY MALE ID =".Dumper($family_male_id)."");
 
             if (($cross_female_id != $family_female_id) || ($cross_male_id != $family_male_id)) {
 				push @{$return{error}},"Parents of cross: $cross_name are not the same as parents of family: $family_name";
@@ -219,7 +221,7 @@ sub _get_cross {
     $stock = $stock_lookup->get_cross_exact();
 
     if (!$stock) {
-        print STDERR "Cross unique id does not exist\n";
+        $logger->error("Cross unique id does not exist");
         return;
     }
 

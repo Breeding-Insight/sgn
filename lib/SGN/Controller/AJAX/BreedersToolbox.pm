@@ -17,6 +17,8 @@ use CXGN::Location;
 use Try::Tiny;
 use CXGN::Tools::Run;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -50,7 +52,7 @@ sub new_breeding_program :Path('/breeders/program/new') Args(0) {
 
     my $new_program = $p->new_breeding_program($name, $desc);
 
-    print STDERR "New program is ".Dumper($new_program)."\n";
+    $logger->debug("New program is ".Dumper($new_program)."");
 
     $c->stash->{rest} = $new_program;
 
@@ -166,7 +168,7 @@ sub get_data_agreement :Path('/breeders/trial/data_agreement/get') :Args(0) {
 
     my $type_id = $data_agreement_cvterm_id_rs->first()->cvterm_id();
 
-    print STDERR "PROJECTID: $project_id TYPE_ID: $type_id\n";
+    $logger->debug("PROJECTID: $project_id TYPE_ID: $type_id");
 
     my $projectprop_rs = $schema->resultset('Project::Projectprop')->search(
 	{ project_id => $project_id, type_id=>$type_id }
@@ -267,7 +269,7 @@ sub get_accession_plots :Path('/ajax/breeders/get_accession_plots') Args(0) {
 
       push @plots, [$plot_id, $plot_name];
     }
-    #print STDERR Dumper \@plots;
+    #$logger->error(Dumper(\@plots));
     $c->stash->{rest} = {data=>\@plots};
 
 }
@@ -277,7 +279,7 @@ sub delete_uploaded_phenotype_files : Path('/ajax/breeders/phenotyping/delete/')
     my $c = shift;
     my $file_id = shift;
     my $schema = $c->dbic_schema('Bio::Chado::Schema');
-    print STDERR "Deleting phenotypes from File ID: $file_id and making file obsolete\n";
+    $logger->debug("Deleting phenotypes from File ID: $file_id and making file obsolete");
     my $dbh = $c->dbc->dbh();
     my $nd_experiment_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'phenotyping_experiment', 'experiment_type')->cvterm_id();
 
@@ -314,7 +316,7 @@ sub delete_uploaded_phenotype_files : Path('/ajax/breeders/phenotyping/delete/')
 
     my $h4 = $dbh->prepare("UPDATE metadata.md_metadata SET obsolete = 1 where metadata_id IN (SELECT metadata_id from metadata.md_files where file_id=?);");
     $h4->execute($file_id);
-    print STDERR "Phenotype file successfully made obsolete (AKA deleted).\n";
+    $logger->debug("Phenotype file successfully made obsolete (AKA deleted).");
 
     my $async_refresh = CXGN::Tools::Run->new();
     $async_refresh->run_async("perl " . $c->config->{basepath} . "/bin/refresh_matviews.pl -H " . $c->config->{dbhost} . " -D " . $c->config->{dbname} . " -U " . $c->config->{dbuser} . " -P " . $c->config->{dbpass} . " -m fullview -c");
@@ -328,7 +330,7 @@ sub progress : Path('/ajax/progress') Args(0) {
 
     my $trait_id = $c->req->param("trait_id");
 
-    print STDERR "Trait id = $trait_id\n";
+    $logger->debug("Trait id = $trait_id");
     
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $dbh = $schema->storage->dbh();
@@ -345,7 +347,7 @@ sub progress : Path('/ajax/progress') Args(0) {
 	push @$data, [ $year, sprintf("%.2f", $mean), sprintf("%.2f", $stddev), $count ];
     }
 
-    print STDERR "Data = ".Dumper($data);
+    $logger->error("Data = ".Dumper($data));
     
     $c->stash->{rest} = { data => $data };
 

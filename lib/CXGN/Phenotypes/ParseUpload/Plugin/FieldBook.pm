@@ -20,6 +20,8 @@ use Moose;
 use File::Slurp;
 use Text::CSV;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "field book";
 }
@@ -41,13 +43,13 @@ sub validate {
     my @file_lines = read_file($filename);
     if (!@file_lines) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
     ## Check that the file has at least 2 lines;
     if (scalar(@file_lines < 2)) {
         $parse_result{'error'} = "File has less than 2 lines.";
-        print STDERR "File has less than 2 lines.\n";
+        $logger->error("File has less than 2 lines.");
         return \%parse_result;
     }
 
@@ -57,7 +59,7 @@ sub validate {
 
     if (!$header_row[1]) {
         $parse_result{'error'} = "File has no header row.";
-        print STDERR "File has no header row.\n";
+        $logger->error("File has no header row.");
         return \%parse_result;
     }
 
@@ -95,7 +97,7 @@ sub validate {
     }
     if (!defined($header_column_info{'trait'}) || !defined($header_column_info{'value'})) {
         $parse_result{'error'} = "trait or value column not found. Make sure to use the database Fieldbook format.";
-        print STDERR "trait or value column not found. Make sure to use the database Fieldbook format.";
+        $logger->error("trait or value column not found. Make sure to use the database Fieldbook format.");
         return \%parse_result;
     }
 
@@ -151,7 +153,7 @@ sub parse {
     }
     if (!defined($header_column_info{'trait'}) || !defined($header_column_info{'value'})) {
         $parse_result{'error'} = "trait or value column not found. Make sure to use the database Fieldbook format.";
-        print STDERR "trait or value column not found. Make sure to use the database Fieldbook format.";
+        $logger->error("trait or value column not found. Make sure to use the database Fieldbook format.");
         return \%parse_result;
     }
 
@@ -173,12 +175,12 @@ sub parse {
 
         if (!defined($plot_id) || !defined($trait) || !defined($value) || !defined($timestamp)) {
             $parse_result{'error'} = "Error parsing line $line_number: plot_name, trait, value, or timestamp is undefined.";
-            print STDERR "line $line_number has value: $value\n";
+            $logger->debug("line $line_number has value: $value");
             return \%parse_result;
         }
         if (!$timestamp =~ m/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\S)(\d{4})/) {
             $parse_result{'error'} = "Error parsing line $line_number: timestamp needs to be of form YYYY-MM-DD HH:MM:SS-0000 or YYYY-MM-DD HH:MM:SS+0000";
-            print STDERR "line $line_number has timestamp: $timestamp\n";
+            $logger->debug("line $line_number has timestamp: $timestamp");
             return \%parse_result;
         }
         $plots_seen{$plot_id} = 1;

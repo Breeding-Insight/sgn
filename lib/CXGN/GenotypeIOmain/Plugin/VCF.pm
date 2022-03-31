@@ -4,6 +4,7 @@ use Moose::Role;
 use Data::Dumper;
 
 use CXGN::Genotype::SNP;
+my $logger = Log::Log4perl->get_logger();
 
 has 'file' => ( isa => 'Str',
 		is => 'rw',
@@ -82,10 +83,10 @@ sub next {
     #my $file = shift;
     my $current = shift;
 
-    #print STDERR "VCF NEXT CALLED\n";
+    #$logger->error("VCF NEXT CALLED");
     open(my $F, "<", $self->file) || die "Can't open file $self->file\n";
 
-    print STDERR "Zooming to header...\n";
+    $logger->debug("Zooming to header...");
     while (<$F>) { 
 	chomp;
 	if (m/\#CHROM/) { 
@@ -96,7 +97,7 @@ sub next {
     my @markers = ();;
     my %rawscores = ();
 
-    print STDERR "Starting genotype parsing...\n";
+    $logger->debug("Starting genotype parsing...");
     my $lines_parsed = 0;
     while (<$F>) { 
 	chomp;
@@ -110,7 +111,7 @@ sub next {
 	#}
 	push @markers, $fields[2];
 	$lines_parsed++;
-	if ($lines_parsed % 500 ==0) { print STDERR "$lines_parsed         \r"; }
+	if ($lines_parsed % 500 ==0) { $logger->error("$lines_parsed         \r"); }
     }
     
     my $genotype = $self->accessions()->[$self->current()];

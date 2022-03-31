@@ -24,6 +24,8 @@ use Moose;
 use MooseX::FollowPBP;
 use Moose::Util::TypeConstraints;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'chado_schema' => (
 		 is       => 'ro',
 		 isa      => 'DBIx::Class::Schema',
@@ -49,7 +51,7 @@ sub get_trait_info {
   my $db_rs = $chado_schema->resultset("General::Db")->search( { 'me.name' => $self->get_db_name() });
 
   if (!$db_rs) {
-    print STDERR "Could not find trait ontology database: ".$self->get_db_name()."\n";
+    $logger->debug("Could not find trait ontology database: ".$self->get_db_name()."");
     return;
   }
 
@@ -65,7 +67,7 @@ sub get_trait_info {
 
 
   if (!$trait_cvterm) {
-    print STDERR "Could not find trait name: ".$trait_name."\n";
+    $logger->debug("Could not find trait name: ".$trait_name."");
     return;
   }
 
@@ -77,7 +79,7 @@ sub get_trait_info {
 	my $trait_def = $trait_cvterm->definition();
 	$trait_def =~ s/([^\.]*\.\s{1})//;
 	if ($trait_def =~ /=/) { $trait_details .= "\n" . $trait_def; }
-	#print STDERR "trait details = $trait_details\n";
+	#$logger->error("trait details = $trait_details");
 
   my $cvterms = $self->_get_cvterms();
 
@@ -91,7 +93,7 @@ sub get_trait_info {
   $trait_props{'trait_categories'}='';
 
 
-	print STDERR "trait name = $trait_name\n";
+	$logger->debug("trait name = $trait_name");
 	# change from default numeric based on trait name
 	if ($trait_name =~ m/percent/) {
 		$trait_props{'trait_format'}='percent';
@@ -106,7 +108,7 @@ sub get_trait_info {
 		$trait_props{'trait_format'}='photo';
 	}
 	elsif ($trait_name =~ m/([0-9])-([0-9]+)/) {
-		print STDERR "matched categorical trait with scale $1 to $2\n";
+		$logger->debug("matched categorical trait with scale $1 to $2");
 
 		if (($2-$1) >= 12) { #leave categorical traits as numeric if they exceed fieldbook's max of 12 categories
 			$trait_props{'trait_minimum'}=$1;
@@ -118,7 +120,7 @@ sub get_trait_info {
 				$categories .= $i . "/";
 			}
 			$categories .= $2;
-			print STDERR "categories = $categories\n";
+			$logger->debug("categories = $categories");
 			$trait_props{'trait_categories'}= $categories;
 		}
 	}

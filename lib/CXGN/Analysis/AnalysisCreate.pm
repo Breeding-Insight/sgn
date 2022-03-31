@@ -66,6 +66,8 @@ use JSON;
 use CXGN::AnalysisModel::SaveModel;
 use CXGN::Onto;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -476,7 +478,7 @@ sub store {
 
         $saved_analysis_id = $a->get_trial_id();
         if ($analysis_dataset_id !~ /^\d+$/) {
-            print STDERR "Dataset ID $analysis_dataset_id not accetable.\n";
+            $logger->debug("Dataset ID $analysis_dataset_id not accetable.");
             $analysis_dataset_id = undef;
         }
 
@@ -511,7 +513,7 @@ sub store {
         }
 
         my ($verified_warning, $verified_error);
-        print STDERR "Storing the analysis...\n";
+        $logger->debug("Storing the analysis...");
         eval {
             ($verified_warning, $verified_error) = $a->create_and_store_analysis_design($analysis_precomputed_design_optional);
         };
@@ -529,11 +531,11 @@ sub store {
         }
 
         if (@errors) {
-            print STDERR "SORRY! Errors: ".join("\n", @errors);
+            $logger->error("SORRY! Errors: ".join(""), @errors);
             return { error => join "; ", @errors };
         }
 
-        print STDERR "Store analysis values...\n";
+        $logger->debug("Store analysis values...");
         my $analysis_result_values_save;
         if ($analysis_result_values_type eq 'analysis_result_values_match_precomputed_design') {
             while (my($field_plot_name, $trait_obj) = each %$analysis_result_values) {
@@ -576,7 +578,7 @@ sub store {
         };
 
         if ($@) {
-            print STDERR "An error occurred storing analysis values ($@).\n";
+            $logger->error("An error occurred storing analysis values ($@).");
             return { error => "An error occurred storing the values ($@).\n" };
         }
 

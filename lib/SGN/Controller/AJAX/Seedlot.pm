@@ -18,6 +18,8 @@ use JSON;
 use CXGN::BreederSearch;
 use CXGN::Onto;
 
+my $logger = Log::Log4perl->get_logger();
+
 __PACKAGE__->config(
     default   => 'application/json',
     stash_key => 'rest',
@@ -409,7 +411,7 @@ sub create_seedlot :Path('/ajax/breeders/seedlot-create/') :Args(0) {
 
     if ($@) {
 	$c->stash->{rest} = { success => 0, seedlot_id => 0, error => $@ };
-	print STDERR "An error condition occurred, was not able to create seedlot. ($@).\n";
+	$logger->error("An error condition occurred, was not able to create seedlot. ($@).");
 	return;
     }
 
@@ -527,7 +529,7 @@ sub upload_seedlots_POST : Args(0) {
 
             # Check for accession stock id or cross stock id
             if ( !defined $val->{accession_stock_id} && !defined $val->{cross_stock_id} ) {
-                print STDERR "--> ERROR: Acc/Cross Stock ID not defined!";
+                $logger->error("--> ERROR: Acc/Cross Stock ID not defined!");
                 die "ERROR: Could not store/update seedlot $key (The specified accession or cross does not exist).";
             }
 
@@ -550,8 +552,8 @@ sub upload_seedlots_POST : Args(0) {
             $sl->check_name_exists(0); #already validated
             my $return = $sl->store();
             if ( defined $return->{error} ) {
-                print STDERR "SEEDLOT STORE ERROR:\n";
-                print STDERR Dumper $return->{error};
+                $logger->debug("SEEDLOT STORE ERROR:");
+                $logger->error(Dumper($return->{error}));
                 die "ERROR: Could not store/update seedlot $key (" . $return->{error} . ")";
             }
             my $seedlot_id = $return->{seedlot_id};
@@ -651,7 +653,7 @@ sub upload_seedlots_POST : Args(0) {
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload seedlots. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload seedlots. ($@).");
         $c->detach();
     }
 
@@ -728,7 +730,7 @@ sub upload_seedlots_inventory_POST : Args(0) {
     my $parser = CXGN::Stock::Seedlot::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('SeedlotInventoryCSV');
     my $parsed_data = $parser->parse();
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     if (!$parsed_data) {
         my $return_error = '';
@@ -737,7 +739,7 @@ sub upload_seedlots_inventory_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -752,7 +754,7 @@ sub upload_seedlots_inventory_POST : Args(0) {
             my $sl = CXGN::Stock::Seedlot->new(schema => $schema, seedlot_id => $val->{seedlot_id});
             $sl->box_name($val->{box_id});
 
-	    print STDERR "QUALITY: $val->{quality}\n";
+	    $logger->debug("QUALITY: $val->{quality}");
 	    $sl->quality($val->{quality});
 
             my $return = $sl->store();
@@ -795,7 +797,7 @@ sub upload_seedlots_inventory_POST : Args(0) {
     };
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload seedlots inventory. ($@).\n";
+        $logger->error("An error condition occurred, was not able to upload seedlots inventory. ($@).");
         $c->detach();
     }
 
@@ -882,7 +884,7 @@ sub list_seedlot_transactions :Chained('seedlot_base') :PathPart('transactions')
     my $plot_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, "plot", "stock_type")->cvterm_id();
     my %types_hash = ( $type_id => 'seedlot', $accession_type_id => 'accession', $plot_type_id => 'plot', $cross_type_id => 'cross' );
 
-    #print STDERR Dumper $transactions;
+    #$logger->error(Dumper($transactions));
     my @transactions;
     foreach my $t (@$transactions) {
         my $value_field = '';
@@ -1032,7 +1034,7 @@ sub add_seedlot_transaction :Chained('seedlot_base') :PathPart('transaction/add'
 
         if ($@) {
             $c->stash->{rest} = { success => 0, seedlot_id => 0, error => $@ };
-            print STDERR "An error condition occurred, was not able to create new seedlot. ($@).\n";
+            $logger->error("An error condition occurred, was not able to create new seedlot. ($@).");
             $c->detach();
         }
     }
@@ -1397,7 +1399,7 @@ sub seedlot_maintenance_event_DELETE {
         $seedlot->remove_event($event_id);
     };
     if ($@) {
-        print STDERR "Could not delete seedlot maintenance event. ($@).\n";
+        $logger->error("Could not delete seedlot maintenance event. ($@).");
         $c->stash->{rest} = { success => 0, error => $@ };
         $c->detach();
     }
@@ -1506,7 +1508,7 @@ sub seedlot_maintenance_event_upload_POST : Args(0) {
         };
         if ($@) {
             $c->stash->{rest} = { error => $@ };
-            print STDERR "An error condition occurred, was not able to upload seedlot maintenance events. ($@).\n";
+            $logger->error("An error condition occurred, was not able to upload seedlot maintenance events. ($@).");
             $c->detach();
         }
     }

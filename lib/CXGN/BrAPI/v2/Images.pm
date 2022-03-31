@@ -15,6 +15,8 @@ use Scalar::Util qw(looks_like_number);
 
 extends 'CXGN::BrAPI::v2::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
     my $self = shift;
     my $params = shift;
@@ -476,7 +478,7 @@ sub image_data_store {
     my $inputs = shift;
     my $content_type = shift;
 
-    print STDERR "Image ID: $image_id. inputs to image metadata store: ".Dumper($inputs);
+    $logger->error("Image ID: $image_id. inputs to image metadata store: ".Dumper($inputs));
 
     # Get our image file extension type from the database
     my @image_ids;
@@ -499,7 +501,7 @@ sub image_data_store {
     my $file_with_extension = $tempfile.$file_extension;
     rename($tempfile, $file_with_extension);
 
-    print STDERR "TEMP FILE : $tempfile\n";
+    $logger->debug("TEMP FILE : $tempfile");
 
     # process image data through CXGN::Image...
     #
@@ -510,10 +512,10 @@ sub image_data_store {
     };
 
     if ($@) {
-	       print STDERR "An error occurred during image processing... $@\n";
+	       $logger->error("An error occurred during image processing... $@");
     }
     else {
-	       print STDERR "Image processed successfully.\n";
+	       $logger->debug("Image processed successfully.");
     }
 
     my %result = ( image_id => $image_id);

@@ -34,6 +34,8 @@ use JSON;
 use File::Basename qw | basename dirname|;
 use CXGN::BrAPI::v2::ExternalReferences;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head1 NAME
 
 
@@ -98,7 +100,7 @@ sub new {
     while (my $trial_row = $trial_rs->next()) {
         my $name = $trial_row->type()->name();
         my $val = $trial_row->value();
-        # print STDERR Dumper [$name, $val];
+        # $logger->error(Dumper([$name, $val]));
         if ($val eq "genotyping_plate") {
             return CXGN::GenotypingTrial->new($args);
         }

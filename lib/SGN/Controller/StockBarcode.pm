@@ -10,6 +10,8 @@ use Data::Dumper;
 use CXGN::Stock;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends "Catalyst::Controller"; }
 
 # use CXGN::ZPL;
@@ -108,7 +110,7 @@ sub download_pdf_labels :Path('/barcode/stock/download/pdf') :Args(0) {
     my $cross_combination_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'cross_combination', 'stock_property' )->cvterm_id();
     my $xlabel_margin = 8;
     # convert mm into pixels
-    print STDERR "MY TOP MARGIN: $top_margin_mm\n";
+    $logger->debug("MY TOP MARGIN: $top_margin_mm");
     if ($cass_print_format eq 'NCSU') {$left_margin_mm = 10, $top_margin_mm = 12, $bottom_margin_mm =  12, $right_margin_mm = 10, $labels_per_page = 10, $labels_per_row = 3, $barcode_type = "2D", $page_format = "letter"; }
     if ($cass_print_format eq 'CASS') {$left_margin_mm = 112, $top_margin_mm = 10, $bottom_margin_mm =  13, $right_margin_mm = 10, $barcode_type = "2D", $labels_per_row = 2; }
     if ($cass_print_format eq 'IITA-3') {$left_margin_mm = 130, $top_margin_mm = 13, $bottom_margin_mm =  11, $right_margin_mm = 10, $labels_per_row = 3, $barcode_type = "2D"; }
@@ -250,7 +252,7 @@ sub download_pdf_labels :Path('/barcode/stock/download/pdf') :Args(0) {
 
             $h_acc->execute($stock_id,$accession_cvterm_id);
             ($accession_name, $accession_id) = $h_acc->fetchrow_array;
-            print STDERR "Accession name for this plot is $accession_name and id is $accession_id\n";
+            $logger->debug("Accession name for this plot is $accession_name and id is $accession_id");
         }
         my $synonym_string;
         if ($plot_cvterm_id == $type_id) {
@@ -285,7 +287,7 @@ sub download_pdf_labels :Path('/barcode/stock/download/pdf') :Args(0) {
 
     my $dir = $c->tempfiles_subdir('pdfs');
     my ($FH, $filename) = $c->tempfile(TEMPLATE=>"pdfs/pdf-XXXXX", SUFFIX=>".pdf", UNLINK=>0);
-    print STDERR "FILENAME: $filename \n\n\n";
+    $logger->debug("FILENAME: $filename \n\n");
     my $pdf = PDF::Create->new(filename=>$c->path_to($filename),
 			       Author=>$c->config->{project_name},
 			       Title=>'Labels',
@@ -304,7 +306,7 @@ sub download_pdf_labels :Path('/barcode/stock/download/pdf') :Args(0) {
     my $label_height;
     if ($cass_print_format eq '32A4'){
         $label_height = 40;
-        print STDERR "LABEL HEIGHT: $label_height\n";
+        $logger->debug("LABEL HEIGHT: $label_height");
     }
     elsif ($cass_print_format eq '32_unique'){
         $label_height = 40;
@@ -326,11 +328,11 @@ sub download_pdf_labels :Path('/barcode/stock/download/pdf') :Args(0) {
 
     my @pages;
     foreach my $page (1..$self->label_to_page($labels_per_page, scalar(@found))) {
-	     print STDERR "Generating page $page...\n";
+	     $logger->debug("Generating page $page...");
 	     push @pages, $base_page->new_page();
     }
 
-    print STDERR $cass_print_format."\n";
+    $logger->debug($cass_print_format."");
     my $row_y_label_count = 1;
     my $labels_on_page = 0;
     my $row_count = 0;
@@ -399,9 +401,9 @@ sub download_pdf_labels :Path('/barcode/stock/download/pdf') :Args(0) {
 
         }
 
-        print STDERR "$tempfile\n";
+        $logger->debug("$tempfile");
         my $image = $pdf->image($tempfile);
-        #print STDERR "IMAGE: ".Data::Dumper::Dumper($image);
+        #$logger->error("IMAGE: ".Data::Dumper::Dumper($image));
 
     	# note: pdf coord system zero is lower left corner
     	#
@@ -441,7 +443,7 @@ sub download_pdf_labels :Path('/barcode/stock/download/pdf') :Args(0) {
             if ($row_y_label_count > $labels_per_row){
                 $row_y_label_count = 1;
             }
-            print STDERR $row_y_label_count." ".$row_count." ".$ypos." ".$labels_on_page."\n";
+            $logger->debug($row_y_label_count." ".$row_count." ".$ypos." ".$labels_on_page."");
             $row_y_label_count++;
             $labels_on_page++;
             $final_barcode_width = ($page_width - $right_margin - $left_margin + (3 * $xlabel_margin)) / $labels_per_row;
@@ -1076,7 +1078,7 @@ sub download_qrcode : Path('/barcode/stock/download/plot_QRcode') : Args(0) {
 
   my $dir = $c->tempfiles_subdir('pdfs');
   my ($FH, $filename) = $c->tempfile(TEMPLATE=>"pdfs/pdf-XXXXX", SUFFIX=>".pdf", UNLINK=>0);
-  print STDERR "FILENAME: $filename \n\n\n";
+  $logger->debug("FILENAME: $filename \n\n");
   my $pdf = PDF::Create->new(filename=>$c->path_to($filename),
            Author=>$c->config->{project_name},
            Title=>'Labels',
@@ -1092,7 +1094,7 @@ sub download_qrcode : Path('/barcode/stock/download/plot_QRcode') : Args(0) {
 
   my @pages;
   foreach my $page (1..$self->label_to_page($labels_per_page, scalar(@found))) {
-     print STDERR "Generating page $page...\n";
+     $logger->debug("Generating page $page...");
      push @pages, $base_page->new_page();
   }
 
@@ -1111,9 +1113,9 @@ sub download_qrcode : Path('/barcode/stock/download/plot_QRcode') : Args(0) {
       $tempfile = $c->forward('/barcode/phenotyping_qrcode_jpg', [ $found[$i]->[0], $found[$i]->[1], $found[$i]->[2]." ".$found[$i]->[3]." ".$found[$i]->[4]." ".$added_text]);
     }
 
-    print STDERR "$tempfile\n";
+    $logger->debug("$tempfile");
     my $image = $pdf->image($tempfile);
-    print STDERR "IMAGE: ".Data::Dumper::Dumper($image);
+    $logger->error("IMAGE: ".Data::Dumper::Dumper($image));
 
     # note: pdf coord system zero is lower left corner
     #
@@ -1240,7 +1242,7 @@ sub download_trial_qrcode : Path('/barcode/trial/download/trial_QRcode') : Args(
 }
   my $dir = $c->tempfiles_subdir('pdfs');
   my ($FH, $filename) = $c->tempfile(TEMPLATE=>"pdfs/pdf-XXXXX", SUFFIX=>".pdf", UNLINK=>0);
-  print STDERR "FILENAME: $filename \n\n\n";
+  $logger->debug("FILENAME: $filename \n\n");
   my $pdf = PDF::Create->new(filename=>$c->path_to($filename),
            Author=>$c->config->{project_name},
            Title=>'Labels',
@@ -1255,7 +1257,7 @@ sub download_trial_qrcode : Path('/barcode/trial/download/trial_QRcode') : Args(
 
   my @pages;
   foreach my $page (1..$self->label_to_page($labels_per_page, scalar(@found))) {
-     print STDERR "Generating page $page...\n";
+     $logger->debug("Generating page $page...");
      push @pages, $base_page->new_page();
   }
 
@@ -1273,9 +1275,9 @@ sub download_trial_qrcode : Path('/barcode/trial/download/trial_QRcode') : Args(
     my $tempfile;
     $tempfile = $c->forward('/barcode/phenotyping_qrcode_jpg', [ $found[$i]->[0], $found[$i]->[1], $barcode_type] );
 
-    print STDERR "$tempfile\n";
+    $logger->debug("$tempfile");
     my $image = $pdf->image($tempfile);
-    print STDERR "IMAGE: ".Data::Dumper::Dumper($image);
+    $logger->error("IMAGE: ".Data::Dumper::Dumper($image));
 
     # note: pdf coord system zero is lower left corner
     #
@@ -1303,7 +1305,7 @@ sub download_trial_qrcode : Path('/barcode/trial/download/trial_QRcode') : Args(
     if ($row_y_label_count > $labels_per_row){
         $row_y_label_count = 1;
     }
-    print STDERR $row_y_label_count." ".$row_count." ".$ypos." ".$labels_on_page."\n";
+    $logger->debug($row_y_label_count." ".$row_count." ".$ypos." ".$labels_on_page."");
     $row_y_label_count++;
     $labels_on_page++;
 
@@ -1346,11 +1348,11 @@ sub upload_barcode_output : Path('/breeders/phenotype/upload') :Args(0) {
     if (! -e $tempfile) {
         die "The file does not exist!\n\n";
     }
-    print STDERR "***Basename= $basename, tempfile = $tempfile \n\n"; ##OK
+    $logger->debug("***Basename= $basename, tempfile = $tempfile \n"); ##OK
     my $archive_path = $c->config->{archive_path};
 
     $tempfile = $archive_path . "/" . $basename ;
-    print STDERR "**tempfile = $tempfile \n\n"; ##OK
+    $logger->debug("**tempfile = $tempfile \n"); ##OK
     #chack for write permissions in $archive_path !
     my $upload_success = $upload->copy_to($archive_path . "/" . $basename); #returns false for failure, true for success
     if (!$upload_success) { die "Could not upload!\n $upload_success" ; }

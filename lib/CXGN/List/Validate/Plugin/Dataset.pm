@@ -6,6 +6,8 @@ use Module::Pluggable require => 1;
 use Data::Dumper;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 sub name {
     return "dataset";
@@ -35,7 +37,7 @@ sub validate {
 
     }
 
-    print STDERR "Total missing = ".Dumper(@missing)."\n";
+    $logger->debug("Total missing = ".Dumper(@missing)."");
     return { missing => \@missing };
 
 }

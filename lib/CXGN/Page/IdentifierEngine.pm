@@ -32,6 +32,8 @@ use Class::MethodMaker
  new => [qw/-init new/],
 ];
 
+my $logger = Log::Log4perl->get_logger();
+
 #use base qw/Class::Singleton/;
 
 =head1 METHODS
@@ -134,10 +136,10 @@ sub get_link {
 		       "(coffee|coffea|coffea\\s+arabica|coffea\\s+robusta)" => ("/content/coffee.pl", "sol_species"),
 		     );
     
-    print STDERR "Finding the link for $id...\n";
+    $logger->debug("Finding the link for $id...");
     foreach my $pattern (keys(%id_mapping)) { 
 	if ($id =~ m/$pattern/i) { 
-	    print STDERR "found link for $pattern: $id_mapping{$pattern}\n";
+	    $logger->debug("found link for $pattern: $id_mapping{$pattern}");
 	    return ($id_mapping{$pattern})[0];
 	}
     }

@@ -12,6 +12,8 @@ use CXGN::List::Validate;
 use SGN::Model::Cvterm;
 use utf8;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST'; }
 
 __PACKAGE__->config(
@@ -32,7 +34,7 @@ sub upload_pedigrees_verify : Path('/ajax/pedigrees/upload_verify') Args(0)  {
     my $c = shift;
 
     if (!$c->user()) {
-	print STDERR "User not logged in... not uploading pedigrees.\n";
+	$logger->debug("User not logged in... not uploading pedigrees.");
 	$c->stash->{rest} = {error => "You need to be logged in to upload pedigrees." };
 	return;
     }
@@ -169,16 +171,16 @@ sub upload_pedigrees_verify : Path('/ajax/pedigrees/upload_verify') Args(0)  {
         return;
     }
 
-    print STDERR "UploadPedigreeCheck1".localtime()."\n";
+    $logger->debug("UploadPedigreeCheck1".localtime()."");
     my $pedigrees = _get_pedigrees_from_file($c, $archived_filename_with_path);
-    print STDERR "UploadPedigreeCheck2".localtime()."\n";
+    $logger->debug("UploadPedigreeCheck2".localtime()."");
 
     my $add = CXGN::Pedigree::AddPedigrees->new({ schema=>$schema, pedigrees=>$pedigrees });
     my $error;
 
     my $pedigree_check = $add->validate_pedigrees();
-    print STDERR "UploadPedigreeCheck3".localtime()."Complete\n";
-    #print STDERR Dumper $pedigree_check;
+    $logger->debug("UploadPedigreeCheck3".localtime()."Complete");
+    #$logger->error(Dumper($pedigree_check));
     if (!$pedigree_check){
         $error = "There was a problem validating pedigrees. Pedigrees were not stored.";
     }
@@ -202,7 +204,7 @@ sub upload_pedigrees_store : Path('/ajax/pedigrees/upload_store') Args(0)  {
     my $error;
 
     my $return = $add->add_pedigrees($overwrite_pedigrees);
-    #print STDERR Dumper $return;
+    #$logger->error(Dumper($return));
     if (!$return){
         $error = "The pedigrees were not stored";
     }

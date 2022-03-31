@@ -37,6 +37,8 @@ use Moose::Role;
 use JSON;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub verify {
     my $self = shift;
     return 1;
@@ -73,7 +75,7 @@ sub download {
             }
         }
     }
-    #print STDERR Dumper \@predefined_columns;
+    #$logger->error(Dumper(\@predefined_columns));
     my $predefined_columns_json = $json->encode(\@predefined_columns);
 
     my @trial_names;
@@ -363,7 +365,7 @@ sub download {
     my $transform = $lt->transform($schema, "traits_2_trait_ids", \@trait_list);
 
     if (@{$transform->{missing}}>0) {
-    	print STDERR "Warning: Some traits could not be found. ".join(",",@{$transform->{missing}})."\n";
+    	$logger->warn("Warning: Some traits could not be found. ".join(",",@{$transform->{missing}})."");
     }
     my @trait_ids = @{$transform->{transform}};
 
@@ -371,10 +373,10 @@ sub download {
     foreach my $t (@trait_ids) {
         my $trait = CXGN::Trait->new( { bcs_schema=> $schema, cvterm_id => $t });
         $cvinfo{$trait->display_name()} = $trait;
-        #print STDERR "**** Trait = " . $trait->display_name . "\n\n";
+        #$logger->error("**** Trait = " . $trait->display_name . "\n");
     }
 
-    #print STDERR "Self include notes is ".$self->include_notes."\n";
+    #$logger->error("Self include notes is ".$self->include_notes."");
     if ( $self->include_notes()) {
         push @trait_list, 'notes';
     }
@@ -385,7 +387,7 @@ sub download {
             $ws->write(6, $i+$num_col_before_traits, $trait_list[$i]);
         #}
         #else {
-        #    print STDERR "Skipping output of trait $trait_list[$i] because it does not exist\n";
+        #    $logger->error("Skipping output of trait $trait_list[$i] because it does not exist");
         #    next;
         #}
 

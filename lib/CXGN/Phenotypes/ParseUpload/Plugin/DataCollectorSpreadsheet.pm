@@ -19,6 +19,8 @@ use Moose;
 #use File::Slurp;
 use Spreadsheet::ParseExcel;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "datacollector spreadsheet";
 }
@@ -45,14 +47,14 @@ sub validate {
     $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
         $parse_result{'error'} = $parser->error();
-        print STDERR "validate error: ".$parser->error()."\n";
+        $logger->error("validate error: ".$parser->error()."");
         return \%parse_result;
     }
 
     $worksheet = ($excel_obj->worksheets())[7]; #support only one worksheet
     if (!$worksheet) {
         $parse_result{'error'} = "No 7th tab found in your Excel file.";
-        print STDERR "No 7th tab found in your Excel file.\n";
+        $logger->error("No 7th tab found in your Excel file.");
         return \%parse_result;
     }
 
@@ -61,7 +63,7 @@ sub validate {
 
     if (($col_max - $col_min)  < 1 || ($row_max - $row_min) < 1 ) { #must have header with at least plot_name and one trait, as well as one row of phenotypes
         $parse_result{'error'} = "Spreadsheet is missing plot_name and atleast one trait in header.";
-        print STDERR "Spreadsheet is missing header\n";
+        $logger->error("Spreadsheet is missing header");
         return \%parse_result;
     }
 
@@ -72,7 +74,7 @@ sub validate {
 
     if (!$plot_name_head || $plot_name_head ne 'plot_name') {
         $parse_result{'error'} = "No plot_name in header.";
-        print STDERR "No plot_name in header\n";
+        $logger->error("No plot_name in header");
         return \%parse_result;
     }
 
@@ -83,7 +85,7 @@ sub validate {
 
     if (!$trial_stock_name_head || (($trial_stock_name_head ne 'accession_name') && ($trial_stock_name_head ne 'family_name') && ($trial_stock_name_head ne 'cross_unique_id'))) {
         $parse_result{'error'} = "No accession_name or family_name or cross_unique_id in header.";
-        print STDERR "No accession_name or family_name or cross_unique_id in header\n";
+        $logger->error("No accession_name or family_name or cross_unique_id in header");
         return \%parse_result;
     }
 
@@ -94,7 +96,7 @@ sub validate {
 
     if (!$plot_num_head || $plot_num_head ne 'plot_number') {
         $parse_result{'error'} = "No plot_number in header.";
-        print STDERR "No plot_number in header\n";
+        $logger->error("No plot_number in header");
         return \%parse_result;
     }
 
@@ -105,7 +107,7 @@ sub validate {
 
     if (!$block_head || $block_head ne 'block_number') {
         $parse_result{'error'} = "No block_number in header.";
-        print STDERR "No block_number in header\n";
+        $logger->error("No block_number in header");
         return \%parse_result;
     }
 
@@ -116,7 +118,7 @@ sub validate {
 
     if (!$is_control_head || $is_control_head ne 'is_a_control') {
         $parse_result{'error'} = "No is_a_control in header.";
-        print STDERR "No is_a_control in header\n";
+        $logger->error("No is_a_control in header");
         return \%parse_result;
     }
 
@@ -127,7 +129,7 @@ sub validate {
 
     if (!$rep_head || $rep_head ne 'rep_number') {
         $parse_result{'error'} = "No rep_number in header.";
-        print STDERR "No rep_number in header\n";
+        $logger->error("No rep_number in header");
         return \%parse_result;
     }
 
@@ -167,14 +169,14 @@ sub parse {
     $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
         $parse_result{'error'} = $parser->error();
-        print STDERR "Could not open excel file";
+        $logger->error("Could not open excel file");
         return \%parse_result;
     }
 
     $worksheet = ( $excel_obj->worksheets() )[7];
     if (!$worksheet) {
         $parse_result{'error'} = "No 7th tab found in your Excel file.";
-        print STDERR "No 7th tab found in your Excel file.\n";
+        $logger->error("No 7th tab found in your Excel file.");
         return \%parse_result;
     }
 
@@ -214,12 +216,12 @@ sub parse {
             if (!defined($trait_value) ) {
                 $trait_value = '';
             }
-            #print STDERR $trait_value." : ".$timestamp."\n";
+            #$logger->error($trait_value." : ".$timestamp."");
 
             if ($timestamp_included) {
                 if (!$timestamp =~ m/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\S)(\d{4})/) {
                     $parse_result{'error'} = "Timestamp needs to be of form YYYY-MM-DD HH:MM:SS-0000 or YYYY-MM-DD HH:MM:SS+0000";
-                    print STDERR "value: $timestamp\n";
+                    $logger->debug("value: $timestamp");
                     return \%parse_result;
                 }
             }

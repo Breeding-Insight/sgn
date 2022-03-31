@@ -25,6 +25,8 @@ use Moose::Util::TypeConstraints;
 use Try::Tiny;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
 		 is       => 'rw',
 		 isa      => 'DBIx::Class::Schema',
@@ -107,7 +109,7 @@ sub get_matching_stock_count {
 
 sub get_synonym_hash_lookup {
     my $self = shift;
-    print STDERR "Synonym Start:".localtime."\n";
+    $logger->debug("Synonym Start:".localtime."");
     my $schema = $self->get_schema();
     my $synonym_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'stock_synonym', 'stock_property')->cvterm_id();
     my $accession_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'accession', 'stock_type')->cvterm_id();
@@ -118,7 +120,7 @@ sub get_synonym_hash_lookup {
     while (my ($uniquename, $synonym) = $h->fetchrow_array()) {
         push @{$result{$uniquename}}, $synonym;
     }
-    print STDERR "Synonym End:".localtime."\n";
+    $logger->debug("Synonym End:".localtime."");
     return \%result;
 }
 
@@ -126,7 +128,7 @@ sub get_owner_hash_lookup {
     my $self = shift;
     my $stock_ids;
     my $where_clause = '';
-    print STDERR "StockOwner Start:".localtime."\n";
+    $logger->debug("StockOwner Start:".localtime."");
     if ($stock_ids){
         my $stock_id_sql = join ',', @$stock_ids;
         $where_clause = "WHERE stock_id IN ($stock_id_sql)";
@@ -139,13 +141,13 @@ sub get_owner_hash_lookup {
     while (my ($stock_id, $sp_person_id, $username, $first_name, $last_name) = $h->fetchrow_array()) {
         push @{$result{$stock_id}}, [$sp_person_id, $username, $first_name, $last_name];
     }
-    print STDERR "StockOwner End:".localtime."\n";
+    $logger->debug("StockOwner End:".localtime."");
     return \%result;
 }
 
 sub get_organization_hash_lookup {
     my $self = shift;
-    print STDERR "StockOrg Start:".localtime."\n";
+    $logger->debug("StockOrg Start:".localtime."");
     my $schema = $self->get_schema();
 	my $organization_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'organization', 'stock_property')->cvterm_id();
     my $q = "SELECT stock_id, value FROM stockprop WHERE type_id=$organization_type_id ORDER BY value;";
@@ -155,7 +157,7 @@ sub get_organization_hash_lookup {
     while (my ($stock_id, $organization) = $h->fetchrow_array()) {
         push @{$result{$stock_id}}, $organization;
     }
-    print STDERR "StockOrg End:".localtime."\n";
+    $logger->debug("StockOrg End:".localtime."");
     return \%result;
 }
 

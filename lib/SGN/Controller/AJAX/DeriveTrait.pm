@@ -14,6 +14,8 @@ use URI::Encode qw(uri_encode uri_decode);
 use CXGN::BreedersToolbox::DeriveTrait;
 use CXGN::Phenotypes::StorePhenotypes;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN {extends 'Catalyst::Controller::REST'}
 
 __PACKAGE__->config(
@@ -52,7 +54,7 @@ sub get_all_derived_trait : Path('/ajax/breeders/trial/trait_formula') Args(0) {
 		push @derived_traits_array, $cvterm_ids[$n]."|".$trait_db_ids[$n].":".$trait_ids[$n];
     	}
 
-    #print STDERR Dumper (@formulas_array);
+    #$logger->error(Dumper((@formulas_array)));
     $c->stash->{rest} = { derived_traits => \@derived_traits_array, formula => \@formulas_array };
 }
 
@@ -76,14 +78,14 @@ sub compute_derive_traits : Path('/ajax/phenotype/create_derived_trait') Args(0)
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
 	my $selected_trait_cvterm = SGN::Model::Cvterm->get_cvterm_row_from_trait_name($schema, $selected_trait);
 	if (!$selected_trait_cvterm) {
-		print STDERR "The trait $selected_trait is not in the database.\n";
+		$logger->debug("The trait $selected_trait is not in the database.");
 	}
 
 	my $selected_trait_cvterm_id = $selected_trait_cvterm->cvterm_id();
 	print "Selected Trait Cvterm_id: $selected_trait_cvterm_id\n";
 
 	if (!$c->user()) {
-		print STDERR "User not logged in... not computing trait.\n";
+		$logger->debug("User not logged in... not computing trait.");
 		$c->stash->{rest} = {error => "You need to be logged in to compute trait." };
 		return;
     	}
@@ -100,7 +102,7 @@ sub compute_derive_traits : Path('/ajax/phenotype/create_derived_trait') Args(0)
 
 	my $triat_name = $trial->get_traits_assayed();
 
-	#print STDERR Dumper($triat_name);
+	#$logger->error(Dumper($triat_name));
 
 
 	if (scalar(@{$triat_name}) == 0)  {
@@ -165,7 +167,7 @@ sub compute_derive_traits : Path('/ajax/phenotype/create_derived_trait') Args(0)
 		push @accessions, $accession;
 	}
 	print "DB ID: $db_id\n";
-	#print STDERR Dumper (\@dependent_trait_ids);
+	#$logger->error(Dumper((\@dependent_trait_ids)));
 	foreach my $accession (@accessions) {
 		my $h1 = $dbh->prepare("select cvterm.cvterm_id from cvterm join dbxref using(dbxref_id) join db using(db_id) where dbxref.accession=? and db.name=?;");
 
@@ -174,7 +176,7 @@ sub compute_derive_traits : Path('/ajax/phenotype/create_derived_trait') Args(0)
 			push @traits_cvterm_ids, $cvterm_id;
 		}
 	}
-	#print STDERR Dumper (\@traits_cvterm_ids);
+	#$logger->error(Dumper((\@traits_cvterm_ids)));
 	for (my $x=0; $x<scalar(@traits_cvterm_ids); $x++){
 		foreach $trait_found (@{$triat_name}) {
 			if ($trait_found->[0] eq $traits_cvterm_ids[$x]) {
@@ -190,7 +192,7 @@ sub compute_derive_traits : Path('/ajax/phenotype/create_derived_trait') Args(0)
 		}
 		push @regres, $full_name;
 	}
-	#print STDERR Dumper (\@regres);
+	#$logger->error(Dumper((\@regres)));
 	my ($stock_name, $stock_id, $plot_name, $value);
 	if (@found_trait_cvterm_ids != @traits_cvterm_ids) {
 		$c->stash->{rest} = {error => "Upload or compute trait(s) required for computing \n\n$selected_trait = $msg_formula." };
@@ -242,29 +244,29 @@ project.project_id=? ) );");
 
 		foreach my $valid_plot_name (keys %valid_plots){
 			my $value_array = $valid_plots{$valid_plot_name};
-			#print STDERR Dumper $value_array;
+			#$logger->error(Dumper($value_array));
 			my %map_hash;
 			for( my $i =0; $i<scalar(@regres); $i++) {
 				$map_hash{$regres[$i]} = $value_array->[$i];
 			}
-			#print STDERR Dumper \%map_hash;
+			#$logger->error(Dumper(\%map_hash));
 			my $msg_formula_sub = $msg_formula;
 			foreach my $full_trait (keys %map_hash) {
 				$full_trait =~ /([\w\s-]+)\|(\w*\:\d+)/g;
-				#print STDERR Dumper $full_trait;
+				#$logger->error(Dumper($full_trait));
 				$msg_formula_sub =~ s/($1\|$2)/$map_hash{$full_trait}/g;
 			}
-			#print STDERR Dumper $msg_formula_sub;
+			#$logger->error(Dumper($msg_formula_sub));
 			my $calc_value = eval "$msg_formula_sub";
-			#print STDERR Dumper $calc_value;
+			#$logger->error(Dumper($calc_value));
 			$data{$valid_plot_name}->{$selected_trait} = [$calc_value,$timestamp];
 		}
 
 	}
 
-	#print STDERR Dumper (\%data);
-	#print STDERR Dumper (\@plots);
-	#print STDERR Dumper (\@traits);
+	#$logger->error(Dumper((\%data)));
+	#$logger->error(Dumper((\@plots)));
+	#$logger->error(Dumper((\@traits)));
 
     $parse_result{'data'} = \%data;
     $parse_result{'plots'} = \@plots;
@@ -315,10 +317,10 @@ sub generate_plot_phenotypes : Path('/ajax/breeders/trial/generate_plot_phenotyp
     my $trait_name = uri_decode($c->req->param('trait_name'));
     my $method = $c->req->param('method');
     my $rounding = $c->req->param('rounding');
-    #print STDERR "Trial: $trial_id\n";
-    #print STDERR "Trait: $trait_name\n";
-    #print STDERR "Method: $method\n";
-    #print STDERR "Round: $rounding\n";
+    #$logger->error("Trial: $trial_id");
+    #$logger->error("Trait: $trait_name");
+    #$logger->error("Method: $method");
+    #$logger->error("Round: $rounding");
     my $schema = $c->dbic_schema('Bio::Chado::Schema');
 
     my @traits;
@@ -350,8 +352,8 @@ sub generate_plot_phenotypes : Path('/ajax/breeders/trial/generate_plot_phenotyp
         push @return_traits, $traits;
         push @return_store_hash, $store_hash;
     }
-    #print STDERR Dumper \%store_hash;
-    #print STDERR Dumper \@return;
+    #$logger->error(Dumper(\%store_hash));
+    #$logger->error(Dumper(\@return));
     $c->stash->{rest} = {
         success => 1,
         info=>\@return_info,
@@ -374,10 +376,10 @@ sub store_generated_plot_phenotypes : Path('/ajax/breeders/trial/store_generated
     my $plots = decode_json($c->req->param('store_plots'));
     my $traits = decode_json($c->req->param('store_traits'));
     my $overwrite_values = $c->req->param('overwrite_values');
-    #print STDERR Dumper $data;
-    #print STDERR Dumper $plots;
-    #print STDERR Dumper $traits;
-    #print STDERR $overwrite_values;
+    #$logger->error(Dumper($data));
+    #$logger->error(Dumper($plots));
+    #$logger->error(Dumper($traits));
+    #$logger->error($overwrite_values);
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
@@ -387,7 +389,7 @@ sub store_generated_plot_phenotypes : Path('/ajax/breeders/trial/store_generated
     if ($overwrite_values) {
         $overwrite = 1;
         my $user_type = $c->user()->get_object->get_user_type();
-        #print STDERR $user_type."\n";
+        #$logger->error($user_type."");
         if ($user_type ne 'curator') {
             $c->stash->{rest} = {error => 'Must be a curator to overwrite values! Please contact us!'};
             $c->detach;

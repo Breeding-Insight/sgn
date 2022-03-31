@@ -87,6 +87,8 @@ use JSON;
 use utf8;
 use Encode;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -243,7 +245,7 @@ has 'display_pedigree' => (
 
 sub search {
     my $self = shift;
-    print STDERR "CXGN::Stock::Search search start\n";
+    $logger->debug("CXGN::Stock::Search search start");
     my $schema = $self->bcs_schema;
     my $people_schema = $self->people_schema;
     my $phenome_schema = $self->phenome_schema;
@@ -436,7 +438,7 @@ sub search {
     my $using_stockprop_filter;
     if ($self->stockprops_values && scalar(keys %{$self->stockprops_values})>0){
         $using_stockprop_filter = 1;
-        #print STDERR Dumper $self->stockprops_values;
+        #$logger->error(Dumper($self->stockprops_values));
         my @stockprop_wheres;
         foreach my $term_name (keys %{$self->stockprops_values}){
             my $property_term = SGN::Model::Cvterm->get_cvterm_row($schema, $term_name, 'stock_property');
@@ -474,7 +476,7 @@ sub search {
                 }
 
             } else {
-                print STDERR "Stockprop $term_name is not in this database! Only use stock_property in system_cvterms.txt!\n";
+                $logger->debug("Stockprop $term_name is not in this database! Only use stock_property in system_cvterms.txt!");
             }
         }
         my $stockprop_where = 'WHERE ' . join ' AND ', @stockprop_wheres;
@@ -572,7 +574,7 @@ sub search {
             };
         }
     }
-    #print STDERR Dumper \%result_hash;
+    #$logger->error(Dumper(\%result_hash));
     
     # Comma separated list of query placeholders for the result stock ids
     my $id_ph = scalar(@result_stock_ids) > 0 ? join ",", ("?") x @result_stock_ids : "NULL";
@@ -699,8 +701,8 @@ ORDER BY organism_id ASC;";
         push @result, $result_hash{$_};
     }
 
-    #print STDERR Dumper \@result;
-    print STDERR "CXGN::Stock::Search search end\n";
+    #$logger->error(Dumper(\@result));
+    $logger->debug("CXGN::Stock::Search search end");
     return (\@result, $records_total);
 }
 
@@ -726,7 +728,7 @@ sub _refresh_materialized_stockprop {
                 push @additional_terms, $_;
             }
         }
-        print STDERR Dumper \@additional_terms;
+        $logger->error(Dumper(\@additional_terms));
 
         my $q = "SELECT t.cvterm_id FROM cvterm as t JOIN cv ON(t.cv_id=cv.cv_id) WHERE t.name=? and cv.name=?;";
         my $h = $schema->storage->dbh()->prepare($q);

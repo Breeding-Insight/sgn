@@ -35,6 +35,8 @@ use File::Slurp qw/slurp/;
 
 =cut
 
+my $logger = Log::Log4perl->get_logger();
+
 sub new {
     my $class  = shift;
     my $self   = {};
@@ -269,7 +271,7 @@ sub check_ids {
 
     #do some simple parameter checking
 
-    print STDERR "PROCESSING IDS: $self->{ids}. ($self->{idType})\n";
+    $logger->debug("PROCESSING IDS: $self->{ids}. ($self->{idType})");
 
     return @ids if ( $self->{idType} eq "" );
     return @ids if ( $self->{ids} !~ /\w/ );

@@ -30,6 +30,8 @@ use CXGN::Tools::Organism;
 use CXGN::Phenome::Schema;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller::REST' }
 
@@ -343,7 +345,7 @@ sub associate_ontology_POST :Args(0) {
                 #if the dbxref exists this should just return the database id to be used for
                 #storing a  dbxref_evidence
                 $locus_dbxref_id = $locus_dbxref->store;
-                #print STDERR "object_dbxref_id = $object_dbxref_id ! \n";
+                #$logger->error("object_dbxref_id = $object_dbxref_id ! ");
                 $locus_dbxref_evidence->set_object_dbxref_id($locus_dbxref_id);
                 $locus_dbxref_evidence->set_relationship_type_id($relationship_id);
                 $locus_dbxref_evidence->set_evidence_code_id($evidence_code_id);
@@ -804,9 +806,9 @@ sub associate_unigene_POST :Args(0) {
     my $logged_person_id = $c->user->get_object->get_sp_person_id if $c->user;
     if ($privileged) {
         try {
-            print STDERR "****ABOUT TO ADD UNIGENE $unigene_id to locus $locus_id\n\n\n";
+            $logger->debug("****ABOUT TO ADD UNIGENE $unigene_id to locus $locus_id\n\n");
             my $id = $locus->add_unigene($unigene_id, $logged_person_id);
-            print STDERR "**DONE id = $id \n\n\n";
+            $logger->debug("**DONE id = $id \n\n");
         } catch {
             $response->{error} = "Failed: $_" ;
             # send an email to sgn bugs

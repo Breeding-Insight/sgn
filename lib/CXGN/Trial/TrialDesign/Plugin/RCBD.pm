@@ -92,9 +92,9 @@ sub create_design {
   $r_block->add_command('rcbd<-as.matrix(rcbd)');
   $r_block->run_block();
   $result_matrix = R::YapRI::Data::Matrix->read_rbase( $rbase,'r_block','rcbd');
-  #print STDERR Dumper $result_matrix;
+  #$logger->error(Dumper($result_matrix));
   @plot_numbers = $result_matrix->get_column("plots");
-  #print STDERR Dumper \@plot_numbers;
+  #$logger->error(Dumper(\@plot_numbers));
   @block_numbers = $result_matrix->get_column("block");
   @stock_names = $result_matrix->get_column("trt");
   # @converted_plot_numbers=@{$self->_convert_plot_numbers(\@plot_numbers, \@block_numbers, $number_of_blocks)};

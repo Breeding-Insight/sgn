@@ -60,6 +60,8 @@ use SGN::Controller::AJAX::DroneImagery::DroneImagery;
 use Storable qw(dclone);
 use Statistics::Descriptive;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -72,7 +74,7 @@ sub drone_imagery_calculate_analytics : Path('/api/drone_imagery/calculate_analy
 sub drone_imagery_calculate_analytics_POST : Args(0) {
     my $self = shift;
     my $c = shift;
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $people_schema = $c->dbic_schema("CXGN::People::Schema");
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
@@ -378,7 +380,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
 
     foreach my $env_variance_percent (@env_variance_percents) {
         for my $iterations (1..$number_iterations) {
-            print STDERR "ITERATION $iterations\n";
+            $logger->debug("ITERATION $iterations");
 
             my $a_env = $env_iterations->{$iterations}->{a_env};
             my $b_env = $env_iterations->{$iterations}->{b_env};
@@ -420,7 +422,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 my $status_factor = system($cmd_factor);
 
                 open(my $fh_factor, '<', $stats_tempfile_fixed_effect_binned) or die "Could not open file '$stats_tempfile_fixed_effect_binned' $!";
-                    print STDERR "Opened $stats_tempfile_fixed_effect_binned\n";
+                    $logger->debug("Opened $stats_tempfile_fixed_effect_binned");
                     my $header = <$fh_factor>;
                     if ($csv->parse($header)) {
                         my @header_cols = $csv->fields();
@@ -454,7 +456,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
             if ($statistics_select_original eq 'airemlf90_grm_random_regression_dap_blups') {
                 $statistics_select = 'airemlf90_grm_random_regression_dap_blups';
 
-                print STDERR "PREPARE RELATIONSHIP MATRIX\n";
+                $logger->debug("PREPARE RELATIONSHIP MATRIX");
                 eval {
                     my %seen_accession_stock_ids;
                     foreach my $trial_id (@$field_trial_id_list) {
@@ -498,7 +500,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -527,7 +529,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -556,7 +558,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -587,13 +589,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -609,7 +611,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -643,12 +645,12 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile) or die "Could not open file '$grm_out_tempfile' $!";
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -754,7 +756,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -783,7 +785,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -812,7 +814,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -837,13 +839,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -859,7 +861,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -893,12 +895,12 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile) or die "Could not open file '$grm_out_tempfile' $!";
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -1210,7 +1212,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             range01 <- function(x){(x-min(x))/(max(x)-min(x))};
                             cor_mat <- range01(cor_mat);
                             write.table(cor_mat, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         elsif ($compute_relationship_matrix_from_htp_phenotypes_type eq 'blues') {
@@ -1238,7 +1240,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             rownames(rel) <- blues[,2];
                             colnames(rel) <- blues[,2];
                             write.table(rel, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         else {
@@ -1247,7 +1249,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         }
 
                         open(my $htp_rel_res, '<', $stats_out_htp_rel_tempfile) or die "Could not open file '$stats_out_htp_rel_tempfile' $!";
-                            print STDERR "Opened $stats_out_htp_rel_tempfile\n";
+                            $logger->debug("Opened $stats_out_htp_rel_tempfile");
                             my $header_row = <$htp_rel_res>;
                             my @header;
                             if ($csv->parse($header_row)) {
@@ -1336,7 +1338,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                 };
 
-                print STDERR "PREPARE ORIGINAL PHENOTYPE FILES\n";
+                $logger->debug("PREPARE ORIGINAL PHENOTYPE FILES");
                 eval {
                     my $phenotypes_search = CXGN::Phenotypes::SearchFactory->instantiate(
                         'MaterializedViewTable',
@@ -1476,7 +1478,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
 
                     @sorted_trait_names = sort {$a <=> $b} keys %seen_times;
-                    # print STDERR Dumper \@sorted_trait_names;
+                    # $logger->error(Dumper(\@sorted_trait_names));
 
                     my $trait_name_encoded = 1;
                     foreach my $trait_name (@sorted_trait_names) {
@@ -1496,7 +1498,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             $time_max = $_;
                         }
                     }
-                    print STDERR Dumper [$time_min, $time_max];
+                    $logger->error(Dumper([$time_min, $time_max]));
 
                     while ( my ($trait_name, $time_term) = each %seen_trait_names) {
                         push @{$trait_composing_info{$trait_name}}, $time_term;
@@ -1525,7 +1527,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     my $status = system($cmd);
 
                     open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                        print STDERR "Opened $stats_out_tempfile\n";
+                        $logger->debug("Opened $stats_out_tempfile");
                         my $header = <$fh>;
                         my @header_cols;
                         if ($csv->parse($header)) {
@@ -1571,7 +1573,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     my $status_factor = system($cmd_factor);
 
                     open(my $fh_factor, '<', $stats_prep_factor_tempfile) or die "Could not open file '$stats_prep_factor_tempfile' $!";
-                        print STDERR "Opened $stats_prep_factor_tempfile\n";
+                        $logger->debug("Opened $stats_prep_factor_tempfile");
                         $header = <$fh_factor>;
                         if ($csv->parse($header)) {
                             @header_cols = $csv->fields();
@@ -1661,7 +1663,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     push @data_matrix_phenotypes_row, $phenotype_data_original{$p}->{$t} + 0;
                                 }
                             } else {
-                                print STDERR $p." : $t : $germplasm_name : NA \n";
+                                $logger->debug($p." : $t : $germplasm_name : NA ");
                                 push @row, '';
                                 push @data_matrix_phenotypes_row, 'NA';
                             }
@@ -1828,11 +1830,11 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         range01 <- function(x){(x-min(x))/(max(x)-min(x))};
                         cor_mat <- range01(cor_mat);
                         write.table(cor_mat, file=\''.$stats_out_pe_pheno_rel_tempfile2.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                        # print STDERR Dumper $pe_rel_cmd;
+                        # $logger->error(Dumper($pe_rel_cmd));
                         my $status_pe_rel = system($pe_rel_cmd);
 
                         open(my $pe_rel_res, '<', $stats_out_pe_pheno_rel_tempfile2) or die "Could not open file '$stats_out_pe_pheno_rel_tempfile2' $!";
-                            print STDERR "Opened $stats_out_pe_pheno_rel_tempfile2\n";
+                            $logger->debug("Opened $stats_out_pe_pheno_rel_tempfile2");
                             my $header_row = <$pe_rel_res>;
                             my @header;
                             if ($csv->parse($header_row)) {
@@ -1959,7 +1961,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 if (defined($phenotype_data_pe{$p}->{$t})) {
                                     push @row, $phenotype_data_pe{$p}->{$t};
                                 } else {
-                                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                                    $logger->debug($p." : $t : $germplasm_name : NA ");
                                     push @row, 'NA';
                                 }
                             }
@@ -2017,7 +2019,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         write.table(cor_mat, file=\''.$stats_out_pe_pheno_rel_tempfile4.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');
                         }
                         "';
-                        # print STDERR Dumper $statistics_cmd;
+                        # $logger->error(Dumper($statistics_cmd));
                         eval {
                             my $status = system($statistics_cmd_pe);
                         };
@@ -2025,13 +2027,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         my %rel_pe_result_hash;
                         my $current_env_row_count = 0;
                         if ($@) {
-                            print STDERR "R ERROR\n";
-                            print STDERR Dumper $@;
+                            $logger->error("R ERROR");
+                            $logger->error(Dumper($@));
                             $run_stats_fault = 1;
                         }
                         else {
                             open(my $pe_rel_res, '<', $stats_out_pe_pheno_rel_tempfile4) or die "Could not open file '$stats_out_pe_pheno_rel_tempfile4' $!";
-                                print STDERR "Opened $stats_out_pe_pheno_rel_tempfile4\n";
+                                $logger->debug("Opened $stats_out_pe_pheno_rel_tempfile4");
                                 my $header_row = <$pe_rel_res>;
                                 my @header;
                                 if ($csv->parse($header_row)) {
@@ -2053,7 +2055,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     $current_env_row_count++;
                                 }
                             close($pe_rel_res);
-                            # print STDERR Dumper \%rel_pe_result_hash;
+                            # $logger->error(Dumper(\%rel_pe_result_hash));
 
                             my $data_rel_pe = '';
                             my %result_hash_pe;
@@ -2076,7 +2078,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             }
 
                             open(my $pe_rel_out, ">", $permanent_environment_structure_tempfile) || die "Can't open file ".$permanent_environment_structure_tempfile;
-                                print STDERR "Opened $permanent_environment_structure_tempfile\n";
+                                $logger->debug("Opened $permanent_environment_structure_tempfile");
                                 print $pe_rel_out $data_rel_pe;
                             close($pe_rel_out);
                         }
@@ -2087,7 +2089,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         }
                     }
 
-                    print STDERR Dumper [$phenotype_min_original, $phenotype_max_original];
+                    $logger->error(Dumper([$phenotype_min_original, $phenotype_max_original]));
 
                     @unique_accession_names = sort keys %unique_accessions;
                     @unique_plot_names = sort keys %seen_plot_names;
@@ -2155,10 +2157,10 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 ) = @$result_1;
 
                 eval {
-                    print STDERR "PLOTTING CORRELATION\n";
+                    $logger->debug("PLOTTING CORRELATION");
                     my ($full_plot_level_correlation_tempfile_fh, $full_plot_level_correlation_tempfile) = tempfile("drone_stats_XXXXX", DIR=> $tmp_stats_dir);
                     open(my $F_fullplot, ">", $full_plot_level_correlation_tempfile) || die "Can't open file ".$full_plot_level_correlation_tempfile;
-                        print STDERR "OPENED PLOTCORR FILE $full_plot_level_correlation_tempfile\n";
+                        $logger->debug("OPENED PLOTCORR FILE $full_plot_level_correlation_tempfile");
 
                         my @header_full_plot_corr = ('plot_name, plot_id, row_number, col_number, rep, block, germplasm_name, germplasm_id');
                         my @types_full_plot_corr = ('pheno_orig_', 'pheno_postm1_', 'eff_origm1_', 'eff_postm1_',
@@ -2228,7 +2230,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat_orig[,-seq(1,8)], hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE);
                     ggsave(\''.$plot_corr_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, limitsize = FALSE, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_plotcorr_plot = system($cmd_plotcorr_plot);
                     push @$spatial_effects_plots, [$plot_corr_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
                     push @$spatial_effects_files_store, [$full_plot_level_correlation_tempfile, "datafile_".$statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
@@ -2675,7 +2677,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat, hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE, label_round = 2);
                     ggsave(\''.$plot_corr_summary_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_plotcorrsum_plot;
+                    # $logger->error(Dumper($cmd_plotcorrsum_plot));
 
                     my $status_plotcorrsum_plot = system($cmd_plotcorrsum_plot);
                     push @$spatial_effects_plots, [$plot_corr_summary_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_envsimscorr_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
@@ -2708,7 +2710,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names).');
                     ggsave(\''.$env_effects_first_figure_tempfile_2.'\', gg, device=\'png\', width=20, height=20, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot_2 = system($cmd_spatialfirst_plot_2);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string_2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_origheatmap_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -2743,12 +2745,12 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     ggsave(\''.$env_effects_first_figure_tempfile.'\', arrangeGrob(gg_eff_1, nrow=1), device=\'png\', width=20, height=20, units=\'in\');
                     write.table(data.frame(airemlf90_grm_random_regression_dap_blups_env_linear = c(cor(mat_env\$value, mat_full\$mat_eff_sim1_1)), airemlf90_grm_random_regression_dap_blups_env_1DN = c(cor(mat_env2\$value, mat_full\$mat_eff_sim2_1)), airemlf90_grm_random_regression_dap_blups_env_2DN = c(cor(mat_env3\$value, mat_full\$mat_eff_sim3_1)), airemlf90_grm_random_regression_dap_blups_env_random = c(cor(mat_env4\$value, mat_full\$mat_eff_sim4_1)), airemlf90_grm_random_regression_dap_blups_env_ar1xar1 = c(cor(mat_env5\$value, mat_full\$mat_eff_sim5_1)), airemlf90_grm_random_regression_dap_blups_env_realdata = c(cor(mat_env6\$value, mat_full\$mat_eff_sim6_1)) ), file=\''.$sim_effects_corr_results.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot = system($cmd_spatialfirst_plot);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_originaleffheatmap_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
                     open(my $fh_corr_result, '<', $sim_effects_corr_results) or die "Could not open file '$sim_effects_corr_results' $!";
-                        print STDERR "Opened $sim_effects_corr_results\n";
+                        $logger->debug("Opened $sim_effects_corr_results");
 
                         my $header = <$fh_corr_result>;
                         my @header;
@@ -2796,7 +2798,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_env1.'\', arrangeGrob(gg_env, gg_p_sim, gg_eff_sim, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_env1;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_env1));
                     my $status_spatialenvsim_plot_env1 = system($cmd_spatialenvsim_plot_env1);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_env1, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env1effheatmap_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -2827,7 +2829,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_env2.'\', arrangeGrob(gg_env2, gg_p_sim2, gg_eff_sim2, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_env2;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_env2));
                     my $status_spatialenvsim_plot_env2 = system($cmd_spatialenvsim_plot_env2);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_env2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env2effheatmap_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -2858,7 +2860,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_env3.'\', arrangeGrob(gg_env3, gg_p_sim3, gg_eff_sim3, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_env3;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_env3));
                     my $status_spatialenvsim_plot_env3 = system($cmd_spatialenvsim_plot_env3);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_env3, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env3effheatmap_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -2889,7 +2891,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_env4.'\', arrangeGrob(gg_env4, gg_p_sim4, gg_eff_sim4, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_env4;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_env4));
                     my $status_spatialenvsim_plot_env4 = system($cmd_spatialenvsim_plot_env4);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_env4, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env4effheatmap_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -2920,7 +2922,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_env5.'\', arrangeGrob(gg_env5, gg_p_sim5, gg_eff_sim5, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_env5;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_env5));
                     my $status_spatialenvsim_plot_env5 = system($cmd_spatialenvsim_plot_env5);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_env5, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env5effheatmap_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -2951,7 +2953,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_env6.'\', arrangeGrob(gg_env6, gg_p_sim6, gg_eff_sim6, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_env6;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_env6));
                     my $status_spatialenvsim_plot_env6 = system($cmd_spatialenvsim_plot_env6);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_env6, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env6effheatmap_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
                 };
@@ -3170,7 +3172,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_plot .= 'ggsave(\''.$genetic_effects_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_plot;
+                    $logger->error(Dumper($cmd_gen_plot));
                     my $status_gen_plot = system($cmd_gen_plot);
                     push @$spatial_effects_plots, [$genetic_effects_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_efforigline_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -3192,7 +3194,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_alt_plot .= 'ggsave(\''.$genetic_effects_alt_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_alt_plot;
+                    $logger->error(Dumper($cmd_gen_alt_plot));
                     my $status_gen_alt_plot = system($cmd_gen_alt_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltline_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -3214,7 +3216,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env1_plot .= 'ggsave(\''.$genetic_effects_alt_env1_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env1_plot;
+                    $logger->error(Dumper($cmd_gen_env1_plot));
                     my $status_gen_env1_plot = system($cmd_gen_env1_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env1_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv1line_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -3236,7 +3238,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env2_plot .= 'ggsave(\''.$genetic_effects_alt_env2_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env2_plot;
+                    $logger->error(Dumper($cmd_gen_env2_plot));
                     my $status_gen_env2_plot = system($cmd_gen_env2_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env2_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv2line_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -3258,7 +3260,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env3_plot .= 'ggsave(\''.$genetic_effects_alt_env3_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env3_plot;
+                    $logger->error(Dumper($cmd_gen_env3_plot));
                     my $status_gen_env3_plot = system($cmd_gen_env3_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env3_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv3line_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -3280,7 +3282,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env4_plot .= 'ggsave(\''.$genetic_effects_alt_env4_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env4_plot;
+                    $logger->error(Dumper($cmd_gen_env4_plot));
                     my $status_gen_env4_plot = system($cmd_gen_env4_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env4_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv4line_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -3302,7 +3304,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env5_plot .= 'ggsave(\''.$genetic_effects_alt_env5_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env5_plot;
+                    $logger->error(Dumper($cmd_gen_env5_plot));
                     my $status_gen_env5_plot = system($cmd_gen_env5_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env5_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv5line_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
 
@@ -3324,7 +3326,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env6_plot .= 'ggsave(\''.$genetic_effects_alt_env6_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env6_plot;
+                    $logger->error(Dumper($cmd_gen_env6_plot));
                     my $status_gen_env6_plot = system($cmd_gen_env6_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env6_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv6line_"."envvar_".$env_variance_percent."_".$permanent_environment_structure."_".$iterations];
                 };
@@ -3420,7 +3422,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
             if ($statistics_select_original eq 'sommer_grm_spatial_genetic_blups' || $statistics_select_original eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
                 $statistics_select = $statistics_select_original eq 'sommer_grm_spatial_genetic_blups' ? 'sommer_grm_spatial_genetic_blups' : 'sommer_grm_spatial_pure_2dspl_genetic_blups';
 
-                print STDERR "PREPARE ORIGINAL PHENOTYPE FILES 2\n";
+                $logger->debug("PREPARE ORIGINAL PHENOTYPE FILES 2");
                 eval {
                     my $phenotypes_search_2 = CXGN::Phenotypes::SearchFactory->instantiate(
                         'MaterializedViewTable',
@@ -3556,7 +3558,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             if (defined($phenotype_data_original_2{$p}->{$t})) {
                                 push @row, $phenotype_data_original_2{$p}->{$t};
                             } else {
-                                print STDERR $p." : $t : $germplasm_name : NA \n";
+                                $logger->debug($p." : $t : $germplasm_name : NA ");
                                 push @row, 'NA';
                             }
                         }
@@ -3593,7 +3595,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         }
                     close($F);
 
-                    print STDERR Dumper [$phenotype_min_original_2, $phenotype_max_original_2];
+                    $logger->error(Dumper([$phenotype_min_original_2, $phenotype_max_original_2]));
                 };
 
                 @seen_rows_array = keys %seen_rows;
@@ -3607,7 +3609,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 $mean_col = $col_stat->mean();
                 $sig_col = $col_stat->variance();
 
-                print STDERR "PREPARE RELATIONSHIP MATRIX\n";
+                $logger->debug("PREPARE RELATIONSHIP MATRIX");
                 eval {
                     my %seen_accession_stock_ids;
                     foreach my $trial_id (@$field_trial_id_list) {
@@ -3651,7 +3653,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -3680,7 +3682,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -3709,7 +3711,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -3740,13 +3742,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -3762,7 +3764,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -3796,14 +3798,14 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile)
                                 or die "Could not open file '$grm_out_tempfile' $!";
 
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -3887,7 +3889,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -3916,7 +3918,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -3945,7 +3947,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -3970,13 +3972,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -3992,7 +3994,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -4026,14 +4028,14 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile)
                                 or die "Could not open file '$grm_out_tempfile' $!";
 
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -4308,7 +4310,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             range01 <- function(x){(x-min(x))/(max(x)-min(x))};
                             cor_mat <- range01(cor_mat);
                             write.table(cor_mat, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         elsif ($compute_relationship_matrix_from_htp_phenotypes_type eq 'blues') {
@@ -4336,7 +4338,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             rownames(rel) <- blues[,2];
                             colnames(rel) <- blues[,2];
                             write.table(rel, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         else {
@@ -4347,7 +4349,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         open(my $htp_rel_res, '<', $stats_out_htp_rel_tempfile)
                             or die "Could not open file '$stats_out_htp_rel_tempfile' $!";
 
-                            print STDERR "Opened $stats_out_htp_rel_tempfile\n";
+                            $logger->debug("Opened $stats_out_htp_rel_tempfile");
                             my $header_row = <$htp_rel_res>;
                             my @header;
                             if ($csv->parse($header_row)) {
@@ -4464,7 +4466,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 ) = @$result_2;
 
                 eval {
-                    print STDERR "PLOTTING CORRELATION\n";
+                    $logger->debug("PLOTTING CORRELATION");
                     my ($full_plot_level_correlation_tempfile_fh, $full_plot_level_correlation_tempfile) = tempfile("drone_stats_XXXXX", DIR=> $tmp_stats_dir);
                     open(my $F_fullplot, ">", $full_plot_level_correlation_tempfile) || die "Can't open file ".$full_plot_level_correlation_tempfile;
 
@@ -4538,7 +4540,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat_orig[,-seq(1,8)], hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE);
                     ggsave(\''.$plot_corr_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, limitsize = FALSE, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_plotcorr_plot = system($cmd_plotcorr_plot);
                     push @$spatial_effects_plots, [$plot_corr_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$iterations];
                     push @$spatial_effects_files_store, [$full_plot_level_correlation_tempfile, "datafile_".$statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$iterations];
@@ -4989,7 +4991,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat, hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE, label_round = 2);
                     ggsave(\''.$plot_corr_summary_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_plotcorrsum_plot;
+                    # $logger->error(Dumper($cmd_plotcorrsum_plot));
                     my $status_plotcorrsum_plot = system($cmd_plotcorrsum_plot);
                     push @$spatial_effects_plots, [$plot_corr_summary_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_envsimscorr_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5021,7 +5023,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_first_figure_tempfile_2.'\', gg, device=\'png\', width=20, height=20, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot_2 = system($cmd_spatialfirst_plot_2);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string_2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_origheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5056,12 +5058,12 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     ggsave(\''.$env_effects_first_figure_tempfile.'\', arrangeGrob(gg_eff_2, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     write.table(data.frame(env_linear = c(cor(mat_env\$value, mat_full\$mat_eff_sim1_2)), env_1DN = c(cor(mat_env2\$value, mat_full\$mat_eff_sim2_2)), env_2DN = c(cor(mat_env3\$value, mat_full\$mat_eff_sim3_2)), env_random = c(cor(mat_env4\$value, mat_full\$mat_eff_sim4_2)), env_ar1xar1 = c(cor(mat_env5\$value, mat_full\$mat_eff_sim5_2)), env_realdata = c(cor(mat_env6\$value, mat_full\$mat_eff_sim6_2)) ), file=\''.$sim_effects_corr_results.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot = system($cmd_spatialfirst_plot);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_originaleffheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
                     open(my $fh_corr_result, '<', $sim_effects_corr_results) or die "Could not open file '$sim_effects_corr_results' $!";
-                        print STDERR "Opened $sim_effects_corr_results\n";
+                        $logger->debug("Opened $sim_effects_corr_results");
 
                         my $header = <$fh_corr_result>;
                         my @header;
@@ -5109,7 +5111,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_2_env1.'\', arrangeGrob(gg_env, gg_p_sim, gg_eff_sim, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_2_env1;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_2_env1));
                     my $status_spatialenvsim_plot_2_env1 = system($cmd_spatialenvsim_plot_2_env1);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_2_env1, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env1effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5140,7 +5142,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_2_env2.'\', arrangeGrob(gg_env2, gg_p_sim2, gg_eff_sim2, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_2_env2;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_2_env2));
                     my $status_spatialenvsim_plot_2_env2 = system($cmd_spatialenvsim_plot_2_env2);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_2_env2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env2effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5171,7 +5173,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_2_env3.'\', arrangeGrob(gg_env3, gg_p_sim3, gg_eff_sim3, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_2_env3;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_2_env3));
                     my $status_spatialenvsim_plot_2_env3 = system($cmd_spatialenvsim_plot_2_env3);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_2_env3, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env3effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5202,7 +5204,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_2_env4.'\', arrangeGrob(gg_env4, gg_p_sim4, gg_eff_sim4, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_2_env4;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_2_env4));
                     my $status_spatialenvsim_plot_2_env4 = system($cmd_spatialenvsim_plot_2_env4);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_2_env4, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env4effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5233,7 +5235,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_2_env5.'\', arrangeGrob(gg_env5, gg_p_sim5, gg_eff_sim5, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_2_env5;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_2_env5));
                     my $status_spatialenvsim_plot_2_env5 = system($cmd_spatialenvsim_plot_2_env5);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_2_env5, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env5effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5264,7 +5266,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_2_env6.'\', arrangeGrob(gg_env6, gg_p_sim6, gg_eff_sim6, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_2_env6;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_2_env6));
                     my $status_spatialenvsim_plot_2_env6 = system($cmd_spatialenvsim_plot_2_env6);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_2_env6, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env6effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
                 };
@@ -5482,7 +5484,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_plot .= 'ggsave(\''.$genetic_effects_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_plot;
+                    $logger->error(Dumper($cmd_gen_plot));
                     my $status_gen_plot = system($cmd_gen_plot);
                     push @$spatial_effects_plots, [$genetic_effects_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_efforigline_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5504,7 +5506,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_alt_plot .= 'ggsave(\''.$genetic_effects_alt_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_alt_plot;
+                    $logger->error(Dumper($cmd_gen_alt_plot));
                     my $status_gen_alt_plot = system($cmd_gen_alt_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltline_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5526,7 +5528,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env1_plot .= 'ggsave(\''.$genetic_effects_alt_env1_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env1_plot;
+                    $logger->error(Dumper($cmd_gen_env1_plot));
                     my $status_gen_env1_plot = system($cmd_gen_env1_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env1_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv1line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5548,7 +5550,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env2_plot .= 'ggsave(\''.$genetic_effects_alt_env2_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env2_plot;
+                    $logger->error(Dumper($cmd_gen_env2_plot));
                     my $status_gen_env2_plot = system($cmd_gen_env2_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env2_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv2line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5570,7 +5572,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env3_plot .= 'ggsave(\''.$genetic_effects_alt_env3_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env3_plot;
+                    $logger->error(Dumper($cmd_gen_env3_plot));
                     my $status_gen_env3_plot = system($cmd_gen_env3_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env3_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv3line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5592,7 +5594,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env4_plot .= 'ggsave(\''.$genetic_effects_alt_env4_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env4_plot;
+                    $logger->error(Dumper($cmd_gen_env4_plot));
                     my $status_gen_env4_plot = system($cmd_gen_env4_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env4_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv4line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5614,7 +5616,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env5_plot .= 'ggsave(\''.$genetic_effects_alt_env5_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env5_plot;
+                    $logger->error(Dumper($cmd_gen_env5_plot));
                     my $status_gen_env5_plot = system($cmd_gen_env5_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env5_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv5line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -5636,7 +5638,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env6_plot .= 'ggsave(\''.$genetic_effects_alt_env6_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env6_plot;
+                    $logger->error(Dumper($cmd_gen_env6_plot));
                     my $status_gen_env6_plot = system($cmd_gen_env6_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env6_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv6line_"."envvar_".$env_variance_percent."_".$iterations];
                 };
@@ -5695,7 +5697,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
             if ($statistics_select_original eq 'sommer_grm_univariate_spatial_genetic_blups' || $statistics_select_original eq 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups') {
                 $statistics_select = $statistics_select_original eq 'sommer_grm_univariate_spatial_genetic_blups' ? 'sommer_grm_univariate_spatial_genetic_blups' : 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups';
 
-                print STDERR "PREPARE ORIGINAL PHENOTYPE FILES 2\n";
+                $logger->debug("PREPARE ORIGINAL PHENOTYPE FILES 2");
                 eval {
                     my $phenotypes_search_2 = CXGN::Phenotypes::SearchFactory->instantiate(
                         'MaterializedViewTable',
@@ -5831,7 +5833,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             if (defined($phenotype_data_original_2{$p}->{$t})) {
                                 push @row, $phenotype_data_original_2{$p}->{$t};
                             } else {
-                                print STDERR $p." : $t : $germplasm_name : NA \n";
+                                $logger->debug($p." : $t : $germplasm_name : NA ");
                                 push @row, 'NA';
                             }
                         }
@@ -5868,7 +5870,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         }
                     close($F);
 
-                    print STDERR Dumper [$phenotype_min_original_2, $phenotype_max_original_2];
+                    $logger->error(Dumper([$phenotype_min_original_2, $phenotype_max_original_2]));
                 };
 
                 @seen_rows_array = keys %seen_rows;
@@ -5882,7 +5884,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 $mean_col = $col_stat->mean();
                 $sig_col = $col_stat->variance();
 
-                print STDERR "PREPARE RELATIONSHIP MATRIX\n";
+                $logger->debug("PREPARE RELATIONSHIP MATRIX");
                 eval {
                     my %seen_accession_stock_ids;
                     foreach my $trial_id (@$field_trial_id_list) {
@@ -5926,7 +5928,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -5955,7 +5957,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -5984,7 +5986,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -6015,13 +6017,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -6037,7 +6039,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -6071,14 +6073,14 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile)
                                 or die "Could not open file '$grm_out_tempfile' $!";
 
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -6162,7 +6164,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -6191,7 +6193,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -6220,7 +6222,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -6245,13 +6247,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -6267,7 +6269,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -6301,14 +6303,14 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile)
                                 or die "Could not open file '$grm_out_tempfile' $!";
 
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -6583,7 +6585,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             range01 <- function(x){(x-min(x))/(max(x)-min(x))};
                             cor_mat <- range01(cor_mat);
                             write.table(cor_mat, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         elsif ($compute_relationship_matrix_from_htp_phenotypes_type eq 'blues') {
@@ -6611,7 +6613,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             rownames(rel) <- blues[,2];
                             colnames(rel) <- blues[,2];
                             write.table(rel, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         else {
@@ -6622,7 +6624,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         open(my $htp_rel_res, '<', $stats_out_htp_rel_tempfile)
                             or die "Could not open file '$stats_out_htp_rel_tempfile' $!";
 
-                            print STDERR "Opened $stats_out_htp_rel_tempfile\n";
+                            $logger->debug("Opened $stats_out_htp_rel_tempfile");
                             my $header_row = <$htp_rel_res>;
                             my @header;
                             if ($csv->parse($header_row)) {
@@ -6739,10 +6741,10 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 ) = @$result_3;
 
                 eval {
-                    print STDERR "PLOTTING CORRELATION\n";
+                    $logger->debug("PLOTTING CORRELATION");
                     my ($full_plot_level_correlation_tempfile_fh, $full_plot_level_correlation_tempfile) = tempfile("drone_stats_XXXXX", DIR=> $tmp_stats_dir);
                     open(my $F_fullplot, ">", $full_plot_level_correlation_tempfile) || die "Can't open file ".$full_plot_level_correlation_tempfile;
-                        print STDERR "OPENED PLOTCORR FILE $full_plot_level_correlation_tempfile\n";
+                        $logger->debug("OPENED PLOTCORR FILE $full_plot_level_correlation_tempfile");
 
                         my @header_full_plot_corr = ('plot_name, plot_id, row_number, col_number, rep, block, germplasm_name, germplasm_id');
                         my @types_full_plot_corr = ('pheno_orig_', 'pheno_postm3_', 'eff_origm3_', 'eff_postm3_',
@@ -6814,7 +6816,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat_orig[,-seq(1,8)], hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE);
                     ggsave(\''.$plot_corr_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, limitsize = FALSE, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_plotcorr_plot = system($cmd_plotcorr_plot);
                     push @$spatial_effects_plots, [$plot_corr_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$iterations];
                     push @$spatial_effects_files_store, [$full_plot_level_correlation_tempfile, "datafile_".$statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$iterations];
@@ -7265,7 +7267,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat, hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE, label_round = 2);
                     ggsave(\''.$plot_corr_summary_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_plotcorrsum_plot;
+                    # $logger->error(Dumper($cmd_plotcorrsum_plot));
 
                     my $status_plotcorrsum_plot = system($cmd_plotcorrsum_plot);
                     push @$spatial_effects_plots, [$plot_corr_summary_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_envsimscorr_"."envvar_".$env_variance_percent."_".$iterations];
@@ -7298,7 +7300,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_first_figure_tempfile_2.'\', gg, device=\'png\', width=20, height=20, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot_2 = system($cmd_spatialfirst_plot_2);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string_2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_origheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7333,12 +7335,12 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     ggsave(\''.$env_effects_first_figure_tempfile.'\', arrangeGrob(gg_eff_3, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     write.table(data.frame(env_linear = c(cor(mat_env\$value, mat_full\$mat_eff_sim1_3)), env_1DN = c(cor(mat_env2\$value, mat_full\$mat_eff_sim2_3)), env_2DN = c(cor(mat_env3\$value, mat_full\$mat_eff_sim3_3)), env_random = c(cor(mat_env4\$value, mat_full\$mat_eff_sim4_3)), env_ar1xar1 = c(cor(mat_env5\$value, mat_full\$mat_eff_sim5_3)), env_realdata = c(cor(mat_env6\$value, mat_full\$mat_eff_sim6_3)) ), file=\''.$sim_effects_corr_results.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot = system($cmd_spatialfirst_plot);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_originaleffheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
                     open(my $fh_corr_result, '<', $sim_effects_corr_results) or die "Could not open file '$sim_effects_corr_results' $!";
-                        print STDERR "Opened $sim_effects_corr_results\n";
+                        $logger->debug("Opened $sim_effects_corr_results");
 
                         my $header = <$fh_corr_result>;
                         my @header;
@@ -7386,7 +7388,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_3_env1.'\', arrangeGrob(gg_env, gg_p_sim, gg_eff_sim, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_3_env1;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_3_env1));
                     my $status_spatialenvsim_plot_3_env1 = system($cmd_spatialenvsim_plot_3_env1);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_3_env1, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env1effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7417,7 +7419,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_3_env2.'\', arrangeGrob(gg_env2, gg_p_sim2, gg_eff_sim2, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_3_env2;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_3_env2));
                     my $status_spatialenvsim_plot_3_env2 = system($cmd_spatialenvsim_plot_3_env2);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_3_env2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env2effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7448,7 +7450,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_3_env3.'\', arrangeGrob(gg_env3, gg_p_sim3, gg_eff_sim3, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_3_env3;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_3_env3));
                     my $status_spatialenvsim_plot_3_env3 = system($cmd_spatialenvsim_plot_3_env3);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_3_env3, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env3effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7479,7 +7481,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_3_env4.'\', arrangeGrob(gg_env4, gg_p_sim4, gg_eff_sim4, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_3_env4;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_3_env4));
                     my $status_spatialenvsim_plot_3_env4 = system($cmd_spatialenvsim_plot_3_env4);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_3_env4, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env4effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7510,7 +7512,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_3_env5.'\', arrangeGrob(gg_env5, gg_p_sim5, gg_eff_sim5, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_3_env5;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_3_env5));
                     my $status_spatialenvsim_plot_3_env5 = system($cmd_spatialenvsim_plot_3_env5);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_3_env5, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env5effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7541,7 +7543,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_2).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_3_env6.'\', arrangeGrob(gg_env6, gg_p_sim6, gg_eff_sim6, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_3_env6;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_3_env6));
                     my $status_spatialenvsim_plot_3_env6 = system($cmd_spatialenvsim_plot_3_env6);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_3_env6, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env6effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
                 };
@@ -7759,7 +7761,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_plot .= 'ggsave(\''.$genetic_effects_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_plot;
+                    $logger->error(Dumper($cmd_gen_plot));
                     my $status_gen_plot = system($cmd_gen_plot);
                     push @$spatial_effects_plots, [$genetic_effects_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_efforigline_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7781,7 +7783,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_alt_plot .= 'ggsave(\''.$genetic_effects_alt_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_alt_plot;
+                    $logger->error(Dumper($cmd_gen_alt_plot));
                     my $status_gen_alt_plot = system($cmd_gen_alt_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltline_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7803,7 +7805,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env1_plot .= 'ggsave(\''.$genetic_effects_alt_env1_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env1_plot;
+                    $logger->error(Dumper($cmd_gen_env1_plot));
                     my $status_gen_env1_plot = system($cmd_gen_env1_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env1_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv1line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7825,7 +7827,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env2_plot .= 'ggsave(\''.$genetic_effects_alt_env2_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env2_plot;
+                    $logger->error(Dumper($cmd_gen_env2_plot));
                     my $status_gen_env2_plot = system($cmd_gen_env2_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env2_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv2line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7847,7 +7849,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env3_plot .= 'ggsave(\''.$genetic_effects_alt_env3_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env3_plot;
+                    $logger->error(Dumper($cmd_gen_env3_plot));
                     my $status_gen_env3_plot = system($cmd_gen_env3_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env3_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv3line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7869,7 +7871,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env4_plot .= 'ggsave(\''.$genetic_effects_alt_env4_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env4_plot;
+                    $logger->error(Dumper($cmd_gen_env4_plot));
                     my $status_gen_env4_plot = system($cmd_gen_env4_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env4_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv4line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7891,7 +7893,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env5_plot .= 'ggsave(\''.$genetic_effects_alt_env5_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env5_plot;
+                    $logger->error(Dumper($cmd_gen_env5_plot));
                     my $status_gen_env5_plot = system($cmd_gen_env5_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env5_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv5line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -7913,7 +7915,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env6_plot .= 'ggsave(\''.$genetic_effects_alt_env6_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env6_plot;
+                    $logger->error(Dumper($cmd_gen_env6_plot));
                     my $status_gen_env6_plot = system($cmd_gen_env6_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env6_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv6line_"."envvar_".$env_variance_percent."_".$iterations];
                 };
@@ -7983,7 +7985,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
             if ($statistics_select_original eq 'asreml_grm_univariate_spatial_genetic_blups' || $statistics_select_original eq 'asreml_grm_univariate_pure_spatial_genetic_blups') {
                 $statistics_select = $statistics_select_original;
 
-                print STDERR "PREPARE ORIGINAL PHENOTYPE FILES 5\n";
+                $logger->debug("PREPARE ORIGINAL PHENOTYPE FILES 5");
                 eval {
                     my $phenotypes_search_5 = CXGN::Phenotypes::SearchFactory->instantiate(
                         'MaterializedViewTable',
@@ -8098,7 +8100,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
 
                     @unique_accession_names = sort keys %unique_accessions;
                     @sorted_trait_names_5 = sort {$a <=> $b} keys %seen_times_5;
-                    # print STDERR Dumper \@sorted_trait_names_5;
+                    # $logger->error(Dumper(\@sorted_trait_names_5));
 
                     my $trait_name_encoded_5 = 1;
                     foreach my $trait_name (@sorted_trait_names_5) {
@@ -8118,7 +8120,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             $time_max_5 = $_;
                         }
                     }
-                    print STDERR Dumper [$time_min_5, $time_max_5];
+                    $logger->error(Dumper([$time_min_5, $time_max_5]));
 
                     while ( my ($trait_name, $time_term) = each %seen_trait_names_5) {
                         push @{$trait_composing_info_5{$trait_name}}, $time_term;
@@ -8148,7 +8150,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     my $status_factor = system($cmd_factor);
 
                     open(my $fh_factor, '<', $stats_prep_factor_tempfile) or die "Could not open file '$stats_prep_factor_tempfile' $!";
-                        print STDERR "Opened $stats_prep_factor_tempfile\n";
+                        $logger->debug("Opened $stats_prep_factor_tempfile");
                         my $header_d = <$fh_factor>;
 
                         my $line_factor_count = 0;
@@ -8208,7 +8210,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             if (defined($phenotype_data_original_5{$p}->{$t})) {
                                 push @row, $phenotype_data_original_5{$p}->{$t} + 0;
                             } else {
-                                print STDERR $p." : $t : $germplasm_name : NA \n";
+                                $logger->debug($p." : $t : $germplasm_name : NA ");
                                 push @row, '';
                             }
 
@@ -8243,7 +8245,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 $mean_col = $col_stat->mean();
                 $sig_col = $col_stat->variance();
 
-                print STDERR "PREPARE RELATIONSHIP MATRIX\n";
+                $logger->debug("PREPARE RELATIONSHIP MATRIX");
                 eval {
                     my %seen_accession_stock_ids;
                     foreach my $trial_id (@$field_trial_id_list) {
@@ -8287,7 +8289,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -8316,7 +8318,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -8345,7 +8347,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -8376,13 +8378,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -8398,7 +8400,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -8437,14 +8439,14 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile)
                                 or die "Could not open file '$grm_out_tempfile' $!";
 
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -8528,7 +8530,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -8557,7 +8559,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -8586,7 +8588,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -8611,13 +8613,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -8633,7 +8635,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -8672,14 +8674,14 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile)
                                 or die "Could not open file '$grm_out_tempfile' $!";
 
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -8961,7 +8963,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 ';
                             }
                             $htp_cmd .= 'write.table(cor_mat, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         elsif ($compute_relationship_matrix_from_htp_phenotypes_type eq 'blues') {
@@ -8994,7 +8996,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             $htp_cmd .= 'rownames(rel) <- blues[,2];
                             colnames(rel) <- blues[,2];
                             write.table(rel, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         else {
@@ -9003,7 +9005,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         }
 
                         open(my $htp_rel_res, '<', $stats_out_htp_rel_tempfile) or die "Could not open file '$stats_out_htp_rel_tempfile' $!";
-                            print STDERR "Opened $stats_out_htp_rel_tempfile\n";
+                            $logger->debug("Opened $stats_out_htp_rel_tempfile");
                             my $header_row = <$htp_rel_res>;
                             my @header;
                             if ($csv->parse($header_row)) {
@@ -9120,10 +9122,10 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 ) = @$result_5;
 
                 eval {
-                    print STDERR "PLOTTING CORRELATION\n";
+                    $logger->debug("PLOTTING CORRELATION");
                     my ($full_plot_level_correlation_tempfile_fh, $full_plot_level_correlation_tempfile) = tempfile("drone_stats_XXXXX", DIR=> $tmp_stats_dir);
                     open(my $F_fullplot, ">", $full_plot_level_correlation_tempfile) || die "Can't open file ".$full_plot_level_correlation_tempfile;
-                        print STDERR "OPENED PLOTCORR FILE $full_plot_level_correlation_tempfile\n";
+                        $logger->debug("OPENED PLOTCORR FILE $full_plot_level_correlation_tempfile");
 
                         my @header_full_plot_corr = ('plot_name, plot_id, row_number, col_number, rep, block, germplasm_name, germplasm_id');
                         my @types_full_plot_corr = ('pheno_orig_', 'pheno_postm5_', 'eff_origm5_', 'eff_postm5_',
@@ -9193,7 +9195,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat_orig[,-seq(1,8)], hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE);
                     ggsave(\''.$plot_corr_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, limitsize = FALSE, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_plotcorr_plot = system($cmd_plotcorr_plot);
                     push @$spatial_effects_plots, [$plot_corr_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$iterations];
                     push @$spatial_effects_files_store, [$full_plot_level_correlation_tempfile, "datafile_".$statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$iterations];
@@ -9644,7 +9646,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat, hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE, label_round = 2);
                     ggsave(\''.$plot_corr_summary_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_plotcorrsum_plot;
+                    # $logger->error(Dumper($cmd_plotcorrsum_plot));
 
                     my $status_plotcorrsum_plot = system($cmd_plotcorrsum_plot);
                     push @$spatial_effects_plots, [$plot_corr_summary_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_envsimscorr_"."envvar_".$env_variance_percent."_".$iterations];
@@ -9677,7 +9679,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_5).');
                     ggsave(\''.$env_effects_first_figure_tempfile_2.'\', gg, device=\'png\', width=20, height=20, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot_2 = system($cmd_spatialfirst_plot_2);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string_2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_origheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -9712,12 +9714,12 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     ggsave(\''.$env_effects_first_figure_tempfile.'\', arrangeGrob(gg_eff_5, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     write.table(data.frame(asreml_grm_univariate_spatial_genetic_blups_env_linear = c(cor(mat_env\$value, mat_full\$mat_eff_sim1_5)), asreml_grm_univariate_spatial_genetic_blups_env_1DN = c(cor(mat_env2\$value, mat_full\$mat_eff_sim2_5)), asreml_grm_univariate_spatial_genetic_blups_env_2DN = c(cor(mat_env3\$value, mat_full\$mat_eff_sim3_5)), asreml_grm_univariate_spatial_genetic_blups_env_random = c(cor(mat_env4\$value, mat_full\$mat_eff_sim4_5)), asreml_grm_univariate_spatial_genetic_blups_env_ar1xar1 = c(cor(mat_env5\$value, mat_full\$mat_eff_sim5_5)), asreml_grm_univariate_spatial_genetic_blups_env_realdata = c(cor(mat_env6\$value, mat_full\$mat_eff_sim6_5)) ), file=\''.$sim_effects_corr_results.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot = system($cmd_spatialfirst_plot);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_originaleffheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
                     open(my $fh_corr_result, '<', $sim_effects_corr_results) or die "Could not open file '$sim_effects_corr_results' $!";
-                        print STDERR "Opened $sim_effects_corr_results\n";
+                        $logger->debug("Opened $sim_effects_corr_results");
 
                         my $header = <$fh_corr_result>;
                         my @header;
@@ -9765,7 +9767,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_5).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_5_env1.'\', arrangeGrob(gg_env, gg_p_sim, gg_eff_sim, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_5_env1;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_5_env1));
                     my $status_spatialenvsim_plot_5_env1 = system($cmd_spatialenvsim_plot_5_env1);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_5_env1, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env1effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -9796,7 +9798,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_5).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_5_env2.'\', arrangeGrob(gg_env2, gg_p_sim2, gg_eff_sim2, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_5_env2;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_5_env2));
                     my $status_spatialenvsim_plot_5_env2 = system($cmd_spatialenvsim_plot_5_env2);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_5_env2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env2effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -9827,7 +9829,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_5).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_5_env3.'\', arrangeGrob(gg_env3, gg_p_sim3, gg_eff_sim3, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_5_env3;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_5_env3));
                     my $status_spatialenvsim_plot_5_env3 = system($cmd_spatialenvsim_plot_5_env3);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_5_env3, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env3effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -9858,7 +9860,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_5).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_5_env4.'\', arrangeGrob(gg_env4, gg_p_sim4, gg_eff_sim4, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_5_env4;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_5_env4));
                     my $status_spatialenvsim_plot_5_env4 = system($cmd_spatialenvsim_plot_5_env4);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_5_env4, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env4effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -9889,7 +9891,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_5).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_5_env5.'\', arrangeGrob(gg_env5, gg_p_sim5, gg_eff_sim5, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_5_env5;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_5_env5));
                     my $status_spatialenvsim_plot_5_env5 = system($cmd_spatialenvsim_plot_5_env5);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_5_env5, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env5effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -9920,7 +9922,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_5).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_5_env6.'\', arrangeGrob(gg_env6, gg_p_sim6, gg_eff_sim6, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_5_env6;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_5_env6));
                     my $status_spatialenvsim_plot_5_env6 = system($cmd_spatialenvsim_plot_5_env6);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_5_env6, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env6effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
                 };
@@ -10138,7 +10140,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_plot .= 'ggsave(\''.$genetic_effects_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_plot;
+                    $logger->error(Dumper($cmd_gen_plot));
                     my $status_gen_plot = system($cmd_gen_plot);
                     push @$spatial_effects_plots, [$genetic_effects_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_efforigline_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -10160,7 +10162,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_alt_plot .= 'ggsave(\''.$genetic_effects_alt_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_alt_plot;
+                    $logger->error(Dumper($cmd_gen_alt_plot));
                     my $status_gen_alt_plot = system($cmd_gen_alt_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltline_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -10182,7 +10184,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env1_plot .= 'ggsave(\''.$genetic_effects_alt_env1_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env1_plot;
+                    $logger->error(Dumper($cmd_gen_env1_plot));
                     my $status_gen_env1_plot = system($cmd_gen_env1_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env1_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv1line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -10204,7 +10206,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env2_plot .= 'ggsave(\''.$genetic_effects_alt_env2_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env2_plot;
+                    $logger->error(Dumper($cmd_gen_env2_plot));
                     my $status_gen_env2_plot = system($cmd_gen_env2_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env2_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv2line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -10226,7 +10228,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env3_plot .= 'ggsave(\''.$genetic_effects_alt_env3_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env3_plot;
+                    $logger->error(Dumper($cmd_gen_env3_plot));
                     my $status_gen_env3_plot = system($cmd_gen_env3_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env3_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv3line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -10248,7 +10250,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env4_plot .= 'ggsave(\''.$genetic_effects_alt_env4_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env4_plot;
+                    $logger->error(Dumper($cmd_gen_env4_plot));
                     my $status_gen_env4_plot = system($cmd_gen_env4_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env4_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv4line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -10270,7 +10272,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env5_plot .= 'ggsave(\''.$genetic_effects_alt_env5_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env5_plot;
+                    $logger->error(Dumper($cmd_gen_env5_plot));
                     my $status_gen_env5_plot = system($cmd_gen_env5_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env5_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv5line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -10292,7 +10294,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env6_plot .= 'ggsave(\''.$genetic_effects_alt_env6_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env6_plot;
+                    $logger->error(Dumper($cmd_gen_env6_plot));
                     my $status_gen_env6_plot = system($cmd_gen_env6_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env6_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv6line_"."envvar_".$env_variance_percent."_".$iterations];
                 };
@@ -10359,7 +10361,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
             if ($statistics_select_original eq 'asreml_grm_multivariate_spatial_genetic_blups') {
                 $statistics_select = 'asreml_grm_multivariate_spatial_genetic_blups';
 
-                print STDERR "PREPARE ORIGINAL PHENOTYPE FILES 6\n";
+                $logger->debug("PREPARE ORIGINAL PHENOTYPE FILES 6");
                 eval {
                     my $phenotypes_search_6 = CXGN::Phenotypes::SearchFactory->instantiate(
                         'MaterializedViewTable',
@@ -10474,7 +10476,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
 
                     @unique_accession_names = sort keys %unique_accessions;
                     @sorted_trait_names_6 = sort {$a <=> $b} keys %seen_times_6;
-                    # print STDERR Dumper \@sorted_trait_names_6;
+                    # $logger->error(Dumper(\@sorted_trait_names_6));
 
                     my $trait_name_encoded_6 = 1;
                     foreach my $trait_name (@sorted_trait_names_6) {
@@ -10494,7 +10496,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             $time_max_6 = $_;
                         }
                     }
-                    print STDERR Dumper [$time_min_6, $time_max_6];
+                    $logger->error(Dumper([$time_min_6, $time_max_6]));
 
                     while ( my ($trait_name, $time_term) = each %seen_trait_names_6) {
                         push @{$trait_composing_info_6{$trait_name}}, $time_term;
@@ -10524,7 +10526,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     my $status_factor = system($cmd_factor);
 
                     open(my $fh_factor, '<', $stats_prep_factor_tempfile) or die "Could not open file '$stats_prep_factor_tempfile' $!";
-                        print STDERR "Opened $stats_prep_factor_tempfile\n";
+                        $logger->debug("Opened $stats_prep_factor_tempfile");
                         my $header_d = <$fh_factor>;
 
                         my $line_factor_count = 0;
@@ -10584,7 +10586,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             if (defined($phenotype_data_original_6{$p}->{$t})) {
                                 push @row, $phenotype_data_original_6{$p}->{$t} + 0;
                             } else {
-                                print STDERR $p." : $t : $germplasm_name : NA \n";
+                                $logger->debug($p." : $t : $germplasm_name : NA ");
                                 push @row, '';
                             }
 
@@ -10619,7 +10621,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 $mean_col = $col_stat->mean();
                 $sig_col = $col_stat->variance();
 
-                print STDERR "PREPARE RELATIONSHIP MATRIX\n";
+                $logger->debug("PREPARE RELATIONSHIP MATRIX");
                 eval {
                     my %seen_accession_stock_ids;
                     foreach my $trial_id (@$field_trial_id_list) {
@@ -10663,7 +10665,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -10692,7 +10694,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -10721,7 +10723,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -10752,13 +10754,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -10774,7 +10776,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -10813,14 +10815,14 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile)
                                 or die "Could not open file '$grm_out_tempfile' $!";
 
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -10904,7 +10906,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 $c->config->{'web_cluster_queue'},
                                 $c->config->{basepath}
                             );
-                            # print STDERR Dumper $parent_hash;
+                            # $logger->error(Dumper($parent_hash));
 
                             my $female_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -10933,7 +10935,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $female_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%female_parent_grm;
+                            # $logger->error(Dumper(\%female_parent_grm));
 
                             my $male_geno = CXGN::Genotype::GRM->new({
                                 bcs_schema=>$schema,
@@ -10962,7 +10964,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 my @l = split '\t', $_;
                                 $male_parent_grm{$l[0]}->{$l[1]} = $l[2];
                             }
-                            # print STDERR Dumper \%male_parent_grm;
+                            # $logger->error(Dumper(\%male_parent_grm));
 
                             my %rel_result_hash;
                             foreach my $a1 (@accession_ids) {
@@ -10987,13 +10989,13 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                     elsif ($a1 == $a2) {
                                         $male_rel = 1;
                                     }
-                                    # print STDERR "$a1 $a2 $female_rel $male_rel\n";
+                                    # $logger->error("$a1 $a2 $female_rel $male_rel");
 
                                     my $rel = 0.5*($female_rel + $male_rel);
                                     $rel_result_hash{$a1}->{$a2} = $rel;
                                 }
                             }
-                            # print STDERR Dumper \%rel_result_hash;
+                            # $logger->error(Dumper(\%rel_result_hash));
 
                             my $data = '';
                             my %result_hash;
@@ -11009,7 +11011,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 }
                             }
 
-                            # print STDERR Dumper $data;
+                            # $logger->error(Dumper($data));
                             open(my $F2, ">", $grm_out_temp_tempfile) || die "Can't open file ".$grm_out_temp_tempfile;
                                 print $F2 $data;
                             close($F2);
@@ -11048,14 +11050,14 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             A_threecol\$stock_id <- substring(A_threecol\$stock_id, 2);
                             A_threecol\$variable <- substring(A_threecol\$variable, 2);
                             write.table(data.frame(variable = A_threecol\$variable, stock_id = A_threecol\$stock_id, value = A_threecol\$value), file=\''.$grm_out_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-                            print STDERR $cmd."\n";
+                            $logger->debug($cmd."");
                             my $status = system($cmd);
 
                             my %rel_pos_def_result_hash;
                             open(my $F3, '<', $grm_out_tempfile)
                                 or die "Could not open file '$grm_out_tempfile' $!";
 
-                                print STDERR "Opened $grm_out_tempfile\n";
+                                $logger->debug("Opened $grm_out_tempfile");
 
                                 while (my $row = <$F3>) {
                                     my @columns;
@@ -11337,7 +11339,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                                 ';
                             }
                             $htp_cmd .= 'write.table(cor_mat, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         elsif ($compute_relationship_matrix_from_htp_phenotypes_type eq 'blues') {
@@ -11370,7 +11372,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                             $htp_cmd .= 'rownames(rel) <- blues[,2];
                             colnames(rel) <- blues[,2];
                             write.table(rel, file=\''.$stats_out_htp_rel_tempfile.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-                            print STDERR Dumper $htp_cmd;
+                            $logger->error(Dumper($htp_cmd));
                             my $status = system($htp_cmd);
                         }
                         else {
@@ -11381,7 +11383,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         open(my $htp_rel_res, '<', $stats_out_htp_rel_tempfile)
                             or die "Could not open file '$stats_out_htp_rel_tempfile' $!";
 
-                            print STDERR "Opened $stats_out_htp_rel_tempfile\n";
+                            $logger->debug("Opened $stats_out_htp_rel_tempfile");
                             my $header_row = <$htp_rel_res>;
                             my @header;
                             if ($csv->parse($header_row)) {
@@ -11498,10 +11500,10 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 ) = @$result_6;
 
                 eval {
-                    print STDERR "PLOTTING CORRELATION\n";
+                    $logger->debug("PLOTTING CORRELATION");
                     my ($full_plot_level_correlation_tempfile_fh, $full_plot_level_correlation_tempfile) = tempfile("drone_stats_XXXXX", DIR=> $tmp_stats_dir);
                     open(my $F_fullplot, ">", $full_plot_level_correlation_tempfile) || die "Can't open file ".$full_plot_level_correlation_tempfile;
-                        print STDERR "OPENED PLOTCORR FILE $full_plot_level_correlation_tempfile\n";
+                        $logger->debug("OPENED PLOTCORR FILE $full_plot_level_correlation_tempfile");
 
                         my @header_full_plot_corr = ('plot_name, plot_id, row_number, col_number, rep, block, germplasm_name, germplasm_id');
                         my @types_full_plot_corr = ('pheno_orig_', 'pheno_postm6_', 'eff_origm6_', 'eff_postm6_',
@@ -11571,7 +11573,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat_orig[,-seq(1,8)], hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE);
                     ggsave(\''.$plot_corr_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, limitsize = FALSE, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_plotcorr_plot = system($cmd_plotcorr_plot);
                     push @$spatial_effects_plots, [$plot_corr_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$iterations];
                     push @$spatial_effects_files_store, [$full_plot_level_correlation_tempfile, "datafile_".$statistics_select.$sim_env_change_over_time.$correlation_between_times."_fullcorr_"."envvar_".$env_variance_percent."_".$iterations];
@@ -12022,7 +12024,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     gg <- ggcorr(data=mat, hjust = 1, size = 2, color = \'grey50\', layout.exp = 1, label = TRUE, label_round = 2);
                     ggsave(\''.$plot_corr_summary_figure_tempfile.'\', gg, device=\'png\', width=30, height=30, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_plotcorrsum_plot;
+                    # $logger->error(Dumper($cmd_plotcorrsum_plot));
 
                     my $status_plotcorrsum_plot = system($cmd_plotcorrsum_plot);
                     push @$spatial_effects_plots, [$plot_corr_summary_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_envsimscorr_"."envvar_".$env_variance_percent."_".$iterations];
@@ -12055,7 +12057,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_6).');
                     ggsave(\''.$env_effects_first_figure_tempfile_2.'\', gg, device=\'png\', width=20, height=20, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot_2 = system($cmd_spatialfirst_plot_2);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string_2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_origheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12090,12 +12092,12 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     ggsave(\''.$env_effects_first_figure_tempfile.'\', arrangeGrob(gg_eff_6, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     write.table(data.frame(asreml_grm_univariate_spatial_genetic_blups_env_linear = c(cor(mat_env\$value, mat_full\$mat_eff_sim1_6)), asreml_grm_univariate_spatial_genetic_blups_env_1DN = c(cor(mat_env2\$value, mat_full\$mat_eff_sim2_6)), asreml_grm_univariate_spatial_genetic_blups_env_2DN = c(cor(mat_env3\$value, mat_full\$mat_eff_sim3_6)), asreml_grm_univariate_spatial_genetic_blups_env_random = c(cor(mat_env4\$value, mat_full\$mat_eff_sim4_6)), asreml_grm_univariate_spatial_genetic_blups_env_ar1xar1 = c(cor(mat_env5\$value, mat_full\$mat_eff_sim5_6)), asreml_grm_univariate_spatial_genetic_blups_env_realdata = c(cor(mat_env6\$value, mat_full\$mat_eff_sim6_6)) ), file=\''.$sim_effects_corr_results.'\', row.names=FALSE, col.names=TRUE, sep=\'\t\');
                     "';
-                    # print STDERR Dumper $cmd;
+                    # $logger->error(Dumper($cmd));
                     my $status_spatialfirst_plot = system($cmd_spatialfirst_plot);
                     push @$spatial_effects_plots, [$env_effects_first_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_originaleffheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
                     open(my $fh_corr_result, '<', $sim_effects_corr_results) or die "Could not open file '$sim_effects_corr_results' $!";
-                        print STDERR "Opened $sim_effects_corr_results\n";
+                        $logger->debug("Opened $sim_effects_corr_results");
 
                         my $header = <$fh_corr_result>;
                         my @header;
@@ -12143,7 +12145,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_6).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_6_env1.'\', arrangeGrob(gg_env, gg_p_sim, gg_eff_sim, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_6_env1;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_6_env1));
                     my $status_spatialenvsim_plot_6_env1 = system($cmd_spatialenvsim_plot_6_env1);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_6_env1, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env1effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12174,7 +12176,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_6).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_6_env2.'\', arrangeGrob(gg_env2, gg_p_sim2, gg_eff_sim2, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_6_env2;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_6_env2));
                     my $status_spatialenvsim_plot_6_env2 = system($cmd_spatialenvsim_plot_6_env2);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_6_env2, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env2effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12205,7 +12207,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_6).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_6_env3.'\', arrangeGrob(gg_env3, gg_p_sim3, gg_eff_sim3, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_6_env3;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_6_env3));
                     my $status_spatialenvsim_plot_6_env3 = system($cmd_spatialenvsim_plot_6_env3);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_6_env3, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env3effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12236,7 +12238,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_6).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_6_env4.'\', arrangeGrob(gg_env4, gg_p_sim4, gg_eff_sim4, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_6_env4;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_6_env4));
                     my $status_spatialenvsim_plot_6_env4 = system($cmd_spatialenvsim_plot_6_env4);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_6_env4, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env4effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12267,7 +12269,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_6).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_6_env5.'\', arrangeGrob(gg_env5, gg_p_sim5, gg_eff_sim5, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_6_env5;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_6_env5));
                     my $status_spatialenvsim_plot_6_env5 = system($cmd_spatialenvsim_plot_6_env5);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_6_env5, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env5effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12298,7 +12300,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         facet_wrap(~trait_type, ncol='.scalar(@sorted_trait_names_6).');
                     ggsave(\''.$env_effects_sim_figure_tempfile_6_env6.'\', arrangeGrob(gg_env6, gg_p_sim6, gg_eff_sim6, nrow=1), device=\'png\', width=25, height=25, units=\'in\');
                     "';
-                    # print STDERR Dumper $cmd_spatialenvsim_plot_6_env6;
+                    # $logger->error(Dumper($cmd_spatialenvsim_plot_6_env6));
                     my $status_spatialenvsim_plot_6_env6 = system($cmd_spatialenvsim_plot_6_env6);
                     push @$spatial_effects_plots, [$env_effects_sim_figure_tempfile_string_6_env6, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_env6effheatmap_"."envvar_".$env_variance_percent."_".$iterations];
                 };
@@ -12516,7 +12518,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_plot .= 'ggsave(\''.$genetic_effects_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_plot;
+                    $logger->error(Dumper($cmd_gen_plot));
                     my $status_gen_plot = system($cmd_gen_plot);
                     push @$spatial_effects_plots, [$genetic_effects_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_efforigline_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12538,7 +12540,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_alt_plot .= 'ggsave(\''.$genetic_effects_alt_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_alt_plot;
+                    $logger->error(Dumper($cmd_gen_alt_plot));
                     my $status_gen_alt_plot = system($cmd_gen_alt_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltline_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12560,7 +12562,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env1_plot .= 'ggsave(\''.$genetic_effects_alt_env1_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env1_plot;
+                    $logger->error(Dumper($cmd_gen_env1_plot));
                     my $status_gen_env1_plot = system($cmd_gen_env1_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env1_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv1line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12582,7 +12584,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env2_plot .= 'ggsave(\''.$genetic_effects_alt_env2_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env2_plot;
+                    $logger->error(Dumper($cmd_gen_env2_plot));
                     my $status_gen_env2_plot = system($cmd_gen_env2_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env2_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv2line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12604,7 +12606,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env3_plot .= 'ggsave(\''.$genetic_effects_alt_env3_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env3_plot;
+                    $logger->error(Dumper($cmd_gen_env3_plot));
                     my $status_gen_env3_plot = system($cmd_gen_env3_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env3_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv3line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12626,7 +12628,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env4_plot .= 'ggsave(\''.$genetic_effects_alt_env4_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env4_plot;
+                    $logger->error(Dumper($cmd_gen_env4_plot));
                     my $status_gen_env4_plot = system($cmd_gen_env4_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env4_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv4line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12648,7 +12650,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env5_plot .= 'ggsave(\''.$genetic_effects_alt_env5_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env5_plot;
+                    $logger->error(Dumper($cmd_gen_env5_plot));
                     my $status_gen_env5_plot = system($cmd_gen_env5_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env5_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv5line_"."envvar_".$env_variance_percent."_".$iterations];
 
@@ -12670,7 +12672,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                     }
                     $cmd_gen_env6_plot .= 'ggsave(\''.$genetic_effects_alt_env6_figure_tempfile.'\', sp, device=\'png\', width=12, height=6, units=\'in\');
                     "';
-                    print STDERR Dumper $cmd_gen_env6_plot;
+                    $logger->error(Dumper($cmd_gen_env6_plot));
                     my $status_gen_env6_plot = system($cmd_gen_env6_plot);
                     push @$spatial_effects_plots, [$genetic_effects_alt_env6_figure_tempfile_string, $statistics_select.$sim_env_change_over_time.$correlation_between_times."_effaltenv6line_"."envvar_".$env_variance_percent."_".$iterations];
                 };
@@ -12737,11 +12739,11 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
         $env_corr_res->{$t}->{mean} = $env_corr_res_stat->mean();
     }
 
-    # print STDERR Dumper $env_corr_res;
-    # print STDERR Dumper $env_iterations;
-    # print STDERR Dumper \%trait_name_encoder;
-    # print STDERR Dumper \%trait_to_time_map;
-    # print STDERR Dumper $env_varcomps;
+    # $logger->error(Dumper($env_corr_res));
+    # $logger->error(Dumper($env_iterations));
+    # $logger->error(Dumper(\%trait_name_encoder));
+    # $logger->error(Dumper(\%trait_to_time_map));
+    # $logger->error(Dumper($env_varcomps));
 
     my %avg_varcomps;
     my @avg_varcomps_display;
@@ -12755,7 +12757,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 }
             }
         }
-        # print STDERR Dumper \%avg_varcomps;
+        # $logger->error(Dumper(\%avg_varcomps));
 
         my %avg_varcomps_save;
         while (my($t, $type_obj) = each %avg_varcomps) {
@@ -12768,7 +12770,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                         my ($level_type, $level_times) = @level_split;
                         my @ar = split '-', $level_times;
                         my ($t1, $t2) = sort @ar;
-                        # print STDERR Dumper [$t1, $t2];
+                        # $logger->error(Dumper([$t1, $t2]));
                         $level_rec = $level_type.".".$t1."-".$t2;
                     }
                     else { #For ASREML-R Varcomp
@@ -12895,7 +12897,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
                 push @{$avg_varcomps{$type}->{$t}->{residual}->{1}->{vals}}, $res;
             }
         }
-        # print STDERR Dumper \%avg_varcomps;
+        # $logger->error(Dumper(\%avg_varcomps));
 
         my %avg_varcomps_save;
         while (my($t, $type_obj) = each %avg_varcomps) {
@@ -12925,7 +12927,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
         }
         %avg_varcomps = %avg_varcomps_save;
     }
-    # print STDERR Dumper \%avg_varcomps;
+    # $logger->error(Dumper(\%avg_varcomps));
 
     my %avg_cross_validation;
     my @avg_cross_validation_display;
@@ -12990,7 +12992,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
     foreach my $f (@$spatial_effects_plots) {
         my $auxiliary_model_file = $c->config->{basepath}.$f->[0];
         my $auxiliary_model_file_archive_type = "nicksmixedmodelsanalytics_v1_".$f->[1];
-        print STDERR "$auxiliary_model_file_archive_type : $auxiliary_model_file\n";
+        $logger->debug("$auxiliary_model_file_archive_type : $auxiliary_model_file");
 
         my $model_aux_original_name = basename($auxiliary_model_file);
 
@@ -13008,7 +13010,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
         if (!$archived_aux_filename_with_path) {
             return { error => "Could not save file $model_aux_original_name in archive." };
         }
-        print STDERR "Archived Analytics Figure File: $archived_aux_filename_with_path\n";
+        $logger->debug("Archived Analytics Figure File: $archived_aux_filename_with_path");
 
         my $md_row_aux = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
         my $file_row_aux = $metadata_schema->resultset("MdFiles")->create({
@@ -13028,7 +13030,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
     foreach my $f (@$spatial_effects_files_store) {
         my $auxiliary_model_file = $f->[0];
         my $auxiliary_model_file_archive_type = "nicksmixedmodelsanalytics_v1_".$f->[1];
-        print STDERR "$auxiliary_model_file_archive_type : $auxiliary_model_file\n";
+        $logger->debug("$auxiliary_model_file_archive_type : $auxiliary_model_file");
 
         my $model_aux_original_name = basename($auxiliary_model_file);
 
@@ -13046,7 +13048,7 @@ sub drone_imagery_calculate_analytics_POST : Args(0) {
         if (!$archived_aux_filename_with_path) {
             return { error => "Could not save file $model_aux_original_name in archive." };
         }
-        print STDERR "Archived Analytics Data File: $archived_aux_filename_with_path\n";
+        $logger->debug("Archived Analytics Data File: $archived_aux_filename_with_path");
 
         my $md_row_aux = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
         my $file_row_aux = $metadata_schema->resultset("MdFiles")->create({

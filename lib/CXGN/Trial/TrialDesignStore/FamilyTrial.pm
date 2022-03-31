@@ -5,10 +5,12 @@ use Try::Tiny;
 
 extends 'CXGN::Trial::TrialDesignStore::PhenotypingTrial';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub BUILD {   # adjust the cvterm ids for FamilyTrials, from phenotyping trials
     my $self = shift;
 
-    #print STDERR "PhenotypingTrial BUILD setting stock type id etc....\n";
+    #$logger->error("PhenotypingTrial BUILD setting stock type id etc....");
     my @source_stock_types;
     $self->set_nd_experiment_type_id(SGN::Model::Cvterm->get_cvterm_row($self->get_bcs_schema(), 'field_layout', 'experiment_type')->cvterm_id());
     $self->set_stock_type_id($self->get_plot_cvterm_id() );

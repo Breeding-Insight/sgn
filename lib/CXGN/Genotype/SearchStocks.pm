@@ -23,6 +23,8 @@ use Data::Dumper;
 use SGN::Model::Cvterm;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -85,8 +87,8 @@ sub get_selected_accessions {
 
     my $vcf_params_string = encode_json \%vcf_params;
 
-#    print STDERR "VCF PARAMS JSON=" .Dumper($vcf_params_string). "\n";
-#    print STDERR "PROTOCOL_ID=" .Dumper($protocol_id). "\n";
+#    $logger->error("VCF PARAMS JSON=" .Dumper($vcf_params_string). "");
+#    $logger->error("PROTOCOL_ID=" .Dumper($protocol_id). "");
 
     my $q = "SELECT DISTINCT stock.stock_id, stock.uniquename FROM stock JOIN nd_experiment_stock ON (stock.stock_id = nd_experiment_stock.stock_id)
         JOIN nd_experiment_protocol ON (nd_experiment_stock.nd_experiment_id = nd_experiment_protocol.nd_experiment_id) AND nd_experiment_stock.type_id = ? AND nd_experiment_protocol.nd_protocol_id =?

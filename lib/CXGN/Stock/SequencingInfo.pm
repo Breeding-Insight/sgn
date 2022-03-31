@@ -27,6 +27,8 @@ use JSON::Any;
 use Data::Dumper;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head1 ACCESSORS
 
 =head2 stock_id
@@ -107,7 +109,7 @@ sub BUILD {
     my $self = shift;
     my $args = shift;
 
-    print STDERR "Building SequencingInfo object...\n";
+    $logger->debug("Building SequencingInfo object...");
     $self->prop_table('stockprop');
     $self->prop_namespace('Stock::Stockprop');
     $self->prop_primary_key('stockprop_id');
@@ -116,7 +118,7 @@ sub BUILD {
     $self->parent_table('stock');
     $self->parent_primary_key('stock_id');
     $self->parent_id($args->{stock_id});
-    print STDERR "Loading...\n";
+    $logger->debug("Loading...");
     $self->load();
 }
 
@@ -142,7 +144,7 @@ sub BUILD {
 
  #     my @stockprops = $class->_get_props($schema, $stock_id, "sequencing_project_info");
 
- #     print STDERR "Stockprops = ".Dumper(\@stockprops);
+ #     $logger->error("Stockprops = ".Dumper(\@stockprops));
 
  #     my @infos = ();
  #     foreach my $sp (@stockprops) {
@@ -156,12 +158,12 @@ sub BUILD {
  # 	$hash->{stockprop_id} = $sp->[0];
  # 	$hash->{uniquename} = $schema->resultset("Stock::Stock")->find( { stock_id => $stock_id })->uniquename();
  # 	if ($@) {
- # 	    print STDERR "Warning: $json is not valid json in stockprop ".$sp->[0].".!\n";
+ # 	    $logger->error("Warning: $json is not valid json in stockprop ".$sp->[0].".!");
  # 	}
  # 	push @infos, $hash;
  #     }
 
- #     #print STDERR "Hashes = ".Dumper(\@infos);
+ #     #$logger->error("Hashes = ".Dumper(\@infos));
  #     return \@infos;
  # }
 
@@ -177,18 +179,18 @@ sub BUILD {
 =cut
 
 sub all_sequenced_stocks {
-    my $class = shift;
+    my $self = shift;
     my $schema = shift;
 
-    print STDERR "all_sequenced_stocks with ".ref($schema)." as parameter...\n";
+    $logger->debug("all_sequenced_stocks with ".ref($schema)." as parameter...");
     my $type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'sequencing_project_info', 'stock_property')->cvterm_id();
-    print STDERR "type_id = $type_id\n";
+    $logger->debug("type_id = $type_id");
 
     my $sp_rs = $schema->resultset("Stock::Stockprop")->search({ type_id => $type_id });
 
     my @sequenced_stocks = ();
     while (my $row = $sp_rs->next()) {
-	print STDERR "found stock with stock_id ".$row->stock_id()."\n";
+	$logger->debug("found stock with stock_id ".$row->stock_id()."");
 	push @sequenced_stocks, $row->stock_id();
     }
 
@@ -220,7 +222,7 @@ sub all_sequenced_stocks {
 
 #     if ($self->stockprop_id()) {
 # 	# update
-# 	print STDERR "updating stockprop...\n";
+# 	$logger->error("updating stockprop...");
 # 	my $row = $self->schema()->resultset("Stock::Stockprop")->find( { stockprop_id => $self->stockprop_id() } );
 # 	if ($row) {
 # 	    $row->value($self->to_json());
@@ -236,7 +238,7 @@ sub all_sequenced_stocks {
 
 # 	$rank++;
 
-# 	print STDERR "inserting stockprop...\n";
+# 	$logger->error("inserting stockprop...");
 # 	my $row = $self->schema()->resultset("Stock::Stockprop")->create(
 # 	    {
 # 		stock_id => $self->stock_id(),
@@ -267,10 +269,10 @@ sub all_sequenced_stocks {
 # sub delete {
 #     my $self = shift;
 
-#     print STDERR "CXGN::Stock::SequencingInfo: Deleting sequencing info object ".$self->stockprop_id()."\n";
+#     $logger->error("CXGN::Stock::SequencingInfo: Deleting sequencing info object ".$self->stockprop_id()."");
 #     my $stockprop;
 
-#     print STDERR "stock_id = ".$self->stock_id().", stockprop_id = ".$self->stockprop_id()."\n";
+#     $logger->error("stock_id = ".$self->stock_id().", stockprop_id = ".$self->stockprop_id()."");
 
 #     eval {
 # 	$stockprop = $self->schema()->resultset("Stock::Stockprop")->find({ type_id=>$self->type_id(), stock_id => $self->stock_id(), stockprop_id=>$self->stockprop_id() });
@@ -281,13 +283,13 @@ sub all_sequenced_stocks {
 #     }
 
 #     if (!$stockprop) {
-# 	print STDERR "No such stockprop associated with such type or stock. Not deleting.\n";
+# 	$logger->error("No such stockprop associated with such type or stock. Not deleting.");
 # 	return 0;
 #     }
 #     else {
-# 	print STDERR "Deleting stcokprop now.\n";
+# 	$logger->error("Deleting stcokprop now.");
 # 	$stockprop->delete();
-# 	print STDERR "SequencingInfo successfully deleted.\n";
+# 	$logger->error("SequencingInfo successfully deleted.");
 # 	return 1;
 #     }
 # }
@@ -305,11 +307,11 @@ sub all_sequenced_stocks {
 # sub _load_object {
 #     my $self= shift;
 
-#     print STDERR "_load_object...\n";
+#     $logger->error("_load_object...");
 
-#     print STDERR "Stockprop_id is now ".$self->stockprop_id()."\n";
+#     $logger->error("Stockprop_id is now ".$self->stockprop_id()."");
 #     if ($self->stockprop_id()) {
-# 	print STDERR "configuring object...\n";
+# 	$logger->error("configuring object...");
 # 	my $stockprop_type_id = SGN::Model::Cvterm->get_cvterm_row($self->schema, $self->type(), 'stock_property')->cvterm_id();
 # 	my $rs = $self->schema->resultset("Stock::Stockprop")->search({ stockprop_id => $self->stockprop_id(), type_id => $stockprop_type_id } );
 
@@ -343,7 +345,7 @@ sub all_sequenced_stocks {
 
 #     my @results;
 
-#     print STDERR "_retrieve_stockprops...\n";
+#     $logger->error("_retrieve_stockprops...");
 
 #     eval {
 #         my $stockprop_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, $type, 'stock_property')->cvterm_id();
@@ -355,7 +357,7 @@ sub all_sequenced_stocks {
 #     };
 
 #     if ($@)  {
-#         print STDERR "Cvterm $type does not exist in this database\n";
+#         $logger->error("Cvterm $type does not exist in this database");
 #     };
 
 #     return @results;
@@ -398,10 +400,10 @@ sub all_sequenced_stocks {
 
 #     my $allowed_fields = $self->allowed_fields();
 
-#     #print STDERR Dumper($hash);
+#     #$logger->error(Dumper($hash));
 
 #     foreach my $f (@$allowed_fields) {
-# 	print STDERR "Processing $f ($hash->{$f})...\n";
+# 	$logger->error("Processing $f ($hash->{$f})...");
 # 	if ( ($hash->{$f} eq "undefined") || ($hash->{$f} eq "") ) { $hash->{$f} = undef; }
 # 	$self->$f($hash->{$f});
 #     }
@@ -423,7 +425,7 @@ sub all_sequenced_stocks {
 
 #     my $allowed_fields = $self->allowed_fields();
 
-#     #print STDERR Dumper($allowed_fields);
+#     #$logger->error(Dumper($allowed_fields));
 #     my $data;
 
 #     foreach my $f (@$allowed_fields) {

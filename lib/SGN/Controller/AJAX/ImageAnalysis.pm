@@ -43,6 +43,8 @@ use CXGN::Image::Search;
 use CXGN::Trait::Search;
 #use Inline::Python;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -92,7 +94,7 @@ sub image_analysis_submit_POST : Args(0) {
         push @image_urls, $original_img;
         push @image_files, $image_file;
     }
-    print STDERR Dumper \@image_urls;
+    $logger->error(Dumper(\@image_urls));
 
     my %service_details = (
         'necrosis' => {
@@ -157,7 +159,7 @@ sub image_analysis_submit_POST : Args(0) {
         my %res;
 
         if (defined $service_details{$service}->{'server_endpoint'}) { # submit image to external service for processing
-            print STDERR "Using endpoint ".$service_details{$service}->{'server_endpoint'}." to analyze image\n";
+            $logger->debug("Using endpoint ".$service_details{$service}->{'server_endpoint'}." to analyze image");
             my $resp = $ua->post(
                 $service_details{$service}->{'server_endpoint'},
                 Content_Type => 'form-data',
@@ -172,19 +174,19 @@ sub image_analysis_submit_POST : Args(0) {
                 if (is_error($rc)) {
                     die "getstore of ".$message_hashref->{image_link}." failed with $rc";
                 }
-                print STDERR Dumper $message_hashref;
+                $logger->error(Dumper($message_hashref));
                 $res{'value'} = $message_hashref->{trait_value};
                 $res{'trait'} = $trait;
                 $res{'trait_id'} = $trait_details->[0]->{trait_id};
             }
             else {
-                print STDERR Dumper $resp->status_line;
+                $logger->error(Dumper($resp->status_line));
                 $res{'error'} = $resp->status_line;
             }
         }
         elsif (defined $service_details{$service}->{'script'}) { # supply image to local script for processing
             my $script = $service_details{$service}->{'script'};
-            print STDERR "Using script $script to analyze image\n";
+            $logger->debug("Using script $script to analyze image");
             my $input_image = $service_details{$service}->{'input_image'};
             my $outfile_image = $service_details{$service}->{'outfile_image'};
             my $results_outfile = $service_details{$service}->{'results_outfile'};
@@ -194,7 +196,7 @@ sub image_analysis_submit_POST : Args(0) {
                 '/DroneImageScripts/' . $script . ' --' . $input_image . ' \'' . $_ .
                 '\' --' . $outfile_image . ' \'' . $archive_temp_image . '\' --' .
                 $results_outfile . ' \'' . $archive_temp_results . '\' ';
-            # print STDERR Dumper $cmd;
+            # $logger->error(Dumper($cmd));
             my $status = system($cmd);
 
             my $csv = Text::CSV->new({ sep_char => ',' });
@@ -237,7 +239,7 @@ sub image_analysis_submit_POST : Args(0) {
             my ($saved_image_id) = $h->fetchrow_array();
             my $image_id;
             if ($saved_image_id) {
-                print STDERR Dumper "Image $archive_temp_image has already been added to the database and will not be added again.";
+                $logger->error(Dumper("Image $archive_temp_image has already been added to the database and will not be added again."));
                 $image = SGN::Image->new( $schema->storage->dbh, $saved_image_id, $c );
                 $image_id = $image->get_image_id();
             }
@@ -256,7 +258,7 @@ sub image_analysis_submit_POST : Args(0) {
                         return {error => "Image processing for $archive_temp_image did not work. Image not associated to stock_id $stock_id.<br/><br/>"};
                     }
                 }
-                print STDERR "Saved $archive_temp_image\n";
+                $logger->debug("Saved $archive_temp_image");
                 $image_id = $image->get_image_id();
                 my $added_image_tag_id = $image->add_tag($image_tag);
             }
@@ -269,7 +271,7 @@ sub image_analysis_submit_POST : Args(0) {
         $it++;
     }
 
-    # print STDERR "Before grouping result is: ".Dumper($result);
+    # $logger->error("Before grouping result is: ".Dumper($result));
 
     $c->stash->{rest} = { success => 1, results => $result };
 }
@@ -279,7 +281,7 @@ sub image_analysis_group_POST : Args(0) {
     my $self = shift;
     my $c = shift;
     my $result = decode_json $c->req->param('result');
-    # print STDERR Dumper($result);
+    # $logger->error(Dumper($result));
     my %grouped_results = ();
     my @table_data = ();
 
@@ -291,13 +293,13 @@ sub image_analysis_group_POST : Args(0) {
 
     for (my $i = 0; $i <= $#sorted_result; $i++) {
         $results_ref = $sorted_result[$i];
-        # print STDERR "\n\nResults ref is ".Dumper($results_ref)."\n\n";
+        # $logger->error("\n\nResults ref is ".Dumper($results_ref)."\n");
         $uniquename = $results_ref->{'stock_uniquename'};
         $trait = $results_ref->{'result'}->{'trait'};
         $value = $results_ref->{'result'}->{'value'};
 
         if ($trait && $value) {
-            print STDERR "Working on $trait for $uniquename. Saving the details \n";
+            $logger->debug("Working on $trait for $uniquename. Saving the details ");
             push @{$grouped_results{$uniquename}{$trait}}, {
                         stock_id => $results_ref->{'stock_id'},
                         collector => $results_ref->{'image_username'},
@@ -309,7 +311,7 @@ sub image_analysis_group_POST : Args(0) {
                 };
         }
         else { # if no result returned for an image, include it with error details.
-            print STDERR "No usable analysis data in this results_ref \n";
+            $logger->debug("No usable analysis data in this results_ref ");
             push @{$grouped_results{$uniquename}{$trait}}, {
                         stock_id => $results_ref->{'stock_id'},
                         collector => $results_ref->{'image_username'},
@@ -326,7 +328,7 @@ sub image_analysis_group_POST : Args(0) {
 
         if ($next_uniquename ne $uniquename) {
 
-            print STDERR "Calculating mean value for $uniquename\n";
+            $logger->debug("Calculating mean value for $uniquename");
 
             my $uniquename_data = $grouped_results{$uniquename};
 
@@ -334,9 +336,9 @@ sub image_analysis_group_POST : Args(0) {
                 my $details = $uniquename_data->{$trait};
                 my @values = map { $_->{'value'}} @{$uniquename_data->{$trait}};
                 @values= grep { $_ ne 'NA' } @values; # remove NAs before calculating mean
-                # print STDERR "\n\n\nVALUES ARE @values and length is ". scalar @values . "\n\n\n";
+                # $logger->error("\n\n\nVALUES ARE @values and length is ". scalar @values . "\n\n");
                 my $mean_value = @values ? sprintf("%.2f", sum(@values)/@values) : undef;
-                print STDERR "Mean value is $mean_value\n";
+                $logger->debug("Mean value is $mean_value");
                 push @table_data, {
                     observationUnitDbId => $uniquename_data->{$trait}[0]->{'stock_id'},
                     observationUnitName => $uniquename,
@@ -352,7 +354,7 @@ sub image_analysis_group_POST : Args(0) {
             }
         }
     }
-    # print STDERR "table data is ".Dumper(@table_data);
+    # $logger->error("table data is ".Dumper(@table_data));
     $c->stash->{rest} = { success => 1, results => \@table_data };
 }
 

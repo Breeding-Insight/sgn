@@ -7,6 +7,8 @@ use JSON::Any;
 use Try::Tiny;
 use Scalar::Util qw(looks_like_number);
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "label_design";
 }
@@ -69,16 +71,16 @@ sub validate {
             foreach my $elem_key (keys %elem_hash) {
                 my $elem_value = $elem_hash{$elem_key};
                 if (exists $element_check{$elem_key}) {
-                    $element_check{$elem_key}($elem_value) ? print STDERR "Check returned: ".$element_check{$elem_key}($elem_value)."\n" : push @problems, $elem_key . ":" . $elem_value;
+                    $element_check{$elem_key}($elem_value) ? $logger->debug("Check returned: ".$element_check{$elem_key}($elem_value)."") : push @problems, $elem_key . ":" . $elem_value;
                 }
                 else {
                     push @problems, "\n$elem_key : $elem_value";
                 }
             }
         } else {
-             #print STDERR "Key is $key and value is $value\n";
+             #$logger->error("Key is $key and value is $value");
              if (exists $page_param_check{$key}) {
-                 $page_param_check{$key}($value) ? print STDERR "Check returned: ".$page_param_check{$key}($value) : push @problems, $key . ":" . $value;
+                 $page_param_check{$key}($value) ? $logger->error("Check returned: ".$page_param_check{$key}($value) : push @problems, $key . ":" . $value);
              }
              else {
                  push @problems, "\n$key : $value";
@@ -208,11 +210,11 @@ sub process_field {
     my %valid_fields = %{$valid_fields};
     my %return_values = %{$return_values};
 
-    print STDERR "Field is $field\n";
+    $logger->debug("Field is $field");
     if ($field =~ m/Number:/) {
         our ($placeholder, $start_num, $increment) = split ':', $field;
         my $length = length($start_num);
-        #print STDERR "Increment is $increment\nKey Number is $key_number\n";
+        #$logger->error("Increment is $increment\nKey Number is $key_number");
         my $custom_num =  $start_num + ($increment * 1);
         my $final_num = sprintf("%0${length}d", $custom_num);
         $return_values{$field} = looks_like_number($final_num);

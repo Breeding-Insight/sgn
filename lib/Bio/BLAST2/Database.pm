@@ -36,6 +36,7 @@ use namespace::clean;
 
 use base qw/ Class::Accessor::Fast /;
 
+my $logger = Log::Log4perl->get_logger();
 
 
 sub new { croak "use open(), not new()" }
@@ -460,7 +461,7 @@ sub _read_blastdbcmd_info {
     my $ffbn = $self->full_file_basename;
     my $cmd = "blastdbcmd -db $ffbn -info";
     my $blastdbcmd = `$cmd 2>&1`;
-    print STDERR "BLASTDBCMD RETURNED: $blastdbcmd\n";
+    $logger->debug("BLASTDBCMD RETURNED: $blastdbcmd");
 
     my ($title) = $blastdbcmd =~ /Database:\s*([\s\S]+)sequences/
       or die "could not parse output of blastdbcmd (0):\n$blastdbcmd";

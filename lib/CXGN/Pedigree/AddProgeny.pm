@@ -28,6 +28,8 @@ use Try::Tiny;
 use CXGN::Stock::StockLookup;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'chado_schema' => (
 		 is       => 'rw',
 		 isa      => 'DBIx::Class::Schema',
@@ -79,7 +81,7 @@ sub add_progeny {
        #Get stock of type cross matching cross name
         $cross_stock = $self->_get_cross($self->get_cross_name());
         if (!$cross_stock) {
-            print STDERR "Cross could not be found\n";
+            $logger->error("Cross could not be found");
             return;
         }
 
@@ -147,7 +149,7 @@ sub add_progeny {
     };
 
     if ($transaction_error) {
-        print STDERR "Transaction1 error adding progenies: $transaction_error\n";
+        $logger->error("Transaction1 error adding progenies: $transaction_error");
         return;
     }
 
@@ -175,7 +177,7 @@ sub _get_cross {
     $stock = $stock_lookup->get_cross_exact();
 
     if (!$stock) {
-        print STDERR "Cross name does not exist\n";
+        $logger->error("Cross name does not exist");
         return;
     }
 

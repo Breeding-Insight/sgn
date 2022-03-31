@@ -8,6 +8,8 @@ use CXGN::Genotype;
 
 use CXGN::GenotypeIOmain;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'format' => ( isa => 'Str',
 		  is  => 'rw',
 		  default => 'vcf', # or dosage
@@ -35,7 +37,7 @@ sub BUILD {
 	$plugin->load_plugin("DosageTransposed");
     }
     else { 
-	print STDERR "No valid format provided. Using vcf.\n";
+	$logger->debug("No valid format provided. Using vcf.");
 	$plugin->load_plugin("VCF");
     }
     $plugin->file($args->{file});
@@ -44,7 +46,7 @@ sub BUILD {
     
     $self->plugin($plugin);
 
-    #print STDERR "count = $data->{count}\n";
+    #$logger->error("count = $data->{count}");
     #$self->count($data->{count});
     #$self->header($data->{header});
     #$self->current(0);
@@ -60,8 +62,8 @@ sub next {
     $gt->rawscores($rawscores);
     $gt->markers($self->markers());
     
-#    print STDERR "NAME: $genotype\n";
-#    print STDERR join ", ", keys %$rawscores;
+#    $logger->error("NAME: $genotype");
+#    $logger->error(join ", ", keys %$rawscores);
 
     return $gt;
 }
@@ -83,13 +85,13 @@ sub header_information_lines {
 
 sub markers { 
     my $self = shift;
-    #print STDERR "Markers now: ".Dumper($self->plugin()->markers())."\n";
+    #$logger->error("Markers now: ".Dumper($self->plugin()->markers())."");
     return $self->plugin()->markers();
 }
 
 sub header { 
     my $self = shift;
-    #print STDERR "Markers now: ".Dumper($self->plugin()->markers())."\n";
+    #$logger->error("Markers now: ".Dumper($self->plugin()->markers())."");
     return $self->plugin()->header();
 }
 

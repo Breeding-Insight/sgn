@@ -21,7 +21,7 @@ CXGN::Trial::TrialDesignStore - Module to validate and store a trial's design (f
  my $store_error;
 
  if ($validate_error) {
-    print STDERR "VALIDATE ERROR: $validate_error\n";
+    $logger->error("VALIDATE ERROR: $validate_error");
  }
  else {
     try {
@@ -32,7 +32,7 @@ CXGN::Trial::TrialDesignStore - Module to validate and store a trial's design (f
  }
 
  if ($store_error) {
-    print STDERR "ERROR SAVING TRIAL!: $store_error\n";
+    $logger->error("ERROR SAVING TRIAL!: $store_error");
  }
 
 If a genotyping experiment is stored, is_genotyping has to be set to true (1). If an analysis is stored, is_analysis has to be set to true. For a phenotyping experiment, both are set to false (0).
@@ -276,9 +276,10 @@ use CXGN::Trial::TrialDesignStore::GenotypingTrial;
 use CXGN::Trial::TrialDesignStore::Analysis;
 use CXGN::Trial::TrialDesignStore::CrossingTrial;
 use CXGN::Trial::TrialDesignStore::SamplingTrial;
+my $logger = Log::Log4perl->get_logger();
 
 sub new {
-    my $class = shift;
+    my $self = shift;
     my $args = shift;
 
     my $type;
@@ -305,23 +306,23 @@ sub new {
 
     my $object;
     if ($type eq "genotyping_trial") {
-        print STDERR "Generating GENOTYPING TRIAL\n";
+        $logger->debug("Generating GENOTYPING TRIAL");
         $object = CXGN::Trial::TrialDesignStore::GenotypingTrial->new($args);
     }
     if ($type eq "phenotyping_trial") {
-        print STDERR "Generating PHENOTYPING TRIAL OBJECT...\n";
+        $logger->debug("Generating PHENOTYPING TRIAL OBJECT...");
         $object = CXGN::Trial::TrialDesignStore::PhenotypingTrial->new($args);
     }
     if ($type eq "analysis") {
-        print STDERR "Generating ANALYSIS TRIAL...\n";
+        $logger->debug("Generating ANALYSIS TRIAL...");
         $object = CXGN::Trial::TrialDesignStore::Analysis->new($args);
     }
     if ($type eq "cross") {
-        print STDERR "Generating CROSSING TRIAL...\n";
+        $logger->debug("Generating CROSSING TRIAL...");
         $object = CXGN::Trial::TrialDesignStore::CrossingTrial->new($args);
     }
     if ($type eq "sampling_trial") {
-        print STDERR "Generating SAMPLING TRIAL...\n";
+        $logger->debug("Generating SAMPLING TRIAL...");
         $object = CXGN::Trial::TrialDesignStore::SamplingTrial->new($args);
     }
 

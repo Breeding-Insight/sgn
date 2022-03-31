@@ -35,6 +35,8 @@ use Data::Dumper;
 use Text::CSV;
 use CXGN::List::Validate;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "highdimensionalphenotypes spreadsheet metabolomics";
 }
@@ -57,25 +59,25 @@ sub validate {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
     my $header_row = <$fh>;
     my @columns;
-    # print STDERR Dumper $csv->fields();
+    # $logger->error(Dumper($csv->fields()));
     if ($csv->parse($header_row)) {
         @columns = $csv->fields();
     } else {
         $parse_result{'error'} = "Could not parse header row.";
-        print STDERR "Could not parse header.\n";
+        $logger->error("Could not parse header.");
         return \%parse_result;
     }
     
     my $header_col_1 = shift @columns;
     if ( $header_col_1 ne "sample_name" ) {
       $parse_result{'error'} = "First cell must be 'sample_name'. Please, check your file.";
-      print STDERR "First cell must be 'sample_name'\n";
+      $logger->error("First cell must be 'sample_name'");
       return \%parse_result;
     }
 
@@ -104,17 +106,17 @@ sub validate {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
     $header_row = <$fh>;
-    # print STDERR Dumper $csv->fields();
+    # $logger->error(Dumper($csv->fields()));
     if ($csv->parse($header_row)) {
         @columns = $csv->fields();
     } else {
         $parse_result{'error'} = "Could not parse header row.";
-        print STDERR "Could not parse header.\n";
+        $logger->error("Could not parse header.");
         return \%parse_result;
     }
     
@@ -219,12 +221,12 @@ sub parse {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
     while (my $row = $csv->getline ($fh)) {
-        # print STDERR "Row is ".Dumper($row)."\n";
+        # $logger->error("Row is ".Dumper($row)."");
         if ( $row_number == 0 ) {
             @header = @{$row};
             $num_cols = scalar(@header);
@@ -254,18 +256,18 @@ sub parse {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
     my $header_row = <$fh>;
     my @columns;
-    # print STDERR Dumper $csv->fields();
+    # $logger->error(Dumper($csv->fields()));
     if ($csv->parse($header_row)) {
         @columns = $csv->fields();
     } else {
         $parse_result{'error'} = "Could not parse header row.";
-        print STDERR "Could not parse header.\n";
+        $logger->error("Could not parse header.");
         return \%parse_result;
     }
 
@@ -297,7 +299,7 @@ sub parse {
     $parse_result{'variables'} = \@traits;
     $parse_result{'variables_desc'} = \%header_column_details;
     return \%parse_result;
-    # print STDERR Dumper \%parse_result;
+    # $logger->error(Dumper(\%parse_result));
 }
 
 1;

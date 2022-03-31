@@ -41,6 +41,8 @@ use File::Basename qw | basename dirname|;
 use Digest::MD5;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'tempfile' => (isa => "Str",
     is => 'rw',
     required => 0
@@ -115,7 +117,7 @@ sub archive {
         die  "You have insufficient privileges to archive a file.\n". Dumper $self->user_role;
     }
     # if (!$subdirectory || !$tempfile || !$archive_filename ) {
-    #     print STDERR "File archive failed: incomplete information to archive file.\n";
+    #     $logger->error("File archive failed: incomplete information to archive file.");
     # 	die "File archive failed: incomplete information to archive file.\n";
     # }
     if ($self->include_timestamp){
@@ -168,16 +170,16 @@ sub archive {
         $error = "Error saving archived file: $file_destination\n$_";
     };
     if ($error) {
-        print STDERR  "$error\n";
+        $logger->error( "$error");
     }
-    print STDERR "ARCHIVED: $file_destination\n";
+    $logger->debug("ARCHIVED: $file_destination");
     return $file_destination;
 }
 
 sub get_md5 {
     my $self = shift;
     my $file_name_and_location = shift;
-    #print STDERR $file_name_and_location;
+    #$logger->error($file_name_and_location);
 
     open(my $F, "<", $file_name_and_location) || die "Can't open file $file_name_and_location";
     binmode $F;

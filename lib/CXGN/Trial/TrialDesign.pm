@@ -37,6 +37,7 @@ use R::YapRI::Data::Matrix;
 use POSIX;
 use List::Util 'max';
 
+my $logger = Log::Log4perl->get_logger();
 with 'MooseX::Object::Pluggable';
 
 has 'trial_name' => (isa => 'Str', is => 'rw', predicate => 'has_trial_name', clearer => 'clear_trial_name');
@@ -135,7 +136,7 @@ has 'unreplicated_accession_no' => (isa => 'Maybe[Int]', is => 'rw', predicate =
 
 sub get_design {
     my $self = shift;
-    #print STDERR Dumper $self->{design};
+    #$logger->error(Dumper($self->{design}));
      return $self->{design};
 }
 
@@ -148,7 +149,7 @@ sub calculate_design {
     if ($self->has_design_type()) {
 	my $design_type = $self->get_design_type();
 	if ($design_type eq "p-rep") { $design_type="Prep"; }
-	print STDERR "DESIGN TYPE = ".$design_type."\n";
+	$logger->debug("DESIGN TYPE = ".$design_type."");
 	$self->load_plugin($design_type);
 	$design = $self->create_design();
     }
@@ -263,7 +264,7 @@ sub _build_plot_names {
         }
     }
 
-    #print STDERR Dumper(\%design);
+    #$logger->error(Dumper(\%design));
 
     return \%design;
 }

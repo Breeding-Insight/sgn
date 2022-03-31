@@ -28,6 +28,8 @@ use JSON::Any;
 use Data::Dumper;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'product_profile_name' => (isa => 'Str', is => 'rw');
 
@@ -79,7 +81,7 @@ sub get_product_profile_info {
         }
         push @profile_list, [@each_row];
     }
-#    print STDERR "PROFILE LIST =".Dumper(\@profile_list)."\n";
+#    $logger->error("PROFILE LIST =".Dumper(\@profile_list)."");
 
     return \@profile_list;
 }

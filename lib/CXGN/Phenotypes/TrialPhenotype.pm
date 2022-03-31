@@ -33,6 +33,8 @@ use SGN::Model::Cvterm;
 use List::MoreUtils qw | :all !before !after |;
 use CXGN::Trial;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'bcs_schema' => (
@@ -190,14 +192,14 @@ sub get_trial_phenotypes_heatmap {
 	});
 	my $data = $trial->get_controls();
 
-	#print STDERR Dumper($data);
+	#$logger->error(Dumper($data));
 
 	my @control_name;
 	foreach my $cntrl (@{$data}) {
 		push @control_name, $cntrl->{'accession_name'};
 	}
-	#print STDERR Dumper(\@$result);
-	#print STDERR Dumper(\@plot_No);
+	#$logger->error(Dumper(\@$result));
+	#$logger->error(Dumper(\@plot_No));
 
 	%results = (
 	col => \@col_No,
@@ -218,8 +220,8 @@ sub get_trial_phenotypes_heatmap {
     phenoID => \@phenoID,
     controls => \@control_name
 	);
-    print STDERR "Search End:".localtime."\n";
-	#print STDERR Dumper($result);
+    $logger->debug("Search End:".localtime."");
+	#$logger->error(Dumper($result));
     return \%results;
 }
 

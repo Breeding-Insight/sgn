@@ -41,6 +41,8 @@ use JSON;
 
 extends 'CXGN::Trial::TrialLayoutDownload';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub retrieve {
     my $self = shift;
     my $schema = $self->schema();
@@ -118,7 +120,7 @@ sub retrieve {
             $i++;
         }
     }
-    #print STDERR Dumper \@subplot_design;
+    #$logger->error(Dumper(\@subplot_design));
 
     @subplot_design = sort { $a->{plot_number} <=> $b->{plot_number} || $a->{subplot_number} <=> $b->{subplot_number} } @subplot_design;
 

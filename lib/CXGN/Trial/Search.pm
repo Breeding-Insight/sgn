@@ -37,6 +37,8 @@ use SGN::Model::Cvterm;
 use CXGN::Calendar;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -343,7 +345,7 @@ sub search {
         GROUP BY(study.name, study.project_id, study.description, folder.name, folder.project_id, folder.description, trial_type_name.cvterm_id, trial_type_name.name, projectprop.value, year.value, location.value, breeding_program.name, breeding_program.project_id, breeding_program.description, harvest_date.value, planting_date.value, design.value, genotyping_facility.value, genotyping_facility_submitted.value, genotyping_facility_status.value, genotyping_plate_format.value, genotyping_plate_sample_type.value, genotyping_facility_plate_id.value, sampling_facility.value, sampling_facility_sample_type.value, project_additional_info.value)
         ORDER BY study.name;";
 
-    print STDERR Dumper $q;
+    $logger->error(Dumper($q));
     my $h = $schema->storage->dbh()->prepare($q);
     $h->execute();
 
@@ -418,9 +420,9 @@ sub search {
         @data_window = @result;
     }
 
-    #print STDERR "TOTAL: $total_count SUBTRACT: $subtract_count \n";
+    #$logger->error("TOTAL: $total_count SUBTRACT: $subtract_count ");
     $total_count = $total_count-$subtract_count;
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     return (\@data_window, $total_count);
 }

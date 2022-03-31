@@ -28,6 +28,8 @@ use CXGN::List::Validate;
 use Try::Tiny;
 use CXGN::Trial;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 Accessor tissue_sample_id()
 
 the database id of the tissue_sample. Is equivalent to stock_id.
@@ -461,7 +463,7 @@ sub _retrieve_plate_sample_type {
 #             my $type_id = SGN::Model::Cvterm->get_cvterm_row($self->schema, 'tissue_sample', 'stock_type')->cvterm_id();
 #             $self->type_id($type_id);
 #             my $id = $self->SUPER::store();
-#             print STDERR "Saving seedlot returned ID $id.".localtime."\n";
+#             $logger->error("Saving seedlot returned ID $id.".localtime."");
 #             $self->tissue_sample_id($id);
 #             #$error = $self->_store_tissue_sample_relationships();
 #             #if ($error){
@@ -471,7 +473,7 @@ sub _retrieve_plate_sample_type {
 #         } else { #Updating tissue_sample
 # 
 #             my $id = $self->SUPER::store();
-#             print STDERR "Updating tissue_sample returned ID $id.".localtime."\n";
+#             $logger->error("Updating tissue_sample returned ID $id.".localtime."");
 #             $self->tissue_sample_id($id);
 #         }
 # 
@@ -514,7 +516,7 @@ sub _retrieve_plate_sample_type {
 #     try {
 #         $self->schema->txn_do($coderef);
 #     } catch {
-#         print STDERR "Transaction Error: $_\n";
+#         $logger->error("Transaction Error: $_");
 #         $transaction_error =  $_;
 #     };
 #     if ($transaction_error){

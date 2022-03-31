@@ -34,6 +34,8 @@ use JSON;
 
 extends 'CXGN::Stock';
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'cross_stock_id' => (isa => "Maybe[Int]",
     is => 'rw',
     required => 0,
@@ -96,7 +98,7 @@ sub BUILD {
 
     # to do: populate female_parent, male_parent etc.
     my ($female_parent, $male_parent, @progenies) = $self->get_cross_relationships();
-    print STDERR Dumper($female_parent);
+    $logger->error(Dumper($female_parent));
 
     if (ref($female_parent)) {
 	$self->female_parent($female_parent->[0]);
@@ -294,7 +296,7 @@ sub get_cross_details {
     while (my ($female_parent_id, $male_parent_id, $cross_entry_id, $female_parent_name, $male_parent_name, $cross_name, $cross_type, $family_id, $family_name, $project_id, $project_name) = $h->fetchrow_array()){
         push @cross_details, [$female_parent_id, $female_parent_name, $male_parent_id, $male_parent_name, $cross_entry_id, $cross_name, $cross_type, $family_id, $family_name, $project_id, $project_name]
     }
-#    print STDERR Dumper(\@cross_details);
+#    $logger->error(Dumper(\@cross_details));
     return \@cross_details;
 }
 
@@ -311,7 +313,7 @@ sub get_cross_details {
 =cut
 
 sub get_cross_info_for_progeny {
-    my $class = shift;
+    my $self = shift;
     my $schema = shift;
     my $female_parent_id = shift;
     my $male_parent_id = shift;
@@ -346,9 +348,9 @@ sub get_cross_info_for_progeny {
     while (my ($cross_entry_id, $cross_name, $cross_type, $year) = $h->fetchrow_array()){
         push @cross_info, [$cross_entry_id, $cross_name, $cross_type, $year];
     }
-    #print STDERR Dumper(\@cross_info);
+    #$logger->error(Dumper(\@cross_info));
     if (scalar(@cross_info)>1){
-        print STDERR "There is more than one (".scalar(@cross_info).") cross linked to this progeny\n";
+        $logger->error("There is more than one (".scalar(@cross_info).") cross linked to this progeny");
     }
     if (scalar(@cross_info)>0){
         return $cross_info[0];
@@ -419,7 +421,7 @@ sub get_progeny_info {
 
         push @progeny_info, [$female_parent_id, $female_parent_name, $male_parent_id, $male_parent_name, $progeny_id, $progeny_name, $cross_type]
     }
-      #print STDERR Dumper(\@progeny_info);
+      #$logger->error(Dumper(\@progeny_info));
     return \@progeny_info;
 }
 
@@ -739,7 +741,7 @@ sub get_cross_properties_trial {
 
     my @data = ();
     while(my($cross_id, $cross_name, $cross_combination, $cross_props) = $h->fetchrow_array()){
-      #print STDERR Dumper $cross_props;
+      #$logger->error(Dumper($cross_props));
         if ($cross_props){
             my $cross_props_hash = decode_json$cross_props;
             push @data, [$cross_id, $cross_name, $cross_combination, $cross_props_hash]
@@ -854,7 +856,7 @@ sub get_cross_progenies_trial {
 sub delete {
     my $self = shift;
 
-    print STDERR "Delete cross ".$self->cross_name()."\n";
+    $logger->debug("Delete cross ".$self->cross_name()."");
     my $dbh = $self->schema()->storage()->dbh();
     my $schema = $self->schema();
     my $cross_id = $self->cross_stock_id();
@@ -877,7 +879,7 @@ sub delete {
 
     while (my($type_id, $seedlot_name) = $h->fetchrow_array()) {
 	    if ($type_id == $collection_of_type_id) {
-            print STDERR "Cross has associated seedlot. Cannot delete.\n";
+            $logger->debug("Cross has associated seedlot. Cannot delete.");
 	        die "Cross has associated seedlot: $seedlot_name. Cannot delete.\n";
 	    }
     }
@@ -893,7 +895,7 @@ sub delete {
 
     while (my($type_id, $project_name) = $h2->fetchrow_array()) {
         if ($type_id == $field_layout_type_id) {
-            print STDERR "Cross has associated trial. Cannot delete.\n";
+            $logger->error("Cross has associated trial. Cannot delete.");
             die "Cross has associated trial: $project_name. Cannot delete.\n";
         }
     }
@@ -908,17 +910,17 @@ sub delete {
 	    ($properties->{images} == 0);
 
 	if (! $can_delete) {
-	    print STDERR "Cross has associated data. Cannot delete.\n";
+	    $logger->error("Cross has associated data. Cannot delete.");
 	    die "Cross has associated data. ($properties->{trials} trials, $properties->{traits} traits and $properties->{genoytpes} genotypes. Cannot delete...\n";
 	}
 	else {
-	    print STDERR "This cross has no associated data that would prevent deletion.";
+	    $logger->error("This cross has no associated data that would prevent deletion.");
 	}
 
     #checking if the stock id has cross stock type
     my $cross_rs = $schema->resultset("Stock::Stock")->find ({stock_id => $cross_id, type_id => $cross_type_id});
     if (!$cross_rs) {
-        print STDERR "This stock id is not a cross. Cannot delete.\n";
+        $logger->error("This stock id is not a cross. Cannot delete.");
 	    die "This stock id is not a cross. Cannot delete.\n";
     }
 
@@ -934,10 +936,10 @@ sub delete {
     if (scalar @nd_experiment_ids == 1) {
         $experiment_id = $nd_experiment_ids[0];
     } else {
-        print STDERR "Error retrieving experiment id"."\n";
+        $logger->error("Error retrieving experiment id"."");
         die "Error retrieving experiment id";
     }
-#    print STDERR "ND EXPERIMENT ID =".Dumper($experiment_id)."\n";
+#    $logger->error("ND EXPERIMENT ID =".Dumper($experiment_id)."");
 
     #delete the nd_experiment_md_files entries
     my $md_files_q = "DELETE FROM phenome.nd_experiment_md_files WHERE nd_experiment_id = ?";
@@ -945,29 +947,29 @@ sub delete {
     $md_files_h->execute($experiment_id);
 
 	# delete the nd_experiment entries
-	print STDERR "Deleting nd_experiment entry for cross...\n";
+	$logger->debug("Deleting nd_experiment entry for cross...");
 	my $q2= "delete from nd_experiment where nd_experiment.nd_experiment_id = ? AND nd_experiment.type_id = ?";
 	my $h2 = $dbh->prepare($q2);
 	$h2->execute($experiment_id, $cross_experiment_type_id);
 
 	# delete stock owner entries
 	#
-	print STDERR "Deleting associated stock_owners...\n";
+	$logger->debug("Deleting associated stock_owners...");
 	my $q3 = "delete from phenome.stock_owner where stock_id=?";
 	my $h3 = $dbh->prepare($q3);
 	$h3->execute($self->cross_stock_id());
 
 	# delete the stock entries
 	#
-	print STDERR "Deleting the stock entry...\n";
+	$logger->debug("Deleting the stock entry...");
 	my $q4 = "delete from stock where stock.stock_id=? and stock.type_id = ?";
 	my $h4 = $dbh->prepare($q4);
 	$h4->execute($self->cross_stock_id(), $cross_type_id);
 
-	print STDERR Dumper($properties);
+	$logger->error(Dumper($properties));
 	# delete the progeny...
 	#
-	print STDERR "Deleting the progeny...\n";
+	$logger->debug("Deleting the progeny...");
 	my $q5 = "delete from stock where stock_id =?";
 	my $h5 = $dbh->prepare($q5);
 	foreach my $progeny (@{$properties->{subjects}}) {
@@ -981,7 +983,7 @@ sub delete {
     };
 
     if ($@) {
-	print STDERR "An error occurred while deleting cross id ".$self->cross_stock_id()."$@\n";
+	$logger->error("An error occurred while deleting cross id ".$self->cross_stock_id()."$@");
 	$dbh->rollback();
 	return $@;
     }
@@ -996,7 +998,7 @@ sub progeny_properties {
 
     my $cross_type_id = SGN::Model::Cvterm->get_cvterm_row($self->schema(), "cross", "stock_type")->cvterm_id();
 
-    print STDERR "sub cross_deletion_possible...\n";
+    $logger->debug("sub cross_deletion_possible...");
     my $q = "SELECT subject.stock_id, subject.uniquename, cvterm.name from stock join stock_relationship on (stock.stock_id=stock_relationship.object_id) join stock as subject on(stock_relationship.subject_id=subject.stock_id) join cvterm on (stock_relationship.type_id=cvterm.cvterm_id) where stock.stock_id = ? and stock.type_id=?";
 
     my $h = $self->schema->storage->dbh()->prepare($q);
@@ -1010,25 +1012,25 @@ sub progeny_properties {
     my $has_images;
 
     while (my($stock_id, $name, $type) = $h->fetchrow_array()) {
-	print STDERR "ID $stock_id NAME $name TYPE $type\n";
+	$logger->debug("ID $stock_id NAME $name TYPE $type");
 	push @subjects, [$stock_id, $name, $type];
 
 	if ($type eq "offspring_of") { # child
 	    my $s = CXGN::Stock->new( { schema => $self->schema(),  stock_id => $stock_id });
 	    if (my @traits = $s->get_trait_list()) {
-		print STDERR "Associated traits: ".Dumper(\@traits);
+		$logger->error("Associated traits: ".Dumper(\@traits));
 		$has_traits += scalar(@traits);
 	    }
 	    if (my @trials = $s->get_trials()) {
-		print STDERR "Associated trials: ".Dumper(\@trials);
+		$logger->error("Associated trials: ".Dumper(\@trials));
 		$has_trials += scalar(@trials);
 	    }
 	    if (my $genotypeprop_ids = $s->get_genotypeprop_ids()) {
-		print STDERR "Associated genotypes: ".Dumper($genotypeprop_ids);
+		$logger->error("Associated genotypes: ".Dumper($genotypeprop_ids));
 		$has_genotypes += scalar(@$genotypeprop_ids);
 	    }
 	    if (my @image_ids = $s->get_image_ids()) {
-		print STDERR "Associated images: ".Dumper(\@image_ids);
+		$logger->error("Associated images: ".Dumper(\@image_ids));
 		$has_images += scalar(@image_ids);
 	    }
 	}
@@ -1041,7 +1043,7 @@ sub progeny_properties {
 	subjects => \@subjects,
     };
 
-    print STDERR Dumper($data);
+    $logger->error(Dumper($data));
     return $data;
 }
 
@@ -1290,7 +1292,7 @@ sub get_cross_additional_info_trial {
 
     my @data = ();
     while(my($cross_id, $cross_name, $cross_combination, $cross_additional_info_json) = $h->fetchrow_array()){
-      #print STDERR Dumper $cross_props;
+      #$logger->error(Dumper($cross_props));
         if ($cross_additional_info_json){
             my $cross_additional_info_hash = decode_json$cross_additional_info_json;
             push @data, [$cross_id, $cross_name, $cross_combination, $cross_additional_info_hash]
@@ -1314,7 +1316,7 @@ sub get_nd_experiment_id_with_type_cross_experiment {
     my $cross_name = $self->cross_name();
     my $cross_id;
     my $experiment_id;
-#    print STDERR "CROSS NAME =".Dumper($cross_name)."\n";
+#    $logger->error("CROSS NAME =".Dumper($cross_name)."");
     my $cross_experiment_type_id =  SGN::Model::Cvterm->get_cvterm_row($schema, 'cross_experiment', 'experiment_type')->cvterm_id;
     my $cross_type_id  =  SGN::Model::Cvterm->get_cvterm_row($schema, 'cross', 'stock_type')->cvterm_id();
 
@@ -1323,7 +1325,7 @@ sub get_nd_experiment_id_with_type_cross_experiment {
     if ($cross_rs) {
         $cross_id = $cross_rs->stock_id();
     } else {
-        print STDERR "Error retrieving cross ID"."\n";
+        $logger->error("Error retrieving cross ID"."");
         return;
     }
 
@@ -1337,7 +1339,7 @@ sub get_nd_experiment_id_with_type_cross_experiment {
     if (scalar @nd_experiment_ids == 1) {
         $experiment_id = $nd_experiment_ids[0];
     } else {
-        print STDERR "Error retrieving experiment ID"."\n";
+        $logger->error("Error retrieving experiment ID"."");
         return;
     }
 

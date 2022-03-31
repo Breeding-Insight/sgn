@@ -7,6 +7,8 @@ use CXGN::Stock::OrderBatch;
 use CXGN::People::Person;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'people_schema' => ( isa => 'Ref', is => 'rw', required => 1 );
 
 has 'dbh' => (is  => 'rw', required => 1,);
@@ -34,7 +36,7 @@ sub BUILD {
     my $people_schema = $self->people_schema();
 
     if (! $args->{sp_order_id}) {
-	print STDERR "Creating empty object...\n";
+	$logger->debug("Creating empty object...");
 	return $self;
     }
 
@@ -152,7 +154,7 @@ sub get_orders_to_person_id {
             contact_person_comments => $comments
         }
     }
-#    print STDERR "ORDERS =".Dumper(\@orders)."\n";
+#    $logger->error("ORDERS =".Dumper(\@orders)."");
     return \@orders;
 }
 
@@ -190,7 +192,7 @@ sub get_order_details {
     my $item_list = join("<br>", @sort_list);
 
     push @order_details, $order_id, $order_from_name, $create_date, $item_list, $order_to_name, $order_status, $comments;
-#    print STDERR "DETAILS =".Dumper(\@order_details)."\n";
+#    $logger->error("DETAILS =".Dumper(\@order_details)."");
 
     return \@order_details;
 

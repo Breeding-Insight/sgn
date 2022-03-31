@@ -5,6 +5,8 @@ use Moose;
 use Data::Dumper;
 use CXGN::DbStats;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' };
 
 __PACKAGE__->config(
@@ -27,7 +29,7 @@ sub trial_types : Path('/ajax/dbstats/trial_types') Args(0) {
     
     my %response = $self->format_response( { title => "Trial Types", subtitle => "Showing $total_trials Total Trials", data => $trial_types });
  
-    print STDERR Dumper(\%response);
+    $logger->error(Dumper(\%response));
     $c->stash->{rest} = \%response;   
 }
 
@@ -44,7 +46,7 @@ sub traits_measured :Path('/ajax/dbstats/traits') Args(0)  {
 
     my %response = $self->format_response( { title => "Traits", subtitle => "Total trait measurements: $total_traits", data => $traits });
  
-    print STDERR Dumper(\%response);
+    $logger->error(Dumper(\%response));
     $c->stash->{rest} = \%response;   
 
 #   my $q = "select cvterm.name, count(*) from phenotype join cvterm on (observable_id=cvterm_id) 
@@ -66,7 +68,7 @@ sub trials_by_breeding_program :Path('/ajax/dbstats/trials_by_breeding_program')
     
     my %response = $self->format_response( { title => "Trials by Breeding Program", subtitle => "Showing $total_trials Total Trials", data => $tbbp });
  
-    print STDERR Dumper(\%response);
+    $logger->error(Dumper(\%response));
     $c->stash->{rest} = \%response;   
 }
 
@@ -109,7 +111,7 @@ sub activity_stats : Path('/ajax/dbstats/activity') Args(0) {
  
     my $data = $dbstats->activity();
     
-    print STDERR Dumper($data);
+    $logger->error(Dumper($data));
     $c->stash->{rest} = $data;
 }
 
@@ -180,7 +182,7 @@ sub format_response {
 	      }
 	  }
 	);
-    print STDERR Dumper(\%response);
+    $logger->error(Dumper(\%response));
     my $n = 0;
     foreach my $d (@{$args->{data}}) { 
 	my ($term, $count) = @$d;

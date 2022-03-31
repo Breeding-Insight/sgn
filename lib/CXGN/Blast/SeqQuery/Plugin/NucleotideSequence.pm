@@ -5,6 +5,8 @@ use Moose;
 
 use Bio::Seq;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "nucleotide sequence";
 }
@@ -24,7 +26,7 @@ sub validate {
     my $c = shift;
     my $sequence = shift;
     
-    print STDERR "SEQUENCE: $sequence\n";
+    $logger->debug("SEQUENCE: $sequence");
 
     my $valid = "OK";
 

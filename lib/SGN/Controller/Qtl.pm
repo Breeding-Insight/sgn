@@ -23,6 +23,8 @@ use Bio::Chado::Schema;
 use CXGN::Phenome::Qtl;
 use CXGN::Phenome::Population;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller'}  
 
 sub view : Path('/qtl/view') Args(1) {
@@ -201,7 +203,7 @@ sub _analyze_correlation  {
                                                 );
         $fh_hm->close;
         
-        print STDERR "\nheatmap tempfile: $heatmap_file\n";
+        $logger->debug("\nheatmap tempfile: $heatmap_file");
        
         my ($fh_ct, $corre_table_file) = tempfile( "corre_table_${pop_id}-XXXXXX",
                                                   DIR      => $corre_temp_dir,
@@ -210,7 +212,7 @@ sub _analyze_correlation  {
                                                 );
         $fh_ct->close;
         
-        print STDERR "\ncorrelation coefficients tempfile: $corre_table_file\n";
+        $logger->debug("\ncorrelation coefficients tempfile: $corre_table_file");
         
         CXGN::Tools::Run->temp_base($corre_temp_dir);
         my ($fh_out, $filename);
@@ -229,7 +231,7 @@ sub _analyze_correlation  {
         } qw / in out /;
 
         $fh_out->close;
-        print STDERR "\ncorrelation r output  tempfile: $corre_output_temp\n";
+        $logger->debug("\ncorrelation r output  tempfile: $corre_output_temp");
         
         {
             my $corre_commands_file = $c->path_to('/cgi-bin/phenome/correlation.r');
@@ -238,7 +240,7 @@ sub _analyze_correlation  {
         }
         try 
         {
-            print STDERR "\nsubmitting correlation job to the cluster..\n";
+            $logger->debug("\nsubmitting correlation job to the cluster..");
             my $r_process = CXGN::Tools::Run->run_cluster(
                 'R', 'CMD', 'BATCH',
                 '--slave',
@@ -253,11 +255,11 @@ sub _analyze_correlation  {
 
             $r_process->wait;
             sleep 5;
-            print STDERR "\ndone with correlation analysis..\n";
+            $logger->debug("\ndone with correlation analysis..");
        }
         catch 
         {  
-            print STDERR "\nsubmitting correlation job to the cluster gone wrong....\n";
+            $logger->debug("\nsubmitting correlation job to the cluster gone wrong....");
             my $err = $_;
             $err =~ s/\n at .+//s; #< remove any additional backtrace
             #     # try to append the R output
@@ -276,8 +278,8 @@ sub _analyze_correlation  {
         $corre_table_file  = fileparse($corre_table_file);
         $corre_table_file  = $c->generated_file_uri("correlation", $corre_table_file);
         
-        print STDERR "\nheatmap tempfile after copying to the apps static dir : $heatmap_file\n";
-        print STDERR "\ncorrelation coefficients after copying to the apps static dir: $corre_table_file\n";
+        $logger->debug("\nheatmap tempfile after copying to the apps static dir : $heatmap_file");
+        $logger->debug("\ncorrelation coefficients after copying to the apps static dir: $corre_table_file");
         
         $c->stash( heatmap_file     => $heatmap_file, 
                    corre_table_file => $corre_table_file
@@ -299,8 +301,8 @@ sub _correlation_output {
     my $heatmap         = $cache->get($key_h);
     my $corre_table     = $cache->get($key_t); 
    
-     print STDERR "\ncached heatmap file: $heatmap\n";
-     print STDERR "\ncached correlation coefficients files: $corre_table\n";
+     $logger->debug("\ncached heatmap file: $heatmap");
+     $logger->debug("\ncached correlation coefficients files: $corre_table");
 
     unless ($heatmap) 
     {

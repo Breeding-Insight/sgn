@@ -51,6 +51,8 @@ use CXGN::Trial::TrialLayout;
 use CXGN::Calendar;
 use JSON::XS;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => ( isa => 'Bio::Chado::Schema',
     is => 'rw',
     required => 1,
@@ -162,7 +164,7 @@ has 'order_by' => (
 sub search {
     my $self = shift;
     my $schema = $self->bcs_schema();
-    print STDERR "Search Start:".localtime."\n";
+    $logger->debug("Search Start:".localtime."");
 
     my $include_timestamp = $self->include_timestamp;
     my $numeric_regex = '^-?[0-9]+([,.][0-9]+)?$';
@@ -246,10 +248,10 @@ sub search {
     my $filter_trait_ids;
     my @or_clause;
     if ($self->trait_list && scalar(@{$self->trait_list})>0) {
-        print STDERR "A trait list was included\n";
+        $logger->debug("A trait list was included");
         foreach (@{$self->trait_list}){
             if ($_){
-                #print STDERR "Working on trait $_\n";
+                #$logger->error("Working on trait $_");
                 push @or_clause, "observations @> '[{\"trait_id\" : $_}]'";
                 $trait_list_check{$_}++;
                 $filter_trait_ids = 1;
@@ -296,7 +298,7 @@ sub search {
 
     my  $q = $select_clause . $where_clause . $or_clause . $order_clause . $limit_clause . $offset_clause;
 
-    # print STDERR "QUERY: $q\n\n";
+    # $logger->error("QUERY: $q\n");
 
     my $location_rs = $schema->resultset('NaturalDiversity::NdGeolocation')->search();
     my %location_id_lookup;
@@ -436,9 +438,9 @@ sub search {
             full_count => $full_count,
         };
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
-    print STDERR "Search End:".localtime."\n";
+    $logger->debug("Search End:".localtime."");
     return (\@result, \%unique_traits);
 }
 

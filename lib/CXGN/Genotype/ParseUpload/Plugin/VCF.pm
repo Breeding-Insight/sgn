@@ -5,6 +5,7 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use Scalar::Util qw(looks_like_number);
 use Math::Round qw(round);
+my $logger = Log::Log4perl->get_logger();
 
 has 'markers' => (is => 'rw', isa => 'Ref');
 has 'chroms' => (is => 'rw', isa => 'Ref');
@@ -29,7 +30,7 @@ sub _validate_with_plugin {
     my @error_messages;
     my %missing_accessions;
 
-    print STDERR "Reading VCF to validate during parse...\n";
+    $logger->debug("Reading VCF to validate during parse...");
 
     my $F;
     my @header;
@@ -39,7 +40,7 @@ sub _validate_with_plugin {
     open($F, "<", $filename) || die "Can't open file $filename\n";
         while (<$F>) {
             chomp;
-            #print STDERR Dumper $_;
+            #$logger->error(Dumper($_));
 
             if ($_ =~ m/^##/){
                 push @header_info, $_;
@@ -165,7 +166,7 @@ sub _validate_with_plugin {
     $self->format(\@formats);
 
     my $number_observation_units = scalar(@observation_unit_names);
-    print STDERR "Number observation units: $number_observation_units...\n";
+    $logger->debug("Number observation units: $number_observation_units...");
 
     my @observation_units_names_trim;
     if ($self->get_igd_numbers_included){
@@ -208,9 +209,9 @@ sub _validate_with_plugin {
     foreach (@missing_stocks){
         if (!$self->get_create_missing_observation_units_as_accessions){
             push @missing_stocks_return, $_;
-            print STDERR "WARNING! Observation unit name $_ not found for stock type $stock_type. You can pass an option to automatically create accessions.\n";
+            $logger->warn("WARNING! Observation unit name $_ not found for stock type $stock_type. You can pass an option to automatically create accessions.");
         } else {
-            print STDERR "Adding new accession $_!\n";
+            $logger->debug("Adding new accession $_!");
             my $stock = $schema->resultset("Stock::Stock")->create({
                 organism_id => $organism_id,
                 name       => $_,
@@ -284,7 +285,7 @@ sub _parse_with_plugin {
     my $schema = $self->get_chado_schema();
     my $stock_type = $self->get_observation_unit_type_name;
 
-    print STDERR "Reading VCF to parse\n";
+    $logger->debug("Reading VCF to parse");
 
     my $F;
     open($F, "<", $filename) || die "Can't open file $filename\n";
@@ -304,7 +305,7 @@ sub next_genotype {
 
     for my $iter (1..10) {
         if (! ($line = <$F>)) {
-            print STDERR "No next genotype... Done!\n";
+            $logger->debug("No next genotype... Done!");
             if ($F) {
                 close($F);
             }
@@ -313,7 +314,7 @@ sub next_genotype {
         else {
             chomp($line);
             LABEL: if ($line =~ m/^\#/) {
-                #print STDERR "Skipping header line: $line\n";
+                #$logger->error("Skipping header line: $line");
                 $line = <$F>;
                 goto LABEL;
             }

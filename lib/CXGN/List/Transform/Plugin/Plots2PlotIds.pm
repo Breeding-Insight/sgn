@@ -2,6 +2,8 @@ package CXGN::List::Transform::Plugin::Plots2PlotIds;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "plots_2_plot_ids";
 }
@@ -35,7 +37,7 @@ sub transform {
 
     if (ref($list) eq "ARRAY" ) { 
 	foreach my $l (@$list) { 
-	    #print STDERR "Converting location $l to location_id...\n";
+	    #$logger->error("Converting location $l to location_id...");
 	    my $rs = $schema->resultset("Stock::Stock")->search( { uniquename => $l, 
 								   type_id    => $type_id });
 	    if ($rs->count() == 0) { 

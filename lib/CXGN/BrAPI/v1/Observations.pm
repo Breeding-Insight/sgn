@@ -14,6 +14,8 @@ use JSON;
 
 extends 'CXGN::BrAPI::v1::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub observations_store {
     my $self = shift;
     my $params = shift;
@@ -30,7 +32,7 @@ sub observations_store {
     my $archive_path = $params->{archive_path};
     my $tempfiles_subdir = $params->{tempfiles_subdir};
 
-    #print STDERR "Observations are ". Dumper($observations) . "\n";
+    #$logger->error("Observations are ". Dumper($observations) . "");
 
     my $page_size = $self->page_size;
     my $page = $self->page;
@@ -43,10 +45,10 @@ sub observations_store {
 
     my @success_status = [];
 
-    #print STDERR "OBSERVATIONS_MODULE: User id is $user_id and type is $user_type\n";
+    #$logger->error("OBSERVATIONS_MODULE: User id is $user_id and type is $user_type");
 
     if ($user_type ne 'submitter' && $user_type ne 'sequencer' && $user_type ne 'curator') {
-        print STDERR 'Must have submitter privileges to upload phenotypes! Please contact us!';
+        $logger->error('Must have submitter privileges to upload phenotypes! Please contact us!');
         push @$status, {'403' => 'Permission Denied. Must have correct privilege.'};
         return CXGN::BrAPI::JSONResponse->return_error($status, 'Must have submitter privileges to upload phenotypes! Please contact us!');
     }
@@ -60,7 +62,7 @@ sub observations_store {
 
     if (!$validated_request || $validated_request->{'error'}) {
         my $parse_error = $validated_request ? $validated_request->{'error'} : "Error parsing request structure";
-        print STDERR $parse_error;
+        $logger->error($parse_error);
         return CXGN::BrAPI::JSONResponse->return_error($status, $parse_error);
     } elsif ($validated_request->{'success'}) {
         push @$status, {'info' => $validated_request->{'success'} };
@@ -74,7 +76,7 @@ sub observations_store {
 
     if (!$parsed_request || $parsed_request->{'error'}) {
         my $parse_error = $parsed_request ? $parsed_request->{'error'} : "Error parsing request data";
-        print STDERR $parse_error;
+        $logger->error($parse_error);
         return CXGN::BrAPI::JSONResponse->return_error($status, $parse_error);
     } elsif ($parsed_request->{'success'}) {
         push @$status, {'info' => $parsed_request->{'success'} };
@@ -82,7 +84,7 @@ sub observations_store {
         @units = @{$parsed_request->{'units'}};
         @variables = @{$parsed_request->{'variables'}};
         %parsed_data = %{$parsed_request->{'data'}};
-        #print STDERR "Parsed data is: ".Dumper(%parsed_data)."\n";
+        #$logger->error("Parsed data is: ".Dumper(%parsed_data)."");
     }
 
     ## Archive in file
@@ -107,7 +109,7 @@ sub observations_store {
         push @$status, {'info' => $archive_success_message };
     }
 
-    print STDERR "Archived Request is in $file\n";
+    $logger->debug("Archived Request is in $file");
 
     ## Set metadata
     my %phenotype_metadata;
@@ -140,11 +142,11 @@ sub observations_store {
     my ($stored_observation_error, $stored_observation_success, $stored_observation_details) = $store_observations->store();
 
     if ($stored_observation_error) {
-        print STDERR "Error: $stored_observation_error\n";
+        $logger->error("Error: $stored_observation_error");
         return CXGN::BrAPI::JSONResponse->return_error($status, $stored_observation_error);
     }
     if ($stored_observation_success) {
-        print STDERR "Success: $stored_observation_success\n";
+        $logger->debug("Success: $stored_observation_success");
         $result{observations} = $stored_observation_details;
     }
 

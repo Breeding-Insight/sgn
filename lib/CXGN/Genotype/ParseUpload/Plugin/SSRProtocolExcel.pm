@@ -3,6 +3,7 @@ package CXGN::Genotype::ParseUpload::Plugin::SSRProtocolExcel;
 use Moose::Role;
 use Spreadsheet::ParseExcel;
 use Data::Dumper;
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
     my $self = shift;
@@ -241,7 +242,7 @@ sub _parse_with_plugin {
     }
 
     my $parsed_result = \%marker_info_hash;
-#    print STDERR "DATA =".Dumper($parsed_result)."\n";
+#    $logger->error("DATA =".Dumper($parsed_result)."");
 
     $self->_set_parsed_data($parsed_result);
 

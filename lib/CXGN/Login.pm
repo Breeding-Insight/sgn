@@ -66,6 +66,8 @@ our $EXCHANGE_DBH = 1;
 
 =cut
 
+my $logger = Log::Log4perl->get_logger();
+
 sub new {
     my $class = shift;
     my $dbh   = shift;
@@ -253,7 +255,7 @@ sub query_from_cookie {
     my $sth = $self->get_sql("user_from_cookie");
     return undef unless $sth;
     if ( !$sth->execute( $LOGIN_TIMEOUT, $cookie_string ) ) {
-        print STDERR "Cookie Query Error: " . $DBH->errstr;
+        $logger->error("Cookie Query Error: " . $DBH->errstr);
         return undef;
     }
     my @result = $sth->fetchrow_array();
@@ -300,7 +302,7 @@ sub login_allowed {
         return 1;
     }
     else {
-	print STDERR "Login is disabled if dbname contains 'sandbox' and production_server is set to 1\n";
+	    $logger->debug("Login is disabled if dbname contains 'sandbox' and production_server is set to 1");
         return 0;
     }
 }
@@ -324,12 +326,12 @@ sub login_user {
     if ( $self->login_allowed() ) {
         my $sth = $self->get_sql("user_from_uname_pass");
 
-	print STDERR "NOW LOGGING IN USER $username\n";
+	$logger->debug("NOW LOGGING IN USER $username");
         my $num_rows = $sth->execute( $username, $password );
 
         my ( $person_id, $disabled, $user_prefs, $first_name, $last_name ) = $sth->fetchrow_array();
 
-	print STDERR "FOUND: $person_id\n";
+	$logger->debug("FOUND: $person_id");
         if ( $num_rows > 1 ) {
             die "Duplicate entries found for username '$username'";
         }

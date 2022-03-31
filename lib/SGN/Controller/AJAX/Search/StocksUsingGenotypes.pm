@@ -11,6 +11,8 @@ use CXGN::Dataset;
 use CXGN::Genotype::SearchStocks;
 use CXGN::List;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 __PACKAGE__->config(
     default   => 'application/json',
@@ -35,7 +37,7 @@ sub get_selected_accessions :Path('/ajax/search/get_selected_accessions') :Args(
     );
 
     my $dataset_ref = $dataset->get_dataset_data();
-#    print STDERR "DATASET =" .Dumper($dataset_ref). "\n";
+#    $logger->error("DATASET =" .Dumper($dataset_ref). "");
 
     my %data = %{$dataset_ref};
 

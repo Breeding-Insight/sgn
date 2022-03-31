@@ -7,6 +7,8 @@ use JSON;
 use CXGN::People::Person;
 use SGN::Image;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -35,7 +37,7 @@ sub add_catalog_item_POST : Args(0) {
     my $item_prop_id = $c->req->param('item_prop_id');
     my $item_stock_id;
     if (!$c->user()) {
-        print STDERR "User not logged in... not adding a catalog item.\n";
+        $logger->debug("User not logged in... not adding a catalog item.");
         $c->stash->{rest} = {error_string => "You must be logged in to add a catalog item." };
         return;
     }
@@ -53,7 +55,7 @@ sub add_catalog_item_POST : Args(0) {
         $c->stash->{rest} = {error_string => "Contact person has no record in the database!",};
         return;
     }
-#    print STDERR "PERSON ID =".Dumper($sp_person_id)."\n";
+#    $logger->error("PERSON ID =".Dumper($sp_person_id)."");
     my $program_rs = $schema->resultset('Project::Project')->find({project_id => $item_breeding_program_id});
     if (!$program_rs) {
         $c->stash->{rest} = {error_string => "Breeding program is not in the database!",};
@@ -159,7 +161,7 @@ sub upload_catalog_items_POST : Args(0) {
     $parser = CXGN::Stock::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path, editable_stock_props=>\@stock_props);
     $parser->load_plugin($upload_type);
     $parsed_data = $parser->parse();
-    #print STDERR "PARSED DATA =".Dumper($parsed_data)."\n";
+    #$logger->error("PARSED DATA =".Dumper($parsed_data)."");
 
     if (!$parsed_data){
         my $return_error = '';
@@ -168,7 +170,7 @@ sub upload_catalog_items_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -183,7 +185,7 @@ sub upload_catalog_items_POST : Args(0) {
         foreach my $item_name (keys %catalog_info) {
             my $stock_rs = $schema->resultset("Stock::Stock")->find({uniquename => $item_name});
             my $stock_id = $stock_rs->stock_id();
-            print STDERR "STOCK ID =".Dumper($stock_id)."\n";
+            $logger->debug("STOCK ID =".Dumper($stock_id)."");
             my %catalog_info_hash = %{$catalog_info{$item_name}};
 
             my $stock_catalog = CXGN::Stock::Catalog->new({
@@ -219,7 +221,7 @@ sub get_catalog :Path('/ajax/catalog/items') :Args(0) {
 
     my $catalog_obj = CXGN::Stock::Catalog->new({ bcs_schema => $schema});
     my $catalog_ref = $catalog_obj->get_catalog_items();
-#    print STDERR "ITEM RESULTS =".Dumper($catalog_ref)."\n";
+#    $logger->error("ITEM RESULTS =".Dumper($catalog_ref)."");
     my @catalog_items;
     my @catalog_list = @$catalog_ref;
     foreach my $catalog_item (@catalog_list) {
@@ -256,7 +258,7 @@ sub item_image_list :Path('/ajax/catalog/image_list') :Args(1) {
     my $item_id = shift;
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $dbh = $c->dbc->dbh;
-#    print STDERR "ITEM ID =".Dumper($item_id)."\n";
+#    $logger->error("ITEM ID =".Dumper($item_id)."");
 
     my @image_ids;
     my $q = "select distinct image_id, cvterm.name, stock_image.display_order FROM phenome.stock_image JOIN stock USING(stock_id) JOIN cvterm ON(type_id=cvterm_id) WHERE stock_id = ? ORDER BY stock_image.display_order ASC";
@@ -265,7 +267,7 @@ sub item_image_list :Path('/ajax/catalog/image_list') :Args(1) {
     while (my ($image_id, $stock_type) = $h->fetchrow_array()){
         push @image_ids, [$image_id, $stock_type];
     }
-#    print STDERR "IMAGE IDS =".Dumper(\@image_ids)."\n";
+#    $logger->error("IMAGE IDS =".Dumper(\@image_ids)."");
     my @image_list;
     foreach my $image_info(@image_ids) {
         my $image_obj = SGN::Image->new($dbh, $image_info->[0]);
@@ -279,18 +281,18 @@ sub item_image_list :Path('/ajax/catalog/image_list') :Args(1) {
         my $image_page  = "/image/view/$image_obj_id";
         my $small_image = $image_obj->get_image_url("thumbnail");
 
-#        print STDERR "IMAGE OBJECT ID =".Dumper($image_obj_id)."\n";
-#        print STDERR "IMAGE OBJECT NAME =".Dumper($image_obj_name)."\n";
-#        print STDERR "IMAGE OBJECT DESCRIPTION =".Dumper($image_obj_description)."\n";
-#        print STDERR "IMAGE MEDIUM =".Dumper($medium_image)."\n";
-#        print STDERR "IMAGE PAGE =".Dumper($image_page)."\n";
+#        $logger->error("IMAGE OBJECT ID =".Dumper($image_obj_id)."");
+#        $logger->error("IMAGE OBJECT NAME =".Dumper($image_obj_name)."");
+#        $logger->error("IMAGE OBJECT DESCRIPTION =".Dumper($image_obj_description)."");
+#        $logger->error("IMAGE MEDIUM =".Dumper($medium_image)."");
+#        $logger->error("IMAGE PAGE =".Dumper($image_page)."");
         push @image_list, {
                 image_id => $image_obj_id,
                 image_name => $image_obj_name,
                 small_image => qq|<a href="$medium_image"  title="<a href=$image_page>Go to image page ($image_obj_name)</a>" class="stock_image_group" rel="gallery-figures"><img src="$small_image"/></a> |,
                 image_description => $image_obj_description,
             };
-#            print STDERR "IMAGE LIST =".Dumper(\@image_list)."\n";
+#            $logger->error("IMAGE LIST =".Dumper(\@image_list)."");
     }
 
     $c->stash->{rest} = {data => \@image_list};
@@ -311,9 +313,9 @@ sub edit_catalog_image_POST : Args(0) {
     my @images;
     my $item_stock_id;
     push @images, $image_id;
-    print STDERR "IMAGE ID =".Dumper(\@images)."\n";
+    $logger->debug("IMAGE ID =".Dumper(\@images)."");
     if (!$c->user()) {
-        print STDERR "User not logged in... not adding a catalog item.\n";
+        $logger->debug("User not logged in... not adding a catalog item.");
         $c->stash->{rest} = {error_string => "You must be logged in to add a catalog image." };
         return;
     }
@@ -354,7 +356,7 @@ sub delete_catalog_item_POST : Args(0) {
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
 
     my $item_prop_id = $c->req->param('item_prop_id');
-    print STDERR "ITEM PROP ID =".Dumper($item_prop_id)."\n";
+    $logger->debug("ITEM PROP ID =".Dumper($item_prop_id)."");
     my $catalog_obj = CXGN::Stock::Catalog->new({ bcs_schema => $schema, prop_id => $item_prop_id });
     $catalog_obj->delete();
     if ($catalog_obj->delete() == 0) {

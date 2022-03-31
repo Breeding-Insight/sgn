@@ -38,6 +38,8 @@ $c->stash->{rest} = { filename => $urlencode{$tempfile.".xls"} };
 use Moose::Role;
 use utf8;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub verify {
     my $self = shift;
     return 1;
@@ -383,7 +385,7 @@ sub download {
     my $transform = $lt->transform($schema, "traits_2_trait_ids", \@trait_list);
 
     if (@{$transform->{missing}}>0) {
-        print STDERR "Warning: Some traits could not be found. ".join(",",@{$transform->{missing}})."\n";
+        $logger->warn("Warning: Some traits could not be found. ".join(",",@{$transform->{missing}})."");
     }
     my @trait_ids = @{$transform->{transform}};
 
@@ -399,7 +401,7 @@ sub download {
             $ws->write(0, $i+$num_col_before_traits, $trait_list[$i]);
         #}
         #else {
-        #    print STDERR "Skipping output of trait $trait_list[$i] because it does not exist\n";
+        #    $logger->error("Skipping output of trait $trait_list[$i] because it does not exist");
         #}
 
         my $plot_count = scalar(keys(%design));
@@ -420,7 +422,7 @@ sub download {
         }
     }
     $workbook->close();
-    print STDERR "DataCollector File created!\n";
+    $logger->debug("DataCollector File created!");
     return { message => "DataCollector File created!"};
 }
 

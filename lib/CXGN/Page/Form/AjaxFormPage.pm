@@ -67,6 +67,8 @@ use CXGN::Feed;
 use JSON;
 use YAML;
 
+my $logger = Log::Log4perl->get_logger();
+
 use base qw /CXGN::Debug/ ;
 =head2 new
 
@@ -928,7 +930,7 @@ sub print_json {
     my $json = JSON->new();
     #$self->get_ajax_page()->send_http_header();
     print "Content-type: application/json\n\n";
-    print STDERR YAML::Dump(\%results);
+    $logger->error(YAML::Dump(\%results));
     print encode_json(\%results);
 }
 

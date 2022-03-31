@@ -16,6 +16,7 @@ use Carp;
 
 use Bio::PrimarySeq;
 use Bio::Seq::LargePrimarySeq;
+my $logger = Log::Log4perl->get_logger();
 
 use base 'Bio::PrimarySeqI';
 
@@ -162,7 +163,7 @@ sub _parse_defline {
 
     my $defline = <$fc>;
 
-    print STDERR "DEFLINE RETRIEVED = $defline\n";
+    $logger->debug("DEFLINE RETRIEVED = $defline");
     
     return if $defline =~ /ERROR:\s+Entry\s*"[^"]+"\s+not found/;
     ( my $id, $defline ) = $defline =~ m(

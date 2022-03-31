@@ -9,6 +9,8 @@ use Data::Dumper;
 use Try::Tiny;
 use CXGN::BreederSearch;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST'; };
 
 __PACKAGE__->config(
@@ -25,15 +27,15 @@ sub get_data : Path('/ajax/breeder/search') Args(0) {
   my @criteria_list = $c->req->param('categories[]');
   my @querytypes = $c->req->param('querytypes[]');
 
-  #print STDERR "criteria list = " . Dumper(@criteria_list);
-  #print STDERR "querytypes = " . Dumper(@querytypes);
+  #$logger->error("criteria list = " . Dumper(@criteria_list));
+  #$logger->error("querytypes = " . Dumper(@querytypes));
 
   my $dataref = {};
   my $queryref = {};
 
   my $error = '';
 
-  print STDERR "Validating criteria_list\n";
+  $logger->debug("Validating criteria_list");
   foreach my $select (@criteria_list) { #ensure criteria list arguments are one of the possible categories
     chomp($select);
     if (! any { $select eq $_ } ('accessions', 'breeding_programs', 'genotyping_protocols', 'genotyping_projects', 'locations', 'plants', 'plots', 'seedlots', 'trait_components', 'traits', 'trials', 'trial_designs', 'trial_types', 'years', undef)) {
@@ -43,7 +45,7 @@ sub get_data : Path('/ajax/breeder/search') Args(0) {
     }
   }
 
-  print STDERR "Validating query types\n";
+  $logger->debug("Validating query types");
   foreach my $binary_number (@querytypes) {# ensure querytype arguments are 0 or 1
     chomp($binary_number);
     if (! any { $binary_number == $_ } ( 0 , 1 )) {
@@ -60,7 +62,7 @@ sub get_data : Path('/ajax/breeder/search') Args(0) {
     if (defined($param) && ($param ne '')) { @data =  $c->req->param("data[$i][]"); }
 
     if (@data) {
-      print STDERR "Validating dataref ids\n";
+      $logger->debug("Validating dataref ids");
       for (my $i=0; $i<@data; $i++) { # ensure dataref arguements (ids) are numeric
         if (m/\D/) {
           $error = "Valid values for dataref are numeric ids";
@@ -84,7 +86,7 @@ sub get_data : Path('/ajax/breeder/search') Args(0) {
   }
   my $results_ref = $bs->metadata_query(\@criteria_list, $dataref, $queryref);
 
-  #print STDERR "RESULTS: ".Data::Dumper::Dumper($results_ref);
+  #$logger->error("RESULTS: ".Data::Dumper::Dumper($results_ref));
   my @results =@{$results_ref->{results}};
 
 
@@ -181,14 +183,14 @@ sub refresh_matviews : Path('/ajax/breeder/refresh') Args(0) {
   my $c = shift;
   my $matviews = $c->req->param('matviews') || 'fullview'; #can be "fullview" or "stockprop"
 
-  print STDERR "dbname=" . $c->config->{dbname} ."\n";
+  $logger->debug("dbname=" . $c->config->{dbname} ."");
 
   my $dbh = $c->dbc->dbh();
   my $bs = CXGN::BreederSearch->new( { dbh=>$dbh, dbname=>$c->config->{dbname}, } );
   my $refresh = $bs->refresh_matviews($c->config->{dbhost}, $c->config->{dbname}, $c->config->{dbuser}, $c->config->{dbpass}, $matviews, 'concurrent', $c->config->{basepath});
 
   if ($refresh->{error}) {
-    print STDERR "Returning with error . . .\n";
+    $logger->debug("Returning with error . . .");
     $c->stash->{rest} = { error => $refresh->{'error'} };
     return;
   }

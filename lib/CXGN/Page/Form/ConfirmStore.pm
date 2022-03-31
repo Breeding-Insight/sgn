@@ -22,6 +22,8 @@ package CXGN::Page::Form::ConfirmStore;
 
 use base qw / CXGN::Page::Form::Editable /;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub new {
 	my $class = shift;
 	my $self = $class->SUPER::new(@_);
@@ -60,9 +62,9 @@ sub store {
     my $self = shift; 
     my %args = @_;
     
-    #print STDERR "args hash before in the store function: \n";
-#    while (my ($key, $value) = each(%args)) { print STDERR "$key $value\n"; }
-    #print STDERR "STORING FORM DATA...\n";
+    #$logger->error("args hash before in the store function: ");
+#    while (my ($key, $value) = each(%args)) { $logger->error("$key $value"); }
+    #$logger->error("STORING FORM DATA...");
     
     $self->propagate_input(%args);
    
@@ -71,7 +73,7 @@ sub store {
     # commit the changes to the database using the store method on
     # each object
     #
-    #print STDERR "STORING OBJECT...\n";
+    #$logger->error("STORING OBJECT...");
     
     my %distinct_objects = $self->get_distinct_objects();
     
@@ -90,8 +92,8 @@ sub store {
       }
     }
     foreach my $k (keys %distinct_objects) { 
-	#print STDERR " DUMP:" .Data::Dumper::Dumper($distinct_objects{$k});
-	#print STDERR " STORING OBJECT: ".ref($distinct_objects{$k})."\n";
+	#$logger->error(" DUMP:" .Data::Dumper::Dumper($distinct_objects{$k}));
+	#$logger->error(" STORING OBJECT: ".ref($distinct_objects{$k})."");
 	
 	my $id = $distinct_objects{$k}->store();
 	$self->set_insert_id($k, $id);

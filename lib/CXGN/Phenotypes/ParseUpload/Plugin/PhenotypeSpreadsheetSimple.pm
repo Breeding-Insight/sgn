@@ -21,6 +21,8 @@ use Spreadsheet::ParseExcel;
 use JSON;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "phenotype spreadsheet simple";
 }
@@ -47,7 +49,7 @@ sub validate {
     $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
         $parse_result{'error'} = $parser->error();
-        print STDERR "validate error: ".$parser->error()."\n";
+        $logger->error("validate error: ".$parser->error()."");
         return \%parse_result;
     }
 
@@ -56,13 +58,13 @@ sub validate {
     my ( $col_min, $col_max ) = $worksheet->col_range();
     if (($col_max - $col_min)  < 1 || ($row_max - $row_min) < 1 ) { #must have header with at least observationunit_name and one trait, as well as one row of phenotypes
         $parse_result{'error'} = "Spreadsheet is missing observationunit_name and atleast one trait in header.";
-        print STDERR "Spreadsheet is missing header\n";
+        $logger->error("Spreadsheet is missing header");
         return \%parse_result;
     }
 
     if ($worksheet->get_cell(0,0)->value() ne 'observationunit_name' ) {
         $parse_result{'error'} = "First column must be 'observationunit_name'. It may help to recreate your spreadsheet from the website.";
-        print STDERR "Columns not correct\n";
+        $logger->error("Columns not correct");
         return \%parse_result;
     }
     my @fixed_columns = qw | observationunit_name |;
@@ -75,12 +77,12 @@ sub validate {
             my $timestamp = '';
             if ($worksheet->get_cell($row,$col)) {
                 $value_string = $worksheet->get_cell($row,$col)->value();
-                #print STDERR $value_string."\n";
+                #$logger->error($value_string."");
                 if ($timestamp_included) {
                     ($value, $timestamp) = split /,/, $value_string;
                     if (!$timestamp =~ m/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\S)(\d{4})/) {
                         $parse_result{'error'} = "Timestamp needs to be of form YYYY-MM-DD HH:MM:SS-0000 or YYYY-MM-DD HH:MM:SS+0000";
-                        print STDERR "value: $timestamp\n";
+                        $logger->debug("value: $timestamp");
                         return \%parse_result;
                     }
                 }
@@ -124,7 +126,7 @@ sub parse {
     $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
         $parse_result{'error'} = $parser->error();
-        print STDERR "validate error: ".$parser->error()."\n";
+        $logger->error("validate error: ".$parser->error()."");
         return \%parse_result;
     }
 
@@ -167,7 +169,7 @@ sub parse {
                                     if (!defined($timestamp)){
                                         $timestamp = '';
                                     }
-                                    #print STDERR $trait_value." : ".$timestamp."\n";
+                                    #$logger->error($trait_value." : ".$timestamp."");
 
                                     if ( defined($trait_value) && defined($timestamp) ) {
                                         if ($trait_value ne '.'){
@@ -193,7 +195,7 @@ sub parse {
     $parse_result{'data'} = \%data;
     $parse_result{'units'} = \@observation_units;
     $parse_result{'variables'} = \@traits;
-    #print STDERR Dumper \%parse_result;
+    #$logger->error(Dumper(\%parse_result));
 
     return \%parse_result;
 }

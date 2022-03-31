@@ -14,6 +14,8 @@ use CXGN::Location::LocationLookup;
 use SGN::Model::Cvterm;
 use CXGN::Chado::Stock;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'schema' => (
     is       => 'rw',
@@ -97,7 +99,7 @@ sub BUILD {
     my $self = shift;
     my $args = shift;
 
-    print STDERR "Build CXGN::Trial::TrialLayout::AbstractLayout... ($args->{trial_id})\n";
+    $logger->debug("Build CXGN::Trial::TrialLayout::AbstractLayout... ($args->{trial_id})");
 
     $self->_build_cvterm_hash();
 }
@@ -114,40 +116,40 @@ sub cvterm_id {
 sub convert_source_stock_types_to_ids {
     my $self = shift;
 
-    print STDERR "Converting source stock types to ids... \n";
+    $logger->debug("Converting source stock types to ids... ");
 
     my @source_cvterm_ids;
     foreach my $source_stock (@{$self->get_source_stock_types()}) {
-        # print STDERR "Converting $source_stock to ... ";
+        # $logger->error("Converting $source_stock to ... ");
         my $source_stock_cvterm_id = $self->cvterm_id($source_stock);
-        # print STDERR "$source_stock_cvterm_id . \n";
+        # $logger->error("$source_stock_cvterm_id . ");
         push @source_cvterm_ids, $source_stock_cvterm_id;
     }
     $self->set_source_stock_type_ids(\@source_cvterm_ids);
 
     my @source_primary_cvterm_ids;
     foreach my $source_stock (@{$self->get_source_primary_stock_types()}) {
-        # print STDERR "Converting $source_stock to ... ";
+        # $logger->error("Converting $source_stock to ... ");
         my $source_stock_cvterm_id = $self->cvterm_id($source_stock);
-        # print STDERR "$source_stock_cvterm_id . \n";
+        # $logger->error("$source_stock_cvterm_id . ");
         push @source_primary_cvterm_ids, $source_stock_cvterm_id;
     }
     $self->set_source_primary_stock_type_ids(\@source_primary_cvterm_ids);
 
     my @target_cvterm_ids;
     foreach my $target_stock (@{$self->get_target_stock_types()}) {
-        # print STDERR "Converting $target_stock to ... ";
+        # $logger->error("Converting $target_stock to ... ");
         my $target_stock_cvterm_id = $self->cvterm_id($target_stock);
-        # print STDERR "$target_stock_cvterm_id . \n";
+        # $logger->error("$target_stock_cvterm_id . ");
         push @target_cvterm_ids, $target_stock_cvterm_id;
     }
     $self->set_target_stock_type_ids(\@target_cvterm_ids);
 
     my @rel_type_cvterm_ids;
     foreach my $rel_type (@{$self->get_relationship_types()}) {
-        # print STDERR "Converting $rel_type to ... ";
+        # $logger->error("Converting $rel_type to ... ");
         my $rel_type_cvterm_id = $self->cvterm_id($rel_type);
-        # print STDERR "$rel_type_cvterm_id . \n";
+        # $logger->error("$rel_type_cvterm_id . ");
         push @rel_type_cvterm_ids, $rel_type_cvterm_id;
     }
     $self->set_relationship_type_ids(\@rel_type_cvterm_ids);
@@ -156,18 +158,18 @@ sub convert_source_stock_types_to_ids {
 
 sub _lookup_trial_id {
     my $self = shift;
-    print STDERR "CXGN::Trial::TrialLayout AbstractLayout _lookup_trial_id() ".localtime."\n";
+    $logger->debug("CXGN::Trial::TrialLayout AbstractLayout _lookup_trial_id() ".localtime."");
     $self->get_schema->storage->dbh->do('SET search_path TO public,sgn');
 
-  #print STDERR "Check 2.1: ".localtime()."\n";
+  #$logger->error("Check 2.1: ".localtime()."");
   $self->_set_project_from_id();
   if (!$self->has_project()) {
-      print STDERR "Trial id not found\n";
+      $logger->debug("Trial id not found");
     return;
   }
 
     if (!$self->_get_trial_year_from_project()) {
-        print STDERR "Trial has no associated trial year... quitting!\n";
+        $logger->debug("Trial has no associated trial year... quitting!");
       #return;
   } else {
         $self->_set_trial_year($self->_get_trial_year_from_project());
@@ -177,7 +179,7 @@ sub _lookup_trial_id {
   $self->_set_trial_description($self->get_project->description());
 
   if (!$self->_get_design_type_from_project()) {
-      print STDERR "Trial has no design type... not creating layout object.\n";
+      $logger->debug("Trial has no design type... not creating layout object.");
       return;
   }
 
@@ -185,7 +187,7 @@ sub _lookup_trial_id {
 
     my $design = $self->_set_design($self->_get_design_from_trial());
 
-###  print STDERR "_lookup_trial_id TRIAL design is now ".Dumper($self->get_design());
+###  $logger->error("_lookup_trial_id TRIAL design is now ".Dumper($self->get_design()));
 
   $self->_set_plot_names($self->_get_plot_info_fields_from_trial("plot_name") || []);
 # moved to subclass  $self->_set_block_numbers($self->_get_plot_info_fields_from_trial("block_number") || []);
@@ -195,13 +197,13 @@ sub _lookup_trial_id {
   $self->_set_accession_names($self->_get_unique_accession_names_from_trial || [] );
   $self->_set_control_names($self->_get_unique_control_accession_names_from_trial || [] );
   #$self->_set_is_a_control($self->_get_plot_info_fields_from_trial("is_a_control"));
-  print STDERR "CXGN::Trial::TrialLayout End Build".localtime."\n";
+  $logger->debug("CXGN::Trial::TrialLayout End Build".localtime."");
 }
 
 sub _retrieve_trial_location {
     my $self = shift;
     if (!$self->_get_location_from_field_layout_experiment()) {
-        print STDERR "Trial has no location.\n";
+        $logger->debug("Trial has no location.");
         return;
     } else {
         $self->_set_trial_location($self->_get_location_from_field_layout_experiment());
@@ -233,7 +235,7 @@ sub _get_unique_accession_names_from_trial {
     my %unique_acc;
     no warnings 'numeric'; #for genotyping plate so that wells don't give warning
 
-    #print STDERR "DESIGN (AbstractTrial): ".Dumper(\%design);
+    #$logger->error("DESIGN (AbstractTrial): ".Dumper(\%design));
 
     foreach my $key (sort { $a <=> $b} keys %design) {
         my %design_info = %{$design{$key}};
@@ -280,7 +282,7 @@ sub _get_plot_info_fields_from_trial {
 	my %design_info = %{$design{$key}};
 	if (exists($design_info{$field_name})) {
 	    if (! exists($unique_field_values{$design_info{$field_name}})) {
-		#print STDERR "pushing $design_info{$field_name}...\n";
+		#$logger->error("pushing $design_info{$field_name}...");
 		push(@field_values, $design_info{$field_name});
 	    }
 	    $unique_field_values{$design_info{$field_name}} = 1;
@@ -295,8 +297,8 @@ sub _get_plot_info_fields_from_trial {
 
 
 sub _get_design_from_trial {
-    print STDERR "Check 2.3.4.1: ".localtime()."\n";
     my $self = shift;
+    $logger->debug("Check 2.3.4.1: ".localtime()."");
     my $schema = $self->get_schema();
     my $project = $self->get_project();
 
@@ -308,34 +310,34 @@ sub _get_design_from_trial {
 
     my $design = decode_json $trial_layout_json->value if ($trial_layout_json);
     if (keys(%$design)) {
-        	    print STDERR "WE HAVE TRIAL LAYOUT JSON!\n";
-	    #print STDERR "TRIAL LAYOUT JSON IS: ".$trial_layout_json->value()."\n";
+        	    $logger->debug("WE HAVE TRIAL LAYOUT JSON!");
+	    #$logger->error("TRIAL LAYOUT JSON IS: ".$trial_layout_json->value()."");
 
 	    #Plant index number needs to be in the cached layout of trials that have plants. this serves a check to assure this.
 	    if ($trial_has_plants){
 		my @plot_values = values %$design;
 		if (!exists($plot_values[0]->{plant_index_numbers})) {
-		    print STDERR "Regenerating cache to include plants...\n";
+		    $logger->debug("Regenerating cache to include plants...");
 		    $self->generate_and_cache_layout();
 		} else {
-		    print STDERR "TrialLayout from cache ".localtime."\n";
+		    $logger->debug("TrialLayout from cache ".localtime."");
 		    return $design;
 		}
 	    } else {
-            print STDERR "TrialLayout from cache ".localtime."\n";
+            $logger->debug("TrialLayout from cache ".localtime."");
             return $design;
 	    }
 	} else {
-	print STDERR "Regenerating cache...\n";
+	$logger->debug("Regenerating cache...");
         my $design = $self->generate_and_cache_layout();
-	#print STDERR "Generated DESIGN (and cached) : ".Dumper($design);
+	#$logger->error("Generated DESIGN (and cached) : ".Dumper($design));
 	return $design;
     }
 }
 
 sub generate_and_cache_layout {
     my $self = shift;
-    print STDERR "TrialLayout generate layout ".localtime."\n";
+    $logger->debug("TrialLayout generate layout ".localtime."");
     my $schema = $self->get_schema();
     my $plots_ref;
     my @plots;
@@ -346,10 +348,10 @@ sub generate_and_cache_layout {
 
     $plots_ref = $self->_get_plots();
     if (!$plots_ref) {
-      print STDERR "_get_design_from_trial: not plots provided... returning.\n";
+      $logger->debug("_get_design_from_trial: not plots provided... returning.");
       return { error => "Something went wrong retrieving plots for this trial. This should not happen, so please contact us." };
   }
-#print STDERR "Check 2.3.4.2: ".localtime()."\n";
+#$logger->error("Check 2.3.4.2: ".localtime()."");
 
     # my $genotyping_user_id;
     # my $genotyping_project_name;
@@ -373,12 +375,12 @@ sub generate_and_cache_layout {
 
     my %design;
 
-    #print STDERR "PLOTS: ".Dumper(\@plots);
+    #$logger->error("PLOTS: ".Dumper(\@plots));
     foreach my $plot (@plots) {
 	$self->retrieve_plot_info($plot, \%design);
     }
 
-    #print STDERR "DESIGN IN generate_and_cache_layout: ".Dumper(\%design);
+    #$logger->error("DESIGN IN generate_and_cache_layout: ".Dumper(\%design));
 
     my $trial_layout_json_rs = $project->search_related('projectprops',{ 'type_id' => $self->cvterm_id('trial_layout_json') });
     while (my $t = $trial_layout_json_rs->next) {
@@ -393,7 +395,7 @@ sub generate_and_cache_layout {
         return \%verify_errors;
     }
 
-    #print STDERR "DESIGN AS READ : ".Dumper(\%design);
+    #$logger->error("DESIGN AS READ : ".Dumper(\%design));
 
     return \%design;
 }
@@ -404,16 +406,16 @@ sub retrieve_plot_info {
     my $plot = shift;
     my $design = shift;
 
-    #print STDERR "retrieve_plot_info()... Working on plot ".$plot->uniquename()."\n";
+    #$logger->error("retrieve_plot_info()... Working on plot ".$plot->uniquename()."");
     my %design_info;
 
     my $json = JSON->new();
 
     # if ($self->get_experiment_type eq 'genotyping_trial'){
     #     $design_info{genotyping_user_id} = $genotyping_user_id;
-    #     #print STDERR "RETRIEVED: genotyping_user_id: $design{genotyping_user_id}\n";
+    #     #$logger->error("RETRIEVED: genotyping_user_id: $design{genotyping_user_id}");
     #     $design_info{genotyping_project_name} = $genotyping_project_name;
-    #     #print STDERR "RETRIEVED: genotyping_project_name: $design{genotyping_project_name}\n";
+    #     #$logger->error("RETRIEVED: genotyping_project_name: $design{genotyping_project_name}");
     # }
     my $plot_name = $plot->uniquename;
     my $plot_id = $plot->stock_id;
@@ -441,7 +443,7 @@ sub retrieve_plot_info {
     my $plot_geo_json_prop = $stockprop_hash{$self->cvterm_id('plot_geo_json')} ? $stockprop_hash{$self->cvterm_id('plot_geo_json')}->[0] : undef;
 
     #print  STDERR "SORUCE STOCK TYPES: ".Dumper($self->get_source_stock_type_ids())."\n".Dumper($self->get_source_stock_types());
-    #print STDERR "REL TYEPS = ".Dumper($self->get_relationship_types());
+    #$logger->error("REL TYEPS = ".Dumper($self->get_relationship_types()));
 
     my $accession_rs = $plot->search_related('stock_relationship_subjects')->search(
 	{ 'me.type_id' => { -in => $self->get_relationship_type_ids() }, 'object.type_id' => { -in => $self->get_source_primary_stock_type_ids() } },
@@ -631,7 +633,7 @@ sub retrieve_plot_info {
 
 	    my $plant_number_rs = $p->search_related('stockprops', {'me.type_id' => $self->cvterm_id('plant_index_number') });
 	    if ($plant_number_rs->count != 1){
-		print STDERR "Problem with plant_index_number stockprop for plant: $plant_name\n";
+		$logger->debug("Problem with plant_index_number stockprop for plant: $plant_name");
 	    }
 	    my $plant_index_number = $plant_number_rs->first->value;
 	    push @plant_index_numbers, $plant_index_number;
@@ -666,7 +668,7 @@ sub retrieve_plot_info {
 	    my $tissue_number_rs = $t->search_related('stockprops', {'me.type_id' => $self->cvterm_id('tissue_sample_index_number') });
 	    if ($tissue_number_rs->count > 0) {
 		if ($tissue_number_rs->count != 1){
-		    print STDERR "Problem with tissue_sample_index_number stockprop for tissue_sample: $tissue_name\n";
+		    $logger->debug("Problem with tissue_sample_index_number stockprop for tissue_sample: $tissue_name");
 		}
 		my $tissue_sample_index_number = $tissue_number_rs->first->value;
 		push @tissue_sample_index_numbers, $tissue_sample_index_number;
@@ -696,7 +698,7 @@ sub retrieve_plot_info {
 
 	    my $subplot_number_rs = $p->search_related('stockprops', {'me.type_id' => $self->cvterm_id('subplot_index_number') });
 	    if ($subplot_number_rs->count != 1){
-		print STDERR "Problem with subplot_index_number stockprop for subplot: $subplot_name\n";
+		$logger->debug("Problem with subplot_index_number stockprop for subplot: $subplot_name");
 	    }
 	    my $subplot_index_number = $subplot_number_rs->first->value;
 	    push @subplot_index_numbers, $subplot_index_number;
@@ -747,11 +749,11 @@ sub _get_location_from_field_layout_experiment {
     my $location_name;
     $field_layout_experiment = $self -> _get_field_layout_experiment_from_project();
     if (!$field_layout_experiment) {
-	print STDERR "No field layout detected for this trial.\n";
+	$logger->debug("No field layout detected for this trial.");
 	return;
     }
     $location_name = $field_layout_experiment -> nd_geolocation -> description();
-    #print STDERR "Location: $location_name\n";
+    #$logger->error("Location: $location_name");
     return $location_name;
 }
 
@@ -777,12 +779,12 @@ sub _get_design_type_from_project {
     my $project;
 
     if (!$self->has_trial_id()) {
-	print STDERR "Have no trial_id, aborting...\n";
+	$logger->debug("Have no trial_id, aborting...");
 	return;
     }
     $project = $self->get_project();
     if (!$project) {
-	print STDERR "Have no project row, aborting...\n";
+	$logger->debug("Have no project row, aborting...");
 	return;
     }
     $design_prop =  $project->projectprops->find(
@@ -835,14 +837,14 @@ sub _get_plots {
 
     $field_layout_experiment = $self->_get_field_layout_experiment_from_project();
     if (!$field_layout_experiment) {
-	print STDERR "No field layout experiment found!\n";
+	$logger->debug("No field layout experiment found!");
 	return;
     }
 
     # get source stock types
     my $source_cvterm_ids = $self->get_source_stock_type_ids();
 
-     print STDERR "EXP TYPE =".$self->get_experiment_type()."\n";
+     $logger->debug("EXP TYPE =".$self->get_experiment_type()."");
 
      # if ($self->get_experiment_type eq 'field_layout'){
      # 	$unit_type_id = $plot_cvterm_id;
@@ -851,14 +853,14 @@ sub _get_plots {
      # 	$unit_type_id = $tissue_cvterm_id;
      # }
      # if ($self->get_experiment_type eq 'analysis_experiment') {
-     # 	print STDERR "EXP TYPE = analysis_experiment ($analysis_instance_cvterm_id)... \n";
+     # 	$logger->error("EXP TYPE = analysis_experiment ($analysis_instance_cvterm_id)... ");
      # 	$unit_type_id = $analysis_instance_cvterm_id;
      # }
     @plots = $field_layout_experiment->nd_experiment_stocks->search_related('stock', {'stock.type_id' => {-in => $self->get_target_stock_type_ids()  } });
 
     #debug...
-    print STDERR "PLOT LIST: \n";
-    print STDERR  join( "\n", map { $_->name() } @plots)."\n";
+    $logger->debug("PLOT LIST: ");
+    $logger->debug( join( "\n", map { $_->name() } @plots)."");
 
     return \@plots;
 }
@@ -866,13 +868,13 @@ sub _get_plots {
 sub _build_cvterm_hash {
     my $self = shift;
 
-    print STDERR "Building cvterm has...\n";
+    $logger->debug("Building cvterm has...");
     my %hash;
 
     my $stockprop_rs = $self->get_schema->resultset("Cv::Cvterm")->search( { 'cv.name' => { -in => [ 'stock_property', 'stock_type', 'experiment_property', 'experiment_type', 'stock_relationship', 'project_property', 'project_relationship' ] } }, { join => 'cv' });
 
     while (my $sp = $stockprop_rs->next()) {
-	#print STDERR "Adding ".$sp->name()."...\n";
+	#$logger->error("Adding ".$sp->name()."...");
 	if (exists($hash{ $sp->name() })) {
 	    die "Duplicate term detected (".$sp->name()."). Sorry, but you cannot continue.";
 	}
@@ -925,7 +927,7 @@ sub _build_cvterm_hash {
     # my $notes_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($self->get_schema, 'notes', 'stock_property')->cvterm_id();
     # my $ncbi_taxonomy_id_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($self->get_schema, 'ncbi_taxonomy_id', 'stock_property')->cvterm_id();
     # my $plot_geo_json_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($self->get_schema, 'plot_geo_json', 'stock_property' )->cvterm_id();
-#    print STDERR "Done.\n";
+#    $logger->error("Done.");
 #}
 
 

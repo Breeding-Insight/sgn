@@ -30,6 +30,8 @@ use Data::Dumper;
 use CXGN::BreedersToolbox::Projects;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'owner_sp_person' => (
     isa => 'ArrayRef',
     is => 'rw',
@@ -401,7 +403,7 @@ sub _retrieve_introgression_end_position_bp {
 sub store {
     my $self = shift;
 
-    print STDERR "storing: UNIQUENAME=".$self->uniquename()."\n";
+    $logger->debug("storing: UNIQUENAME=".$self->uniquename()."");
 
     my $id = $self->SUPER::store();
 
@@ -463,7 +465,7 @@ sub store {
     }
 
     if($self->pedigree){
-        print STDERR "CXGN::Stock::Accession->store does not store pedigree info yet!\n";
+        $logger->debug("CXGN::Stock::Accession->store does not store pedigree info yet!");
     }
     if ($self->variety){
         $self->_update_stockprop('variety', $self->variety);
@@ -524,7 +526,7 @@ sub store {
         }
     }
 
-    print STDERR "Saving returned ID $id.\n";
+    $logger->debug("Saving returned ID $id.");
     $self->stock_id($id);
 
     return $self->stock_id();

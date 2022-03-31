@@ -12,6 +12,8 @@ use Data::Dumper;
 
 extends 'CXGN::Dataset';
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'cache_root' => (
     isa => 'Str',
     is => 'rw',
@@ -33,7 +35,7 @@ sub key {
     my $self = shift;
     my $datatype = shift;
 
-    #print STDERR Dumper($self->_get_dataref());
+    #$logger->error(Dumper($self->_get_dataref()));
     my $json = JSON->new();
     #preserve order of hash keys to get same text
     $json = $json->canonical();
@@ -57,7 +59,7 @@ sub genotype_key {
     my $end_position = shift;
     my $marker_name_list = shift;
 
-    #print STDERR Dumper($self->_get_dataref());
+    #$logger->error(Dumper($self->_get_dataref()));
     my $json = JSON->new();
     #preserve order of hash keys to get same text
     $json = $json->canonical();
@@ -150,15 +152,15 @@ override('retrieve_plots',
 	     my $self = shift;
 
 	     if ($self->cache()->exists($self->key("plots"))) {
-		 print STDERR "Retrieving plots from cache...\n";
+		 $logger->debug("Retrieving plots from cache...");
 		 my $plot_json = $self->cache()->get($self->key("plots"));
 		 my $plots = JSON::Any->decode($plot_json);
 		 return $plots;
 	     }
 	     else {
-		 print STDERR "Retrieving plots and caching them...\n";
+		 $logger->debug("Retrieving plots and caching them...");
 		 my $plots = $self->SUPER::retrieve_plots();
-		 #print STDERR Dumper($plots);
+		 #$logger->error(Dumper($plots));
 		 my $plot_json = JSON::Any->encode($plots);
 		 $self->cache()->set($self->key("plots"), $plot_json, $self->cache_expiry());
 		 return $plots;

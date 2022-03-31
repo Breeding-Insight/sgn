@@ -3,6 +3,8 @@ package SGN::Controller::solGS::Path;
 use Moose;
 use namespace::autoclean;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 sub model_page_url {
 	my ($self, $args) = @_;
@@ -77,7 +79,7 @@ sub page_type {
 	# my $path = $c->req->path;
 	my $type;
 
-    print STDERR "\nurl: $url\n";
+    $logger->debug("\nurl: $url");
     my $model_pages = '/solgs/trait'
     . '|solgs/traits/all/'
     . '|solgs/model/combined/trials/'

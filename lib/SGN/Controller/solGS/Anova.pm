@@ -28,6 +28,8 @@ use URI::FromHash 'uri';
 use Scalar::Util qw /weaken reftype/;
 use Storable qw/ nstore retrieve /;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller::REST' }
 
@@ -223,7 +225,7 @@ sub anova_analyis :Path('/anova/analysis/') Args(0) {
 
 	    # my $tr_test = $tr->{$k};
 	    # my $trait_id = $c->stash->{trait_id};
-	    # print STDERR "\nanova_analysis k $k -- tr test: $tr_test -- trait_id: $trait_id\n";
+	    # $logger->error("\nanova_analysis k $k -- tr test: $tr_test -- trait_id: $trait_id");
 	    # if ($k =~ /trait_abbr/)
 	    # {
 	    # 	#$tr->{$k} = undef;
@@ -232,7 +234,7 @@ sub anova_analyis :Path('/anova/analysis/') Args(0) {
 
 	    # 	    $c->controller('solGS::solGS')->get_trait_details($c, $trait_id);
 	    # 	    my $trait_abbr = $c->stash->{trait_abbr};
-	    # 	    print STDERR "\nanova analysis : trait id: $trait_id -- tr abbr: $trait_abbr\n";
+	    # 	    $logger->error("\nanova analysis : trait id: $trait_id -- tr abbr: $trait_abbr");
 	    # 	}
 	    # }
 

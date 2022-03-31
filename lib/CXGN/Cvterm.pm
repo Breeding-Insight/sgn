@@ -27,6 +27,8 @@ use Bio::Chado::Schema;
 use CXGN::Metadata::Schema;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 use base qw / CXGN::DB::Object / ;
 
 use Try::Tiny;
@@ -315,7 +317,7 @@ sub _retrieve_cvtermprop {
             push @results, $r->value;
         }
     } catch {
-        print STDERR "Cvterm $type does not exist in this database\n";
+        $logger->debug("Cvterm $type does not exist in this database");
     };
 
     my $res = join ',', @results;
@@ -337,7 +339,7 @@ sub _remove_cvtermprop {
         return 0;
     }
     else {
-        print STDERR "Error removing cvtermprop from cvterm ".$self->cvterm_id().". Please check this manually.\n";
+        $logger->error("Error removing cvtermprop from cvterm ".$self->cvterm_id().". Please check this manually.");
         return 0;
     }
 }

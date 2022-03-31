@@ -25,6 +25,8 @@ use Try::Tiny;
 use CXGN::People::Schema;
 use CXGN::People::Roles;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -106,7 +108,7 @@ sub roles :Chained('/') PathPart('ajax/roles') CaptureArgs(0) {
     my $self = shift;
     my $c = shift;
 
-    print STDERR "ajax/roles...\n";
+    $logger->debug("ajax/roles...");
     
     $c->stash->{message} = "processing";
 }
@@ -115,7 +117,7 @@ sub list_roles :Chained('roles') PathPart('list') Args(0) {
     my $self = shift;
     my $c = shift;
 
-    print STDERR "roles list\n";
+    $logger->debug("roles list");
     if (! $c->user()) {
 	$c->stash->{rest} = { error => "You must be logged in to use this function." };
 	return;
@@ -159,7 +161,7 @@ sub list_roles :Chained('roles') PathPart('list') Args(0) {
 
 	my $role_name = $roles{$row->get_column('sp_role_id')};
 
-	print STDERR "ROLE : $role_name\n";
+	$logger->debug("ROLE : $role_name");
 	
 	if (! $c->user()->has_role("curator")) {
 	    # only show breeding programs

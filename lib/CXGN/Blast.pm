@@ -94,6 +94,8 @@ use CXGN::Tools::Run;
 
 use Bio::BLAST2::Database;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'sgn_schema' => ( isa => 'SGN::Schema',
 		      is => 'ro',
 		      required => 1,
@@ -200,7 +202,7 @@ sub BUILD {
 	$self->jbrowse_src($row->jbrowse_src());
     }
     else { 
-	print STDERR "No blast_db_id provided. Creating empty object...\n";
+	$logger->debug("No blast_db_id provided. Creating empty object...");
     }
 }
 

@@ -212,7 +212,7 @@ around 'finalize_error' => sub {
         #try {
         #    $self->view('Email::ErrorEmail')->process( $self )
         #} catch {
-        #    $self->log->error("Failed to send error email! Error was: $_");
+        #    $logger->error("Failed to send error email! Error was: $_");
         #    push @{$self->error}, $_;
         #};
     }

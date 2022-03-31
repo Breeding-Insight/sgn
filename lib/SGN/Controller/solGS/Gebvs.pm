@@ -17,6 +17,8 @@ use Scalar::Util qw /weaken reftype/;
 use String::CRC;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller' }
 
 
@@ -124,13 +126,13 @@ sub combine_gebvs_jobs_args {
         }
 
 	my $identifier = $self->combined_gebvs_file_id($c);
-    print STDERR "\ncombined_gebvs_file_id: $identifier\n";
+    $logger->debug("\ncombined_gebvs_file_id: $identifier");
 	my $tmp_dir = $c->stash->{solgs_tempfiles_dir};
 
         #my $combined_gebvs_file = $c->controller('solGS::Files')->create_tempfile($tmp_dir, "combined_gebvs_${identifier}");
         $self->combined_gebvs_file($c);
         my  $combined_gebvs_file = $c->stash->{combined_gebvs_file};
-        print STDERR "\ncombined_gebvs_file --  $combined_gebvs_file\n";
+        $logger->debug("\ncombined_gebvs_file --  $combined_gebvs_file");
         $c->stash->{input_files}  = $gebvs_files;
         $c->stash->{output_files} = $combined_gebvs_file;
         $c->stash->{r_temp_file}  = "combining-gebvs-${identifier}";
@@ -369,7 +371,7 @@ sub training_pop_analyzed_traits {
 
     @traits = uniq(@traits);
     @si_traits = uniq(@si_traits);
-print STDERR "\nanalyzed_traits_files -- @analyzed_traits_files\n";
+$logger->debug("\nanalyzed_traits_files -- @analyzed_traits_files");
     $c->stash->{training_pop_analyzed_traits}        = \@traits;
     $c->stash->{training_pop_analyzed_traits_ids}    = \@selected_analyzed_traits;
     $c->stash->{training_pop_analyzed_traits_files}  = \@analyzed_traits_files;

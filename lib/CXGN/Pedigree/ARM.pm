@@ -54,6 +54,8 @@ use File::Copy;
 use CXGN::Tools::Run;
 use File::Temp 'tempfile';
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -132,7 +134,7 @@ sub get_arm {
 
     my $number_system_cores = `getconf _NPROCESSORS_ONLN` or die "Could not get number of system cores!\n";
     chomp($number_system_cores);
-    print STDERR "NUMCORES $number_system_cores\n";
+    $logger->debug("NUMCORES $number_system_cores");
 
     my @individuals_stock_ids;
     my @all_individual_accessions_stock_ids;
@@ -141,7 +143,7 @@ sub get_arm {
     my %seen_male_parents;
 
     if ($plot_list && scalar(@$plot_list)>0) {
-        print STDERR "COMPUTING ARM FROM PARENTS FOR PLOTS\n";
+        $logger->debug("COMPUTING ARM FROM PARENTS FOR PLOTS");
         my $plot_list_string = join ',', @$plot_list;
         my $q = "SELECT plot.stock_id, accession.stock_id, female_parent.stock_id, male_parent.stock_id
             FROM stock AS plot
@@ -168,9 +170,9 @@ sub get_arm {
         @all_individual_accessions_stock_ids = @plot_accession_stock_ids_found;
         @individuals_stock_ids = @plot_stock_ids_found;
 
-        # print STDERR Dumper \@plot_stock_ids_found;
-        # print STDERR Dumper \@plot_female_stock_ids_found;
-        # print STDERR Dumper \@plot_male_stock_ids_found;
+        # $logger->error(Dumper(\@plot_stock_ids_found));
+        # $logger->error(Dumper(\@plot_female_stock_ids_found));
+        # $logger->error(Dumper(\@plot_male_stock_ids_found));
 
         for my $i (0..scalar(@plot_stock_ids_found)-1) {
             my $female_stock_id = $plot_female_stock_ids_found[$i];
@@ -190,7 +192,7 @@ sub get_arm {
         }
     }
     elsif ($accession_list && scalar(@$accession_list)>0) {
-        print STDERR "COMPUTING ARM FROM PARENTS FOR ACCESSIONS\n";
+        $logger->debug("COMPUTING ARM FROM PARENTS FOR ACCESSIONS");
         my $accession_list_string = join ',', @$accession_list;
         my $q = "SELECT accession.stock_id, female_parent.stock_id, male_parent.stock_id
             FROM stock AS accession
@@ -210,9 +212,9 @@ sub get_arm {
             push @male_stock_ids_found, $male_parent_stock_id;
         }
 
-        # print STDERR Dumper \@accession_stock_ids_found;
-        # print STDERR Dumper \@female_stock_ids_found;
-        # print STDERR Dumper \@male_stock_ids_found;
+        # $logger->error(Dumper(\@accession_stock_ids_found));
+        # $logger->error(Dumper(\@female_stock_ids_found));
+        # $logger->error(Dumper(\@male_stock_ids_found));
 
         @all_individual_accessions_stock_ids = @$accession_list;
         @individuals_stock_ids = @$accession_list;
@@ -245,7 +247,7 @@ sub arm_cache_key {
     my $self = shift;
     my $datatype = shift;
 
-    #print STDERR Dumper($self->_get_dataref());
+    #$logger->error(Dumper($self->_get_dataref()));
     my $json = JSON->new();
     #preserve order of hash keys to get same text
     $json = $json->canonical();
@@ -328,7 +330,7 @@ sub download_arm {
             my %result_hash;
             my $row_num = 0;
             my %seen_stock_ids;
-            # print STDERR Dumper \@grm;
+            # $logger->error(Dumper(\@grm));
             foreach my $s (@$stock_ids) {
                 foreach my $c (@$stock_ids) {
                     if (!exists($result_hash{$s}->{$c}) && !exists($result_hash{$c}->{$s})) {
@@ -425,7 +427,7 @@ sub download_arm {
             my %result_hash;
             my $row_num = 0;
             my %seen_stock_ids;
-            # print STDERR Dumper \@grm;
+            # $logger->error(Dumper(\@grm));
             foreach my $s (@$stock_ids) {
                 foreach my $c (@$stock_ids) {
                     if (!exists($result_hash{$s}->{$c}) && !exists($result_hash{$c}->{$s})) {
@@ -477,7 +479,7 @@ sub download_arm {
             my %result_hash;
             my $row_num = 0;
             my %seen_stock_ids;
-            # print STDERR Dumper \@grm;
+            # $logger->error(Dumper(\@grm));
             foreach my $s (@$stock_ids) {
                 foreach my $c (@$stock_ids) {
                     if (!exists($result_hash{$s}->{$c}) && !exists($result_hash{$c}->{$s})) {
@@ -575,7 +577,7 @@ sub download_arm {
             ggplot(data = mat, aes(x=V1, y=V2, fill=V3)) + geom_tile();
             dev.off();
             "';
-            print STDERR Dumper $heatmap_cmd;
+            $logger->error(Dumper($heatmap_cmd));
 
             my $tmp_output_dir = $shared_cluster_dir_config."/tmp_download_arm_heatmap";
             mkdir $tmp_output_dir if ! -d $tmp_output_dir;

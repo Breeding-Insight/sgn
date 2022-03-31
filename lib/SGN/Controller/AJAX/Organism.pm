@@ -6,6 +6,8 @@ use JSON::Any;
 use URI::Encode;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 
@@ -209,10 +211,10 @@ sub metadata_form {
 
     my $data = {};
     if ($json) {
-        #print STDERR "CONVERTING JSON...\n";
+        #$logger->error("CONVERTING JSON...");
         $data = $c->stash->{json}->jsonToObj($json); }
     else {
-        #print STDERR "No JSON data provided...\n";
+        #$logger->error("No JSON data provided...");
 
     }
 

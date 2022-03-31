@@ -24,6 +24,8 @@ use CXGN::Genotype::Search;
 use JSON::XS;
 use CXGN::Trial;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -92,7 +94,7 @@ sub manage_trials : Path("/breeders/trials") Args(0) {
         }
     }
 
-    #print STDERR "Breeding programs are ".Dumper(@breeding_programs);
+    #$logger->error("Breeding programs are ".Dumper(@breeding_programs));
     my $field_management_factors = $c->config->{management_factor_types};
     my @management_factor_types = split ',',$field_management_factors;
 
@@ -109,7 +111,7 @@ sub manage_trials : Path("/breeders/trials") Args(0) {
     my $json = JSON::XS->new();
     my $locations = $json->decode($projects->get_all_locations_by_breeding_program());
 
-    #print STDERR "Locations are ".Dumper($locations)."\n";
+    #$logger->error("Locations are ".Dumper($locations)."");
 
     $c->stash->{locations} = $locations;
 
@@ -479,7 +481,7 @@ sub manage_phenotyping_download : Path("/breeders/phenotyping/download") Args(1)
     my $metadata_schema = $c->dbic_schema('CXGN::Metadata::Schema');
     my $file_row = $metadata_schema->resultset("MdFiles")->find({file_id => $file_id});
     my $file_destination =  catfile($file_row->dirname, $file_row->basename);
-    #print STDERR "\n\n\nfile name:".$file_row->basename."\n";
+    #$logger->error("\n\n\nfile name:".$file_row->basename."");
     my $contents = read_file($file_destination);
     my $file_name = $file_row->basename;
     $c->res->content_type('Application/trt');
@@ -495,9 +497,9 @@ sub manage_phenotyping_view : Path("/breeders/phenotyping/view") Args(1) {
     my $metadata_schema = $c->dbic_schema('CXGN::Metadata::Schema');
     my $file_row = $metadata_schema->resultset("MdFiles")->find({file_id => $file_id});
     my $file_destination =  catfile($file_row->dirname, $file_row->basename);
-    #print STDERR "\n\n\nfile name:".$file_row->basename."\n";
+    #$logger->error("\n\n\nfile name:".$file_row->basename."");
     my @contents = ReadData ($file_destination);
-    #print STDERR Dumper \@contents;
+    #$logger->error(Dumper(\@contents));
     my $file_name = $file_row->basename;
     $c->stash->{file_content} = \@contents;
     $c->stash->{filename} = $file_name;
@@ -767,7 +769,7 @@ sub get_file_data : Private {
         FROM metadata.md_files AS mdf
         JOIN metadata.md_metadata AS md ON (mdf.metadata_id = md.metadata_id)
         WHERE mdf.filetype IN ($file_type_string) $where_string;";
-    print STDERR $q."\n";
+    $logger->debug($q."");
     my $h = $c->dbc->dbh->prepare($q);
     $h->execute();
     while (my ($file_id, $basename, $dirname, $filetype, $md5, $create_date, $obsolete) = $h->fetchrow_array()) {

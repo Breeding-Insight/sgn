@@ -43,7 +43,7 @@ sub create_design {
         $greenhouse_design{$plot_num}->{'plant_names'} = \@plant_names;
     }
 
-    #print STDERR Dumper \%greenhouse_design;
+    #$logger->error(Dumper(\%greenhouse_design));
     return \%greenhouse_design;
 }
 

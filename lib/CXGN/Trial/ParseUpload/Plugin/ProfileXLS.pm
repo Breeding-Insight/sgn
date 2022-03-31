@@ -6,6 +6,7 @@ use CXGN::Stock::StockLookup;
 use SGN::Model::Cvterm;
 use Data::Dumper;
 use CXGN::List::Validate;
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
     my $self = shift;
@@ -236,7 +237,7 @@ sub _parse_with_plugin {
             'trait_type' => $trait_type
         }
     }
-#    print STDERR "PARSED RESULT =".Dumper(%parsed_result)."\n";
+#    $logger->error("PARSED RESULT =".Dumper(%parsed_result)."");
 
     $self->_set_parsed_data(\%parsed_result);
 

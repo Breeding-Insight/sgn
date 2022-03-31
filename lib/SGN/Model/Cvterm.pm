@@ -26,6 +26,8 @@ package SGN::Model::Cvterm;
 use CXGN::Chado::Cvterm;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub get_cvterm_object {
     my $self = shift;
     my $schema = shift;
@@ -35,7 +37,7 @@ sub get_cvterm_object {
     my $cv = $schema->resultset('Cv::Cv')->find( { name => $cv_name });
 
     if (! $cv) {
-	print STDERR "CV $cv_name not found. Ignoring.";
+	$logger->error("CV $cv_name not found. Ignoring.");
 	return undef;
     }
     my $term = CXGN::Chado::Cvterm->new_with_term_name(
@@ -67,7 +69,7 @@ sub get_cvterm_row_from_trait_name {
     my $schema = shift;
     my $trait_name = shift;
 
-    #print STDERR $trait_name;
+    #$logger->error($trait_name);
 
     #fieldbook trait string should be "$trait_name|$dbname:$trait_accession" e.g. plant height|CO_334:0000123. substring on last occurance of |
     my $delim = "|";
@@ -206,21 +208,21 @@ sub _concatenate_cvterm_array {
     my $format = shift;
     my $first = shift;
     my $second = shift;
-    #print STDERR "_concatenate_cvterm_array\n";
-    #print STDERR Dumper $first;
-    #print STDERR Dumper $second;
+    #$logger->error("_concatenate_cvterm_array");
+    #$logger->error(Dumper($first));
+    #$logger->error(Dumper($second));
     my %first_hash = %$first;
     foreach my $f (keys %first_hash){
         my $ids = $first_hash{$f};
         foreach my $s (@$second){
             my @component_ids = @$ids;
-            #print STDERR "_iterate\n";
+            #$logger->error("_iterate");
             my $name = get_trait_from_cvterm_id($schema, $s, $format);
             my $concatenated_cvterm = $f.$delimiter.$name;
             push @component_ids, $s;
             delete $first_hash{$f};
             $first_hash{$concatenated_cvterm} = \@component_ids;
-            #print STDERR Dumper \%first_hash;
+            #$logger->error(Dumper(\%first_hash));
         }
     }
     return \%first_hash;
@@ -232,9 +234,9 @@ sub get_traits_from_component_categories {
     my $composable_cvterm_delimiter = shift;
     my $composable_cvterm_format = shift;
     my $cvterm_id_hash = shift;
-    #print STDERR Dumper $cvterm_id_hash;
-    #print STDERR Dumper $allowed_composed_cvs;
-    #print STDERR Dumper $composable_cvterm_format;
+    #$logger->error(Dumper($cvterm_id_hash));
+    #$logger->error(Dumper($allowed_composed_cvs));
+    #$logger->error(Dumper($composable_cvterm_format));
 
     my %id_hash = %$cvterm_id_hash;
     delete @id_hash{ grep { scalar @{$id_hash{$_}} < 1 } keys %id_hash }; #remove cvtypes with no ids
@@ -254,7 +256,7 @@ sub get_traits_from_component_categories {
         $concatenated_cvterms = _concatenate_cvterm_array($schema, $composable_cvterm_delimiter, $composable_cvterm_format, $concatenated_cvterms, $ordered_id_groups[$n+1]);
     }
 
-    #print STDERR "possible traits are: ".Dumper($concatenated_cvterms)."\n";
+    #$logger->error("possible traits are: ".Dumper($concatenated_cvterms)."");
 
     my @existing_traits;
     my @new_traits;
@@ -273,7 +275,7 @@ sub get_traits_from_component_categories {
         push @new_traits, [ $concatenated_cvterms->{$key}, $key ];
     }
 
-    #print STDERR "existing traits are: ".Dumper(/@existing_traits)." and new traits are".Dumper(/@new_traits)."\n";
+    #$logger->error("existing traits are: ".Dumper(/@existing_traits)." and new traits are".Dumper(/@new_traits)."");
 
     return {
       existing_traits => \@existing_traits,

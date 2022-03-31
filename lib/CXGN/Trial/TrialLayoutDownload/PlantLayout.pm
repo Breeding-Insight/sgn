@@ -41,6 +41,8 @@ use JSON;
 
 extends 'CXGN::Trial::TrialLayoutDownload';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub retrieve {
     my $self = shift;
     my $schema = $self->schema();
@@ -134,7 +136,7 @@ sub retrieve {
             $i++;
         }
     }
-    #print STDERR Dumper \@plant_design;
+    #$logger->error(Dumper(\@plant_design));
 
     my @overall_trait_names = sort keys %$overall_performance_hash;
     my @exact_trait_names = sort keys %$exact_performance_hash;

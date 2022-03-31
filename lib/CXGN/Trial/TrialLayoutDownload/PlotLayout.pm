@@ -41,6 +41,8 @@ use JSON;
 
 extends 'CXGN::Trial::TrialLayoutDownload';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub retrieve {
     my $self = shift;
     my $schema = $self->schema();
@@ -96,7 +98,7 @@ sub retrieve {
         my $line;
         foreach (@possible_cols){
             if ($selected_cols{$_}){
-                #print STDERR "Working on column $_\n";
+                #$logger->error("Working on column $_");
                 if ($_ eq 'location_name'){
                     push @$line, $location_name;
                 } elsif ($_ eq 'plot_geo_json'){
@@ -120,7 +122,7 @@ sub retrieve {
             }
         }
 
-        #print STDERR "Adding treatment and trait performance\n";
+        #$logger->error("Adding treatment and trait performance");
 
         $line = $self->_add_treatment_to_line($treatment_units_hash_list, $line, $design_info->{'plot_name'});
         $line = $self->_add_exact_performance_to_line(\@exact_trait_names, $line, $exact_performance_hash, $design_info->{'plot_name'});

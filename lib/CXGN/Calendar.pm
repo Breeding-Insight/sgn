@@ -26,6 +26,8 @@ use Time::Piece;
 use Time::Seconds;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'bcs_schema' => (
 	isa => 'Bio::Chado::Schema',
@@ -133,42 +135,42 @@ sub format_time {
 	my $self = shift;
     my $input_time = shift;
 
-    #print STDERR $input_time."\n";
+    #$logger->error($input_time."");
 
     my $formatted_time;
 
     if ($input_time =~ /^\d{4}-\d\d-\d\d$/) {
-        #print STDERR '1 '.$input_time."\n";
+        #$logger->error('1 '.$input_time."");
         $formatted_time = Time::Piece->strptime($input_time, '%Y-%m-%d');
     }
     if ($input_time =~ /^\d\d\d\d\/\d\d\/\d\d\s\d\d:\d\d:\d\d$/) {
-        #print STDERR '2 '.$input_time."\n";
+        #$logger->error('2 '.$input_time."");
         $formatted_time = Time::Piece->strptime($input_time, '%Y/%m/%d %H:%M:%S');
     }
     if ($input_time =~ /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/) {
-        #print STDERR '3 '.$input_time."\n";
+        #$logger->error('3 '.$input_time."");
         $formatted_time = Time::Piece->strptime($input_time, '%Y-%m-%dT%H:%M:%S');
     }
     if ($input_time =~ /^(\d{4})-(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{2})$/) {
-        #print STDERR '4 '.$input_time."\n";
+        #$logger->error('4 '.$input_time."");
         $formatted_time = Time::Piece->strptime($input_time, '%Y-%b-%d');
     }
     if ($input_time =~ /^(\d{4})-(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{1})$/) {
         my $single_digit_date = substr($input_time, -1);
         my $input_time_1 = substr($input_time, 0, -1);
         $input_time = $input_time_1.'0'.$single_digit_date;
-        #print STDERR '5 '.$input_time."\n";
+        #$logger->error('5 '.$input_time."");
         $formatted_time = Time::Piece->strptime($input_time, '%Y-%b-%d');
     }
     if ($input_time =~ /^(\d{4})-(January|February|March|April|May|June|July|August|September|October|November|December)-(\d{2})$/) {
-        #print STDERR '6 '.$input_time."\n";
+        #$logger->error('6 '.$input_time."");
         $formatted_time = Time::Piece->strptime($input_time, '%Y-%B-%d');
     }
     if ($input_time =~ /^(\d{4})-(January|February|March|April|May|June|July|August|September|October|November|December)-(\d{1})$/) {
         my $single_digit_date = substr($input_time, -1);
         my $input_time_1 = substr($input_time, 0, -1);
         $input_time = $input_time_1.'0'.$single_digit_date;
-        #print STDERR '7 '.$input_time."\n";
+        #$logger->error('7 '.$input_time."");
         $formatted_time = Time::Piece->strptime($input_time, '%Y-%B-%d');
     }
     return $formatted_time;
@@ -181,7 +183,7 @@ sub get_calendar_events_personal {
 	my $dbh = $schema->storage->dbh;
 	my $person_id = $self->sp_person_id;
 	my @roles = @{$self->roles};
-	#print STDERR Dumper \@roles;
+	#$logger->error(Dumper(\@roles));
 
 	my @search_project_ids = '-1';
 	foreach (@roles) {
@@ -237,7 +239,7 @@ sub populate_calendar_events {
 	    next;
 	}
 
-    #print STDERR $calendar_formatted_value;
+    #$logger->error($calendar_formatted_value);
 
 	@calendar_array = $self->parse_calendar_array($calendar_formatted_value);
     if (!$calendar_array[0]) {

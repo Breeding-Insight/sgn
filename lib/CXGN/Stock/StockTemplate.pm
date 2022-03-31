@@ -30,6 +30,8 @@ use File::Basename qw | basename dirname|;
 use Spreadsheet::ParseExcel;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'schema' => (
     is  => 'rw',
@@ -119,7 +121,7 @@ sub parse {
     my $worksheet = ( $workbook->worksheets() )[0]; #support only one worksheet
     my ( $row_min, $row_max ) = $worksheet->row_range();
     my ( $col_min, $col_max ) = $worksheet->col_range();
-    print STDERR "$row_min $row_max $col_min $col_max \n";
+    $logger->debug("$row_min $row_max $col_min $col_max ");
     if ($col_max < 2 || $row_max < 8 ) {#must have header and at least one row of phenotypes
       push @errors, "Spreadsheet is missing header";
       $self->parse_errors(\@errors);
@@ -166,7 +168,7 @@ sub parse {
         my $unformatted_value = $cell->unformatted() ;
         ## read the header row, make a hash of names to column numbers, then in the data rows, get_cell($row, $col_for_header{'SomeHeader'})
         $headers{$value} = $col;
-	print STDERR "cell value: $value\n";
+	$logger->debug("cell value: $value");
     }
     for my $row ( 8 .. $row_max ) { # phenotypes should be from row 9 and on
         # got the row number, now look at the column headers
@@ -177,11 +179,11 @@ sub parse {
         my $planted_plants = $worksheet->get_cell ($row , $headers{'NOPLT'})->value();
         my $surv_plants = $worksheet->get_cell ($row , $headers{'NOSV'})->value;
         foreach my $header (keys %headers) {
-	      print STDERR "header loop header: $header\n";
+	      $logger->debug("header loop header: $header");
             if ($header =~ m/^CO_\d\{1-4\}:\d{7}/ ) {
-	      print STDERR "has header: $header row: $row col: ".$headers{$header}."\n";
+	      $logger->debug("has header: $header row: $row col: ".$headers{$header}."");
 	      my $value = $worksheet->get_cell( $row , $headers{$header} )->value();
-	      print STDERR "has value: $value\n";
+	      $logger->debug("has value: $value");
                 ## remove spaces
                 $value =~ s/^\s+//;
                 $value =~ s/\s+$//;
@@ -189,13 +191,13 @@ sub parse {
                 my ($full_accession, $full_unit ) = split(/\|/, $header); # do we support units in a spreadsheet upload?
                 my ($value_type, $unit_value) = split(/\:/, $full_unit);
                 my ($db_name, $accession) = split (/\:/ , $full_accession);
-                #print STDERR "db_name = '$db_name' sp_accession = '$sp_accession'\n";
+                #$logger->error("db_name = '$db_name' sp_accession = '$sp_accession'");
                 next() if (!$accession);
                 ####################
                 #skip non-numeric values
                 if ($value !~ /^\d/) {
                     if ($value eq "\." ) { next; }
-		    print STDERR "measurement:  $value \n";
+		    $logger->debug("measurement:  $value ");
                     #push @errors,  "** Found non-numeric value in column $header (value = '" . $value ."') Row = $row.";
                     next;
                 }
@@ -205,7 +207,7 @@ sub parse {
                 $hashref->{join("\t", $spreadsheet_id, $operator, $date, $row) }->{$plot_stock_id}->{$full_accession}->{planted_plants} = $planted_plants;
                 $hashref->{join("\t", $spreadsheet_id, $operator, $date, $row) }->{$plot_stock_id}->{$full_accession}->{surviving_plants} = $surv_plants;
                 $hashref->{join("\t", $spreadsheet_id, $operator, $date, $row) }->{$plot_stock_id}->{$full_accession}->{value} = $value;
-		print STDERR "Accession: $full_accession Replicate: $replicate Block: $block\n";
+		$logger->debug("Accession: $full_accession Replicate: $replicate Block: $block");
             }
         }
     }
@@ -217,7 +219,7 @@ sub parse {
     $self->parsed_header(\%header_hash);
     if (scalar(@errors) >= 1) {
       $self->parse_errors(\@errors);
-      print STDERR "More than one parse error\n";
+      $logger->error("More than one parse error");
     }
 }
 
@@ -233,17 +235,17 @@ sub verify {
     foreach my $key (keys %$hashref) {
         ##$hashref->{join("\t", $spreadsheet_id, $operator, $date, $row) }->{$plot_stock_id}->{$cvterm_accession}->{replicate} = $replicate;
         my ($spreadsheet_id, $operator, $date, $row) = split(/\t/, $key);
-        print STDERR "***** verify found key $key !!!!!!!\n\n";
-        print STDERR "verify :  ... . . . .spreadsheet = $spreadsheet_id, operator = $operator, date = $date, row = $row \n\n";
+        $logger->debug("***** verify found key $key !!!!!!!\n");
+        $logger->debug("verify :  ... . . . .spreadsheet = $spreadsheet_id, operator = $operator, date = $date, row = $row \n");
         ###
         foreach my $plot_stock_id (keys %{$hashref->{$key} } ) {
             #check if the stock exists
-            print STDERR "verify .. Looking for stock_id ".$plot_stock_id."\n";
+            $logger->debug("verify .. Looking for stock_id ".$plot_stock_id."");
 	    my $stock;
 	    $stock = $schema->resultset("Stock::Stock")->find( { stock_id => $plot_stock_id } );
             if (!$stock) { push @errors, "Stock $plot_stock_id does not exist in the database!"; }
             foreach my $cvterm_accession (keys %{$hashref->{$key}->{$plot_stock_id} } ) {
-                print STDERR "verify ... Looking for accession $cvterm_accession..\n";
+                $logger->debug("verify ... Looking for accession $cvterm_accession..");
                 my ($db_name, $accession) = split (/:/, $cvterm_accession);
                 if (!$db_name) { push @errors, "could not find valid db_name in accession $cvterm_accession";}
                 if (!$accession) { push @errors, "Could not find valid cvterm accession in $cvterm_accession";}
@@ -268,7 +270,7 @@ sub verify {
     }
     $self->warnings(\@warnings);
     foreach my $err (@errors) {
-        print STDERR " *!*!*!error = $err\n";
+        $logger->error(" *!*!*!error = $err");
     }
     if (scalar(@errors) >= 1) {
       $self->verify_errors(\@errors);
@@ -308,7 +310,7 @@ sub store {
       $file_row->insert();
       
 
-      print STDERR "\nFile id: ".$file_row->file_id()."\n";
+      $logger->debug("\nFile id: ".$file_row->file_id()."");
 
 
 
@@ -322,7 +324,7 @@ sub store {
       # find the cvterm for a phenotyping experiment
       my $pheno_cvterm = SGN::Model::Cvterm->get_cvterm_row($schema, 'phenotyping_experiment', 'experiment_type');
 
-      print STDERR " ***store: phenotyping experiment cvterm = " . $pheno_cvterm->cvterm_id . "\n";
+      $logger->debug(" ***store: phenotyping experiment cvterm = " . $pheno_cvterm->cvterm_id . "");
       ##################
       #This has to be stored in the database when adding a new project for these plots
       my $field_layout_experiment = 'field_layout'; #############################
@@ -330,21 +332,21 @@ sub store {
       foreach my $key (keys %$hashref) {
 	my ($spreadsheet_id, $operator, $date, $row) = split(/\t/, $key);
 	foreach my $plot_stock_id (keys %{$hashref->{$key} } ) {
-	  print STDERR " *** store: loading information for stock $plot_stock_id \n";
+	  $logger->debug(" *** store: loading information for stock $plot_stock_id ");
 	  foreach my $cvterm_accession (keys %{$hashref->{$key}->{$plot_stock_id} } ) {
-	    print STDERR " ** store: cvterm_accession = $cvterm_accession\n";
+	    $logger->debug(" ** store: cvterm_accession = $cvterm_accession");
 	    my $replicate = $hashref->{$key}->{$plot_stock_id}->{$cvterm_accession}->{replicate};
 	    my $block = $hashref->{$key}->{$plot_stock_id}->{$cvterm_accession}->{block};
 	    my $planted_plants = $hashref->{$key}->{$plot_stock_id}->{$cvterm_accession}->{planted_plants};
 	    my $surviving_plants = $hashref->{$key}->{$plot_stock_id}->{$cvterm_accession}->{surviving_plants};
 	    my $value = $hashref->{$key}->{$plot_stock_id}->{$cvterm_accession}->{value};
 
-	    print STDERR " ** store: value = $value\n";
+	    $logger->debug(" ** store: value = $value");
 	    my ($db_name, $accession) = split (/:/, $cvterm_accession);
 	    my $db = $schema->resultset("General::Db")->search(
 							       {
 								'me.name' => $db_name, } );
-	    print STDERR " ** store: found db $db_name , accession = $accession \n";
+	    $logger->debug(" ** store: found db $db_name , accession = $accession ");
 	    if ($db) {
 	      my $dbxref = $db->search_related("dbxrefs", { accession => $accession, });
 	      if ($dbxref) {
@@ -393,7 +395,7 @@ sub store {
 											    nd_geolocation_id => $location_id,
 											    type_id => $pheno_cvterm->cvterm_id(),
 											   } );
-		  print STDERR " ** store: created new experiment " . $experiment->nd_experiment_id . "\n";
+		  $logger->debug(" ** store: created new experiment " . $experiment->nd_experiment_id . "");
 		  $experiment->create_nd_experimentprops(
 		      {
 			  date => $date } ,
@@ -412,13 +414,13 @@ sub store {
 		$experiment->find_or_create_related('nd_experiment_projects', {
 		    project_id => $project_id
 						    } );
-		print STDERR " ** store: linking experiment " . $experiment->nd_experiment_id . " with project $project_id \n";
+		$logger->debug(" ** store: linking experiment " . $experiment->nd_experiment_id . " with project $project_id ");
 		#link the experiment to the stock
 		$experiment->find_or_create_related('nd_experiment_stocks' , {
 		    stock_id => $plot_stock_id,
 		    type_id  =>  $pheno_cvterm->cvterm_id,
 						    });
-		print STDERR " ** store: linking experiment " . $experiment->nd_experiment_id . " to stock $plot_stock_id \n";
+		$logger->debug(" ** store: linking experiment " . $experiment->nd_experiment_id . " to stock $plot_stock_id ");
 		my $uniquename = "Stock: " . $plot_stock_id . ", trait: " . $cvterm->name . " date: $date" . "  operator = $operator" ;
 		my $phenotype = $cvterm->find_or_create_related(
 		    "phenotype_cvalues", {
@@ -426,7 +428,7 @@ sub store {
 			value => $value ,
 			uniquename => $uniquename,
 		    });
-		print STDERR " ** store: added phenotype value $value , observable = " . $cvterm->name ." uniquename = $uniquename \n";
+		$logger->debug(" ** store: added phenotype value $value , observable = " . $cvterm->name ." uniquename = $uniquename ");
 		#link the phenotpe to the experiment
 		$experiment->find_or_create_related('nd_experiment_phenotypes' , {
 		    phenotype_id => $phenotype->phenotype_id });

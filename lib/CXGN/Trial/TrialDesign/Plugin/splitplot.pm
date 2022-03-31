@@ -68,14 +68,14 @@ sub create_design {
         coln => scalar(@stock_list),
         data => \@stock_list,
     });
-    #print STDERR Dumper $stock_data_matrix;
+    #$logger->error(Dumper($stock_data_matrix));
     my $treatment_data_matrix =  R::YapRI::Data::Matrix->new({
         name => 'treatment_data_matrix',
         rown => 1,
         coln => scalar(@$treatments),
         data => $treatments,
     });
-    #print STDERR Dumper $treatment_data_matrix;
+    #$logger->error(Dumper($treatment_data_matrix));
 
     $r_block = $rbase->create_block('r_block');
     $stock_data_matrix->send_rbase($rbase, 'r_block');
@@ -98,7 +98,7 @@ sub create_design {
     $r_block->add_command('split<-as.matrix(split)');
     $r_block->run_block();
     $result_matrix = R::YapRI::Data::Matrix->read_rbase( $rbase,'r_block','split');
-    #print STDERR Dumper $result_matrix;
+    #$logger->error(Dumper($result_matrix));
 
     @plot_numbers = $result_matrix->get_column("plots");
     @subplots_numbers = $result_matrix->get_column("splots");

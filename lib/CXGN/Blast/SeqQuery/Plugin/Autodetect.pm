@@ -3,6 +3,8 @@ package CXGN::Blast::SeqQuery::Plugin::Autodetect;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 sub name { 
   return 'autodetect';
@@ -91,8 +93,8 @@ sub process {
     $final_seq = ">Untitled_sequence\n$sequence\n";
   }
 
-  # print STDERR "accessing the autodetect process function\n";
-  print STDERR "FINAL SEQ: $final_seq\n";
+  # $logger->error("accessing the autodetect process function");
+  $logger->debug("FINAL SEQ: $final_seq");
   return $final_seq;
 }
 
@@ -129,7 +131,7 @@ sub autodetect_seq_type {
 		$seq_type = 'protein';
 	}
 	
-	print STDERR "accessing the autodetect_seq_type function. header: $seq_header, seq_type: $seq_type, valid:  $valid_nt, length: ".length($sequence)."\n";
+	$logger->debug("accessing the autodetect_seq_type function. header: $seq_header, seq_type: $seq_type, valid:  $valid_nt, length: ".length($sequence)."");
 	
 	return $seq_type;
 }

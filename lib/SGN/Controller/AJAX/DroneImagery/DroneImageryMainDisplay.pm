@@ -26,6 +26,8 @@ use Image::Size;
 use CXGN::DroneImagery::ImageTypes;
 #use Inline::Python;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -266,7 +268,7 @@ sub raw_drone_imagery_drone_run_band_summary_GET : Args(0) {
         project_image_type_id_list=>\@main_image_types_array
     });
     my ($result, $total_count) = $images_search->search();
-    #print STDERR Dumper $result;
+    #$logger->error(Dumper($result));
 
     my $observation_unit_plot_polygon_types = CXGN::DroneImagery::ImageTypes::get_all_project_md_image_observation_unit_plot_polygon_types($schema);
     my $observation_unit_plot_polygon_type_names;
@@ -281,7 +283,7 @@ sub raw_drone_imagery_drone_run_band_summary_GET : Args(0) {
         project_image_type_id_list=>\@observation_unit_plot_polygon_types_array
     });
     my ($observation_unit_polygon_result, $observation_unit_polygon_total_count) = $observation_unit_polygon_imagery_search->search();
-    #print STDERR Dumper $observation_unit_polygon_result;
+    #$logger->error(Dumper($observation_unit_polygon_result));
 
     my %original_background_removed_threshold_terms = (
         'threshold_background_removed_stitched_drone_imagery_blue' => 'Blue (450-520nm)',
@@ -377,7 +379,7 @@ sub raw_drone_imagery_drone_run_band_summary_GET : Args(0) {
         push @{$unique_drone_runs{$_->{drone_run_project_id}}->{bands}->{$_->{drone_run_band_project_id}}->{$_->{project_image_type_name}."_images"}}, '<a href="/image/view/'.$image_id.'" target="_blank">'.$image_source_tag_tiny.'</a>';
     }
 
-    # print STDERR Dumper \%unique_drone_runs;
+    # $logger->error(Dumper(\%unique_drone_runs));
 
     foreach my $k (sort keys %unique_drone_runs) {
         my $v = $unique_drone_runs{$k};

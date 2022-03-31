@@ -8,6 +8,8 @@ extends 'CXGN::Project';
 use SGN::Model::Cvterm;
 use CXGN::Calendar;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 function get_associated_image_band_projects()
 
  Usage:
@@ -84,7 +86,7 @@ sub set_drone_run_date {
         $row->value($event);
         $row->update();
     } else {
-        print STDERR "date format did not pass check: $date \n";
+        $logger->debug("date format did not pass check: $date ");
     }
 }
 

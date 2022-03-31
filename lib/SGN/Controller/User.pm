@@ -3,6 +3,8 @@ package SGN::Controller::User;
 
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller' };
 
 sub login :Path('/user/login') Args(0) {
@@ -11,7 +13,7 @@ sub login :Path('/user/login') Args(0) {
 
     $c->stash->{goto_url} = $c->req->param("goto_url");
 
-    print STDERR "GOTOURL=".$c->stash->{goto_url}."\n";
+    $logger->debug("GOTOURL=".$c->stash->{goto_url}."");
     $c->stash->{template} = '/user/login.mas';
 }
 

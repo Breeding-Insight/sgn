@@ -35,6 +35,8 @@ use Encode;
 use JSON::XS qw | decode_json |;
 use utf8;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -103,7 +105,7 @@ sub do_fuzzy_search {
     my $c = shift;
     my $accession_list = shift;
     my $organism_list = shift;
-    print STDERR "DoFuzzySearch 1".localtime()."\n";
+    $logger->debug("DoFuzzySearch 1".localtime()."");
 
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $fuzzy_accession_search = CXGN::BreedersToolbox::StocksFuzzySearch->new({schema => $schema});
@@ -131,7 +133,7 @@ sub do_fuzzy_search {
     s/^\s+|\s+$//g for @organism_list;
 
     my $fuzzy_search_result = $fuzzy_accession_search->get_matches(\@accession_list, $max_distance, 'accession');
-    print STDERR "DoFuzzySearch 2".localtime()."\n";
+    $logger->debug("DoFuzzySearch 2".localtime()."");
 
     $found_accessions = $fuzzy_search_result->{'found'};
     $fuzzy_accessions = $fuzzy_search_result->{'fuzzy'};
@@ -142,11 +144,11 @@ sub do_fuzzy_search {
         $found_organisms = $fuzzy_organism_result->{'found'};
         $fuzzy_organisms = $fuzzy_organism_result->{'fuzzy'};
         $absent_organisms = $fuzzy_organism_result->{'absent'};
-        #print STDERR "\n\nOrganismFuzzyResult:\n".Data::Dumper::Dumper($fuzzy_organism_result)."\n\n";
+        #$logger->error("\n\nOrganismFuzzyResult:\n".Data::Dumper::Dumper($fuzzy_organism_result)."\n");
     }
 
-    print STDERR "DoFuzzySearch 3".localtime()."\n";
-    #print STDERR Dumper $fuzzy_accessions;
+    $logger->debug("DoFuzzySearch 3".localtime()."");
+    #$logger->error(Dumper($fuzzy_accessions));
 
     my %return = (
         success => "1",
@@ -197,7 +199,7 @@ sub do_exact_search {
         found_organisms => []
     };
 
-    #print STDERR Dumper($rest);
+    #$logger->error(Dumper($rest));
     $c->stash->{rest} = $rest;
 }
 
@@ -283,7 +285,7 @@ sub verify_accessions_file_POST : Args(0) {
             $c->detach();
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -318,7 +320,7 @@ sub verify_accessions_file_POST : Args(0) {
         fuzzy_organisms => $parsed_data->{fuzzy_organisms},
         found_organisms => $parsed_data->{found_organisms}
     );
-    print STDERR "verify_accessions_file returns: " . Dumper %return;
+    $logger->error("verify_accessions_file returns: " . Dumper(%return));
     if ($parsed_data->{error_string}){
         $return{error_string} = $parsed_data->{error_string};
     }
@@ -335,7 +337,7 @@ sub verify_fuzzy_options_POST : Args(0) {
     my $accession_list_id = $c->req->param('accession_list_id');
     my $fuzzy_option_hash = decode_json( encode("utf8", $c->req->param('fuzzy_option_data')));
     my $names_to_add = _parse_list_from_json($c, $c->req->param('names_to_add'));
-    #print STDERR Dumper $fuzzy_option_hash;
+    #$logger->error(Dumper($fuzzy_option_hash));
     my $list = CXGN::List->new( { dbh => $c->dbc()->dbh(), list_id => $accession_list_id } );
 
     my %names_to_add = map {$_ => 1} @$names_to_add;
@@ -365,7 +367,7 @@ sub verify_fuzzy_options_POST : Args(0) {
         success => "1",
         names_to_add => \@names_to_add
     };
-    #print STDERR Dumper($rest);
+    #$logger->error(Dumper($rest));
     $c->stash->{rest} = $rest;
 }
 
@@ -465,7 +467,7 @@ sub add_accession_list_POST : Args(0) {
     };
     if ($transaction_error) {
         $c->stash->{rest} = {error =>  "Transaction error storing stocks: $transaction_error" };
-        print STDERR "Transaction error storing stocks: $transaction_error\n";
+        $logger->debug("Transaction error storing stocks: $transaction_error");
         return;
     }
 
@@ -473,7 +475,7 @@ sub add_accession_list_POST : Args(0) {
     my $bs = CXGN::BreederSearch->new( { dbh=>$dbh, dbname=>$c->config->{dbname}, } );
     my $refresh = $bs->refresh_matviews($c->config->{dbhost}, $c->config->{dbname}, $c->config->{dbuser}, $c->config->{dbpass}, 'stockprop', 'concurrent', $c->config->{basepath});
 
-    #print STDERR Dumper \@added_fullinfo_stocks;
+    #$logger->error(Dumper(\@added_fullinfo_stocks));
     $c->stash->{rest} = {
         success => "1",
         added => \@added_fullinfo_stocks
@@ -520,7 +522,7 @@ sub fuzzy_response_download_POST : Args(0) {
     my $schema = $c->dbic_schema('Bio::Chado::Schema', 'sgn_chado');
     my $fuzzy_json = $c->req->param('fuzzy_response');
     my $fuzzy_response = decode_json(encode("utf8", $fuzzy_json));
-    #print STDERR Dumper $fuzzy_response;
+    #$logger->error(Dumper($fuzzy_response));
 
     my $synonym_hash_lookup = CXGN::Stock::StockLookup->new({schema => $schema})->get_synonym_hash_lookup();
     my @data_out;

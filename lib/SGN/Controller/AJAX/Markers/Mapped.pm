@@ -24,6 +24,8 @@ use JSON;
 use CXGN::Marker::Search;
 use CXGN::Marker::SearchMatView;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -399,10 +401,10 @@ sub query_mapped_markers_GET : Args(0) {
         push(@$places, $offset);
     }
 
-    # print STDERR "MAPPED MARKER QUERY:\n";
-    # print STDERR "$query\n";
+    # $logger->error("MAPPED MARKER QUERY:");
+    # $logger->error("$query");
     # use Data::Dumper;
-    # print STDERR Dumper $places;
+    # $logger->error(Dumper($places));
 
     # Perform query
     my $h = $dbh->prepare($query);

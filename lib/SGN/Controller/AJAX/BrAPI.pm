@@ -25,6 +25,8 @@ use Time::Piece;
 
 use CXGN::BrAPI;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' };
 
 __PACKAGE__->config(
@@ -286,7 +288,7 @@ sub _authenticate_user {
 	# authentication or serverinfo call method request auth, we authenticate.
     if ($c->config->{brapi_require_login} == 1 || $force_authenticate || !exists($server_permission{$wildcard})){
         ($user_id, $user_type, $user_pref, $expired) = CXGN::Login->new($c->dbc->dbh)->query_from_cookie($c->stash->{session_token});
-        #print STDERR $user_id." : ".$user_type." : ".$expired;
+        #$logger->error($user_id." : ".$user_type." : ".$expired);
 
         if (!$user_id || $expired || !$user_type || (!exists($server_permission{$user_type}) && !exists($server_permission{$wildcard}))) {
             my $brapi_package_result = CXGN::BrAPI::JSONResponse->return_error($status, 'You must login and have permission to access this BrAPI call.');
@@ -2173,8 +2175,8 @@ sub studies_germplasm_POST {
 	my %metadata_hash = %$metadata;
 	my %result_hash = %$result;
 
-	#print STDERR Dumper($metadata);
-	#print STDERR Dumper($result);
+	#$logger->error(Dumper($metadata));
+	#$logger->error(Dumper($result));
 
 	my $pagintation = $metadata_hash{"pagination"};
 }
@@ -2479,7 +2481,7 @@ sub studies_observations_granular_PUT {
 	my $c = shift;
     my $clean_inputs = $c->stash->{clean_inputs};
     my $observations = $clean_inputs->{observations};
-    #print STDERR "Observations are ". Dumper($observations) . "\n";
+    #$logger->error("Observations are ". Dumper($observations) . "");
 	save_observation_results($self, $c, $observations, 'v1');
 }
 
@@ -3311,7 +3313,7 @@ sub observationvariable_ontologies_GET {
 	foreach my $n (@namespaces) {
 		$n =~ s/\s*(\w+)\s*\(.*\)/$1/g;
 	}
-	#print STDERR Dumper \@namespaces;
+	#$logger->error(Dumper(\@namespaces));
 
 	my $clean_inputs = $c->stash->{clean_inputs};
 	my $brapi = $self->brapi_module;
@@ -3894,7 +3896,7 @@ sub observations_table_GET {
 sub observations_single :  Chained('brapi') PathPart('observations') CaptureArgs(1) {
      my $self = shift;
      my $c = shift;
-     print STDERR " Capturing id\n";
+     $logger->debug(" Capturing id");
      $c->stash->{observation_id} = shift;
 }
 
@@ -4057,7 +4059,7 @@ sub variants_search_GET {
 sub variants_single :  Chained('brapi') PathPart('variants') CaptureArgs(1) {
      my $self = shift;
      my $c = shift;
-     print STDERR " Capturing variants id\n";
+     $logger->debug(" Capturing variants id");
      $c->stash->{variants_id} = shift;
 }
 
@@ -4311,7 +4313,7 @@ sub images_POST {
 sub images_by_id :  Chained('brapi') PathPart('images') CaptureArgs(1) {
      my $self = shift;
      my $c = shift;
-     print STDERR "Images_base... capturing image_id\n";
+     $logger->debug("Images_base... capturing image_id");
      $c->stash->{image_id} = shift;
 }
 
@@ -4367,7 +4369,8 @@ sub image_content_store_PUT {
 	my ($auth_success, $user_id, $user_type, $user_pref, $expired) = _authenticate_user($c, $force_authenticate);
 
     my $clean_inputs = $c->stash->{clean_inputs};
-    print STDERR Dumper($clean_inputs);print Dumper $c->req->body();
+    $logger->error(Dumper($clean_inputs));
+	$logger->error(Dumper($c->req->body()));
     my $brapi = $self->brapi_module;
     my $brapi_module = $brapi->brapi_wrapper('Images');
     my $image_dir = File::Spec->catfile($c->config->{static_datasets_path}, $c->config->{image_dir});

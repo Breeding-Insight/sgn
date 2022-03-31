@@ -14,6 +14,8 @@ use File::Slurp qw | read_file |;
 
 use constant MAX_FORMATTABLE_REPORT_FILE_SIZE => 2_000_000;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "Bioperl";
 }
@@ -105,11 +107,11 @@ sub parse {
     
     #don't do any formatting on report files that are huge
     if (-s $raw_report_file > MAX_FORMATTABLE_REPORT_FILE_SIZE) { 
-	print STDERR "raw report too large ".(-s $raw_report_file)."\n";
+	$logger->warn("raw report too large ".(-s $raw_report_file)."");
 	return read_file($raw_report_file);
     }
 
-    print STDERR "Starting to format BLAST report...\n";
+    $logger->debug("Starting to format BLAST report...");
 
     my $formatted_report_file = $raw_report_file.".formatted.html";
     
@@ -129,12 +131,12 @@ sub parse {
 
         $s =~ s/^lcl\|//;
         my $url = $bdb->lookup_url || CXGN::Tools::Identifiers::identifier_url($s);
-	print STDERR "CHECKING ID $s FOR URL... found $url\nLOOKUPURL: ".$bdb->lookup_url."\n".CXGN::Tools::Identifiers::identifier_url($s)."\n";
+	$logger->debug("CHECKING ID $s FOR URL... found $url\nLOOKUPURL: ".$bdb->lookup_url."\n".CXGN::Tools::Identifiers::identifier_url($s)."");
         return qq { <a class="blast_match_ident" href="$url">$s</a> };
     }
     
     
-    print STDERR "Parse file $raw_report_file using bioperl...\n";
+    $logger->debug("Parse file $raw_report_file using bioperl...");
     my $in = Bio::SearchIO->new(-format => 'blast', -file   => "< $raw_report_file")
 	or die "$! opening $raw_report_file for reading";
     my $writer = $self->make_bioperl_result_writer( $bdb->blast_db_id() );
@@ -156,7 +158,7 @@ sub parse {
     # }
     # print $fmt qq|</pre>\n|;
     
-    print STDERR "FORMATTED BLAST REPORT AVAILABLE AT: $formatted_report_file\n";
+    $logger->debug("FORMATTED BLAST REPORT AVAILABLE AT: $formatted_report_file");
 
     return read_file($formatted_report_file);
 }
@@ -187,7 +189,7 @@ sub make_bioperl_result_writer {
 
 	my ($self, $hit, $result) = @_;
 
-  # print STDERR "HIT LINK: $hit->name, $result\n";
+  # $logger->error("HIT LINK: $hit->name, $result");
 
 	my $id = $hit->name;
 	

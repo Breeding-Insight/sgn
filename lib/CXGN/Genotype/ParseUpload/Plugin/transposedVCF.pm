@@ -28,6 +28,7 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use Scalar::Util qw(looks_like_number);
 use Math::Round qw(round);
+my $logger = Log::Log4perl->get_logger();
 
 has 'markers' => (is => 'rw', isa => 'Ref');
 has 'chroms' => (is => 'rw', isa => 'Ref');
@@ -53,7 +54,7 @@ sub _validate_with_plugin {
     my @error_messages;
     my %missing_accessions;
 
-    print STDERR "Reading VCF to validate during parse...\n";
+    $logger->debug("Reading VCF to validate during parse...");
 
     my $F;
 
@@ -67,7 +68,7 @@ sub _validate_with_plugin {
     while (<$F>) { 
 	chomp;
 	if (m/\#\#/) { 
-	    print STDERR "Reading header line $_\n";
+	    $logger->debug("Reading header line $_");
 	    push @header_info, $_;
 	}
 	else {
@@ -76,7 +77,7 @@ sub _validate_with_plugin {
 	}
     }
 
-    #print STDERR "CHROMS: $chroms\n";
+    #$logger->debug("CHROMS: $chroms");
     chomp($chroms);
     my @chroms = split /\t/, $chroms;
     foreach (@chroms) {
@@ -95,7 +96,7 @@ sub _validate_with_plugin {
         }
     }
     $self->pos(\@pos);
-    #print STDERR "POS = ".Dumper(\@pos);
+    #$logger->error("POS = ".Dumper(\@pos));
 
     my $ids = <$F>;
     chomp($ids);
@@ -106,45 +107,45 @@ sub _validate_with_plugin {
         }
     }
     $self->ids(\@ids);
-    #print STDERR "IDS = ".Dumper(\@ids);
+    #$logger->error("IDS = ".Dumper(\@ids));
     
     my $refs = <$F>;
     chomp($refs);
     my @refs = split /\t/, $refs;
     $self->refs(\@refs);
-    #print STDERR "REFS = ".Dumper(\@refs);
+    #$logger->error("REFS = ".Dumper(\@refs));
     
     my $alts = <$F>;
     chomp($alts);
     my @alts = split /\t/, $alts;
     $self->alts(\@alts);
-    #print STDERR "ALTS = ".Dumper(\@alts);
+    #$logger->error("ALTS = ".Dumper(\@alts));
     
     my $qual = <$F>;
     chomp($qual);
     my @qual = split /\t/,$qual;
     $self->qual(\@qual);
-    #print STDERR "QUAL = ".Dumper(\@qual);
+    #$logger->error("QUAL = ".Dumper(\@qual));
     
     my $filter = <$F>;
     chomp($filter);
     my @filter = split /\t/, $filter;
     $self->filter(\@filter);
-    #print STDERR "FILTER = ".Dumper(\@filter);
+    #$logger->error("FILTER = ".Dumper(\@filter));
     
     my $info = <$F>;
     chomp($info);
     my @info = split /\t/, $info;
     $self->info(\@info);
-    #print STDERR "INFO = ".Dumper(\@info);
+    #$logger->error("INFO = ".Dumper(\@info));
     
     my $format = <$F>;
     chomp($format);
     my @format = split /\t/, $format;
     $self->format(\@format);
-    #print STDERR "FORMAT = ".Dumper(\@format);
+    #$logger->error("FORMAT = ".Dumper(\@format));
 
-    print STDERR "marker count = ".scalar(@ids)."\n";
+    $logger->debug("marker count = ".scalar(@ids)."");
 
     if ($chroms[0] ne '#CHROM'){
         push @error_messages, 'Line 1 must start with "#CHROM".';
@@ -176,7 +177,7 @@ sub _validate_with_plugin {
 
     my @observation_unit_names;
 
-    #print STDERR "Scanning file for observation unit names... \n";
+    #$logger->error("Scanning file for observation unit names... ");
     my $lines = 0;
     while (<$F>) {
 	chomp;
@@ -185,14 +186,14 @@ sub _validate_with_plugin {
 	#print "Parsing line $fields[0]\n";
 	push @observation_unit_names, $fields[0];
 	$lines++;
-	if ($lines % 100 == 0) { print STDERR "Reading line $lines...        \r"; }
+	if ($lines % 100 == 0) { $logger->error("Reading line $lines...        \r"); }
     }
     
-    #print STDERR "\n";
+    #$logger->error("");
     close($F);
     
     my $number_observation_units = scalar(@observation_unit_names);
-    #print STDERR "Number of observation units: $number_observation_units\n";
+    #$logger->error("Number of observation units: $number_observation_units");
     
     my @observation_units_names_trim;
     if ($self->get_igd_numbers_included){
@@ -235,7 +236,7 @@ sub _validate_with_plugin {
     foreach (@missing_stocks){
         if (!$self->get_create_missing_observation_units_as_accessions){
             push @missing_stocks_return, $_;
-            print STDERR "WARNING! Observation unit name $_ not found for stock type $stock_type. You can pass an option to automatically create accessions.\n";
+            $logger->warn("WARNING! Observation unit name $_ not found for stock type $stock_type. You can pass an option to automatically create accessions.");
         } else {
             my $stock = $schema->resultset("Stock::Stock")->create({
                 organism_id => $organism_id,
@@ -273,7 +274,7 @@ sub _parse_with_plugin {
     my $schema = $self->get_chado_schema();
     my $stock_type = $self->get_observation_unit_type_name;
 
-    print STDERR "Reading VCF to parse\n";
+    $logger->debug("Reading VCF to parse");
 
     my $F;
     open($F, "<", $filename) || die "Can't open file $filename\n";
@@ -314,7 +315,7 @@ sub extract_protocol_data {
             format => $marker_info_p8,
         );
 
-        #print STDERR "Marker: ".Dumper(\%marker);
+        #$logger->error("Marker: ".Dumper(\%marker));
         push @{$protocolprop_info{'marker_names'}}, $marker_name;
 
         $protocolprop_info{'markers'}->{$chrom_name}->{$marker_name} = \%marker;
@@ -330,7 +331,7 @@ sub extract_protocol_data {
 sub next_genotype {
     my $self = shift;
     
-    #print STDERR "Processing next genotype...\n";
+    #$logger->error("Processing next genotype...");
     my @fields;
 
     my $genotypeprop = {}; # hashref
@@ -341,7 +342,7 @@ sub next_genotype {
     my $F = $self->_fh();
     
     if (! ($line = <$F>)) { 
-        print STDERR "No next genotype... Done!\n"; 
+        $logger->debug("No next genotype... Done!");
         close($F); 
         return ( [$observation_unit_name], $genotypeprop );
     }
@@ -349,26 +350,26 @@ sub next_genotype {
         chomp($line);
 
         LABEL: if ($line =~ m/^\#/) {
-            #print STDERR "Skipping header line: $line\n";
+            #$logger->error("Skipping header line: $line");
             $line = <$F>;
             goto LABEL;
         }
 
         if ($self->_is_first_line()) {
-            print STDERR "Skipping 8 more lines... ";
+            $logger->error("Skipping 8 more lines... ");
             for (0..7) {
                 $line = <$F>;
-                # print STDERR Dumper $line;
+                # $logger->error(Dumper($line));
             }
         }
         chomp($line);
 
         my @fields = split /\t/, $line;
-        #print STDERR Dumper \@fields;
+        #$logger->error(Dumper(\@fields));
 
         $observation_unit_name = $fields[0];
         my @scores = @fields[1..$#fields];
-        #print STDERR Dumper \@scores;
+        #$logger->error(Dumper(\@scores));
 
         my $marker_name = "";
 

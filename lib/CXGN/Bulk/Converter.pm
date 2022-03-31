@@ -8,6 +8,8 @@ use File::Slurp;
 
 our %solyc_conversion_hash;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub process_parameters { 
     my $self = shift;
     $self->{output_fields} = [ 'Input', 'Output' ];
@@ -35,7 +37,7 @@ sub process_ids {
     my ($dump_fh, $notfound_fh) = $self->create_dumpfile();
     my @not_found = ();
     foreach my $id (@{$self->{ids}}) { 
-	print STDERR "Converting $id to $solyc_conversion_hash{uc($id)}\n";
+	$logger->debug("Converting $id to $solyc_conversion_hash{uc($id)}");
 	if (exists($solyc_conversion_hash{uc($id)})) { 
 	    print $dump_fh "$id\t$solyc_conversion_hash{uc($id)}\n";
 	}
@@ -51,11 +53,11 @@ sub process_ids {
 sub get_hash { 
     my $self = shift;
     
-    print STDERR "Generating hash... ";
+    $logger->error("Generating hash... ");
 
     my @conversion = ();
     foreach my $file (@{$self->{solyc_conversion_files}}) { 
-	print STDERR "(processing $file) ";
+	$logger->error("(processing $file) ");
 	my @lines = read_file($file);
 	@conversion = (@conversion, @lines);
     }
@@ -65,7 +67,7 @@ sub get_hash {
 	$solyc_conversion_hash{uc($fields[0])} = $fields[1];
     }
 
-    print STDERR "Done.\n";
+    $logger->debug("Done.");
 
 }
 

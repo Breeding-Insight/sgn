@@ -15,6 +15,8 @@ use JSON;
 
 extends 'CXGN::BrAPI::v2::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
     my $self = shift;
     my $params = shift;
@@ -243,15 +245,15 @@ sub observations_store {
     my $status = $self->status;
     my %result;
 
-    #print STDERR "OBSERVATIONS_MODULE: User id is $user_id and type is $user_type\n";
+    #$logger->error("OBSERVATIONS_MODULE: User id is $user_id and type is $user_type");
     if (!$user_id) {
-        print STDERR 'Must provide user_id to upload phenotypes! Please contact us!';
+        $logger->error('Must provide user_id to upload phenotypes! Please contact us!');
         push @$status, {'403' => 'Permission Denied. Must provide user_id.'};
         return CXGN::BrAPI::JSONResponse->return_error($status, 'Must provide user_id to upload phenotypes! Please contact us!', 403);
     }
 
     if ($user_type ne 'submitter' && $user_type ne 'sequencer' && $user_type ne 'curator') {
-        print STDERR 'Must have submitter privileges to upload phenotypes! Please contact us!';
+        $logger->error('Must have submitter privileges to upload phenotypes! Please contact us!');
         push @$status, {'403' => 'Permission Denied. Must have correct privilege.'};
         return CXGN::BrAPI::JSONResponse->return_error($status, 'Must have submitter privileges to upload phenotypes! Please contact us!', 403);
     }
@@ -268,7 +270,7 @@ sub observations_store {
 
     if (!$validated_request || $validated_request->{'error'}) {
         my $parse_error = $validated_request ? $validated_request->{'error'} : "Error parsing request structure";
-        print STDERR $parse_error;
+        $logger->error($parse_error);
         return CXGN::BrAPI::JSONResponse->return_error($status, $parse_error, 400);
     } elsif ($validated_request->{'success'}) {
         push @$status, {'info' => $validated_request->{'success'} };
@@ -282,7 +284,7 @@ sub observations_store {
 
     if (!$parsed_request || $parsed_request->{'error'}) {
         my $parse_error = $parsed_request ? $parsed_request->{'error'} : "Error parsing request data";
-        print STDERR $parse_error;
+        $logger->error($parse_error);
         return CXGN::BrAPI::JSONResponse->return_error($status, $parse_error, 400);
     } elsif ($parsed_request->{'success'}) {
         push @$status, {'info' => $parsed_request->{'success'} };
@@ -314,7 +316,7 @@ sub observations_store {
         push @$status, {'info' => $archive_success_message };
     }
 
-    print STDERR "Archived Request is in $file\n";
+    $logger->debug("Archived Request is in $file");
 
     ## Set metadata
     my %phenotype_metadata;
@@ -350,17 +352,17 @@ sub observations_store {
     # my ($verified_warning, $verified_error) = $store_observations->verify();
     #
     # if ($verified_error) {
-    #     print STDERR "Error: $verified_error\n";
+    #     $logger->error("Error: $verified_error");
     #     return CXGN::BrAPI::JSONResponse->return_error($status, "Error: Your request did not pass the checks.", 500);
     # }
     # if ($verified_warning) {
-    #     print STDERR "\nWarning: $verified_warning\n";
+    #     $logger->error("\nWarning: $verified_warning");
     # }
 
     my ($stored_observation_error, $stored_observation_success, $stored_observation_details) = $store_observations->store();
 
     if ($stored_observation_error) {
-        print STDERR "Error: $stored_observation_error\n";
+        $logger->error("Error: $stored_observation_error");
         return CXGN::BrAPI::JSONResponse->return_error($status, "Error: Your request could not be processed correctly.", 500);
     }
     if ($stored_observation_success) {
@@ -368,7 +370,7 @@ sub observations_store {
         my $bs = CXGN::BreederSearch->new( { dbh=>$dbh, dbname=>$c->config->{dbname}, } );
         my $refresh = $bs->refresh_matviews($c->config->{dbhost}, $c->config->{dbname}, $c->config->{dbuser}, $c->config->{dbpass}, 'phenotypes', 'concurrent', $c->config->{basepath});
 
-        print STDERR "Success: $stored_observation_success\n";
+        $logger->debug("Success: $stored_observation_success");
         # result need to be updated with v2 format
         $result{data} = $stored_observation_details;
 
@@ -399,7 +401,7 @@ sub _search_observation_id {
     my ($plant_list, $subplot_list);
     my $trait_contains;
     my $trait_list;
-   
+
     my $numeric_regex = '^[0-9]+([,.][0-9]+)?$';
 
     my $stock_lookup = CXGN::Stock::StockLookup->new({ schema => $schema} );
@@ -474,10 +476,10 @@ sub _search_observation_id {
     my $filter_trait_ids;
     my @or_clause;
     if ($trait_list && scalar(@{$trait_list})>0) {
-        print STDERR "A trait list was included\n";
+        $logger->debug("A trait list was included");
         foreach (@{$trait_list}){
             if ($_){
-                #print STDERR "Working on trait $_\n";
+                #$logger->error("Working on trait $_");
                 push @or_clause, "observations @> '[{\"trait_id\" : $_}]'";
                 $trait_list_check{$_}++;
                 $filter_trait_ids = 1;
@@ -518,7 +520,7 @@ sub _search_observation_id {
 
     my  $q = $select_clause . $where_clause . $or_clause . $order_clause . $limit_clause . $offset_clause;
 
-    print STDERR "QUERY: $q\n\n";
+    $logger->debug("QUERY: $q\n");
 
     my $location_rs = $schema->resultset('NaturalDiversity::NdGeolocation')->search();
     my %location_id_lookup;
@@ -652,7 +654,7 @@ sub _search_observation_id {
         };
     }
 
-    print STDERR "Search End:".localtime."\n";
+    $logger->debug("Search End:".localtime."");
     return (\@result, \%unique_traits);
 }
 

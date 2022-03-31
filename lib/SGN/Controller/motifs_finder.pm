@@ -6,6 +6,8 @@ use File::Temp qw | tempfile |;
 use File::Basename;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -55,7 +57,7 @@ sub name_var :Path('/test/') :Args(0) {
     my ($fh, $filename) =tempfile("XXXXX", DIR => "$basePath/static/documents/tempfiles/motifs_finder/");
     #my ($fh, $filename) =tempfile("XXXXX", DIR => "$basePath/motifs_finder/");
     
-    print STDERR Dumper($filename);
+    $logger->error(Dumper($filename));
 	if ($sequence !~ /^>/ && $seq_file eq '')  {
 		push ( @errors , "Please, paste sequences or attach sequence file.<br/>Ensure your sequence conform with 'usage help' description.\n");
 	}
@@ -288,7 +290,7 @@ sub name_var :Path('/test/') :Args(0) {
         	my $error = system($cmd);
         }
 
-        print STDERR Dumper(\@logo_image);
+        $logger->error(Dumper(\@logo_image));
         $c->stash->{sum} = join("<br/>", @sum);
         $c->stash->{sum_indv_tab} = \@value_sum_indv_tab;
         $c->stash->{BGPM_tab} = \@value_BGPM_tab;

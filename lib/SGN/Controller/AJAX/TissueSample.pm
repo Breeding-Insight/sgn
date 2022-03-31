@@ -19,6 +19,8 @@ use CXGN::People::Login;
 use CXGN::Trial::Search;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -62,7 +64,7 @@ sub tissue_sample_field_trials_GET : Args(0) {
             "<a class='btn btn-sm btn-default' href='/breeders/trial/$_->{trial_id}/download/layout?format=csv&dataLevel=field_trial_tissue_samples&selected_columns=$selected_columns_json'>Download Layout</a>"
           ];
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     $c->stash->{rest} = { data => \@result };
 }
@@ -99,7 +101,7 @@ sub tissue_sample_genotyping_trials_GET : Args(0) {
             "<a class='btn btn-sm btn-default' href='/breeders/trial/$_->{trial_id}/download/layout?format=csv&dataLevel=plate'>Download Layout</a>"
           ];
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     $c->stash->{rest} = { data => \@result };
 }
@@ -135,7 +137,7 @@ sub tissue_sample_sampling_trials_GET : Args(0) {
             "<a class='btn btn-sm btn-default' href='/breeders/trial/$_->{trial_id}/download/layout?format=csv&dataLevel=samplingtrial'>Download Layout</a>"
           ];
     }
-    #print STDERR Dumper \@result;
+    #$logger->error(Dumper(\@result));
 
     $c->stash->{rest} = { data => \@result };
 }

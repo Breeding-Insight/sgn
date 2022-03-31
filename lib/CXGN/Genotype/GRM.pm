@@ -59,6 +59,8 @@ use File::Copy;
 use CXGN::Tools::Run;
 use File::Temp 'tempfile';
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -215,7 +217,7 @@ sub get_grm {
 
     my $number_system_cores = `getconf _NPROCESSORS_ONLN` or die "Could not get number of system cores!\n";
     chomp($number_system_cores);
-    print STDERR "NUMCORES $number_system_cores\n";
+    $logger->debug("NUMCORES $number_system_cores");
 
     my $tmp_output_dir = $shared_cluster_dir_config."/tmp_genotype_download_grm";
     mkdir $tmp_output_dir if ! -d $tmp_output_dir;
@@ -279,7 +281,7 @@ sub get_grm {
         }
         # IN this case of a hybrid evaluation where the parents of the accessions planted in a plot are genotyped
         elsif ($get_grm_for_parental_accessions && $plot_list && scalar(@$plot_list)>0) {
-            print STDERR "COMPUTING GENOTYPE FROM PARENTS FOR PLOTS\n";
+            $logger->debug("COMPUTING GENOTYPE FROM PARENTS FOR PLOTS");
             my $plot_list_string = join ',', @$plot_list;
             my $q = "SELECT plot.stock_id, accession.stock_id, female_parent.stock_id, male_parent.stock_id
                 FROM stock AS plot
@@ -305,9 +307,9 @@ sub get_grm {
 
             @all_individual_accessions_stock_ids = @plot_accession_stock_ids_found;
 
-            # print STDERR Dumper \@plot_stock_ids_found;
-            # print STDERR Dumper \@plot_female_stock_ids_found;
-            # print STDERR Dumper \@plot_male_stock_ids_found;
+            # $logger->error(Dumper(\@plot_stock_ids_found));
+            # $logger->error(Dumper(\@plot_female_stock_ids_found));
+            # $logger->error(Dumper(\@plot_male_stock_ids_found));
 
             for my $i (0..scalar(@plot_stock_ids_found)-1) {
                 my $female_stock_id = $plot_female_stock_ids_found[$i];
@@ -347,7 +349,7 @@ sub get_grm {
         }
         # IN this case of a hybrid evaluation where the parents of the accessions planted in a plot are genotyped
         elsif ($get_grm_for_parental_accessions && $accession_list && scalar(@$accession_list)>0) {
-            print STDERR "COMPUTING GENOTYPE FROM PARENTS FOR ACCESSIONS\n";
+            $logger->debug("COMPUTING GENOTYPE FROM PARENTS FOR ACCESSIONS");
             my $accession_list_string = join ',', @$accession_list;
             my $q = "SELECT accession.stock_id, female_parent.stock_id, male_parent.stock_id
                 FROM stock AS accession
@@ -367,9 +369,9 @@ sub get_grm {
                 push @male_stock_ids_found, $male_parent_stock_id;
             }
 
-            # print STDERR Dumper \@accession_stock_ids_found;
-            # print STDERR Dumper \@female_stock_ids_found;
-            # print STDERR Dumper \@male_stock_ids_found;
+            # $logger->error(Dumper(\@accession_stock_ids_found));
+            # $logger->error(Dumper(\@female_stock_ids_found));
+            # $logger->error(Dumper(\@male_stock_ids_found));
 
             @all_individual_accessions_stock_ids = @$accession_list;
 
@@ -410,9 +412,9 @@ sub get_grm {
             }
         }
 
-        # print STDERR Dumper \@all_marker_names;
-        # print STDERR Dumper \@individuals_stock_ids;
-        # print STDERR Dumper \@dosage_matrix;
+        # $logger->error(Dumper(\@all_marker_names));
+        # $logger->error(Dumper(\@individuals_stock_ids));
+        # $logger->error(Dumper(\@dosage_matrix));
 
         my $maf = $self->minor_allele_frequency();
         my $marker_filter = $self->marker_filter();
@@ -469,7 +471,7 @@ sub get_grm {
             $cmd .= 'A <- solve(A);';
         }
         $cmd .= 'write.table(A, file=\''.$grm_tempfile_out.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-        print STDERR Dumper $cmd;
+        $logger->error(Dumper($cmd));
 
         # Do the GRM on the cluster
         my $grm_cmd = CXGN::Tools::Run->new(
@@ -490,7 +492,7 @@ sub get_grm {
         $grm_cmd->wait;
     }
     else {
-        print STDERR "No protocol, so giving equal relationship of all stocks!!\n";
+        $logger->debug("No protocol, so giving equal relationship of all stocks!!");
         my $number_of_stocks = 0;
         my $stock_id_string = '';
         if ($accession_list && scalar(@$accession_list)) {
@@ -511,7 +513,7 @@ sub get_grm {
             A <- as.data.frame(diag('.$number_of_stocks.'));
             write.table(A, file=\''.$grm_tempfile_out.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');
         "';
-        print STDERR Dumper $cmd;
+        $logger->error(Dumper($cmd));
         my $status = system($cmd);
     }
 
@@ -522,7 +524,7 @@ sub grm_cache_key {
     my $self = shift;
     my $datatype = shift;
 
-    #print STDERR Dumper($self->_get_dataref());
+    #$logger->error(Dumper($self->_get_dataref()));
     my $json = JSON->new();
     #preserve order of hash keys to get same text
     $json = $json->canonical();
@@ -568,7 +570,7 @@ sub download_grm {
 
     my $return;
     if ($self->cache()->exists($key)) {
-        print STDERR "DOWNLOAD GRM CACHED\n";
+        $logger->debug("DOWNLOAD GRM CACHED");
         if ($return_type eq 'filehandle') {
             $return = $self->cache()->handle($key);
         }
@@ -577,10 +579,10 @@ sub download_grm {
         }
     }
     else {
-        print STDERR "DOWNLOAD GRM\n";
+        $logger->debug("DOWNLOAD GRM");
         my ($grm_tempfile_out, $stock_ids, $all_accession_stock_ids) = $self->get_grm($shared_cluster_dir_config, $backend_config, $cluster_host_config, $web_cluster_queue_config, $basepath_config);
-        # print STDERR Dumper $stock_ids;
-        # print STDERR Dumper $all_accession_stock_ids;
+        # $logger->error(Dumper($stock_ids));
+        # $logger->error(Dumper($all_accession_stock_ids));
 
         my @grm;
         open(my $fh, "<", $grm_tempfile_out) or die "Can't open < $grm_tempfile_out: $!";
@@ -625,7 +627,7 @@ sub download_grm {
             my %result_hash;
             my $row_num = 0;
             my %seen_stock_ids;
-            # print STDERR Dumper \@grm;
+            # $logger->error(Dumper(\@grm));
             foreach my $s (@$stock_ids) {
                 my $col_num = 0;
                 foreach my $c (@$stock_ids) {
@@ -712,7 +714,7 @@ sub download_grm {
             my %result_hash;
             my $row_num = 0;
             my %seen_stock_ids;
-            # print STDERR Dumper \@grm;
+            # $logger->error(Dumper(\@grm));
             foreach my $s (@$stock_ids) {
                 my $col_num = 0;
                 foreach my $c (@$stock_ids) {
@@ -759,7 +761,7 @@ sub download_grm {
             my %result_hash;
             my $row_num = 0;
             my %seen_stock_ids;
-            # print STDERR Dumper \@grm;
+            # $logger->error(Dumper(\@grm));
             foreach my $s (@$stock_ids) {
                 my $col_num = 0;
                 foreach my $c (@$stock_ids) {
@@ -847,7 +849,7 @@ sub download_grm {
             ggplot(data = mat, aes(x=V1, y=V2, fill=V3)) + geom_tile();
             dev.off();
             "';
-            print STDERR Dumper $heatmap_cmd;
+            $logger->error(Dumper($heatmap_cmd));
 
             my $tmp_output_dir = $shared_cluster_dir_config."/tmp_genotype_download_grm_heatmap";
             mkdir $tmp_output_dir if ! -d $tmp_output_dir;

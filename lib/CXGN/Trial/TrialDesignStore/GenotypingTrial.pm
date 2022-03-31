@@ -4,13 +4,15 @@ package CXGN::Trial::TrialDesignStore::GenotypingTrial;
 use Moose;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'CXGN::Trial::TrialDesignStore::AbstractTrial';}
 
 sub BUILD {
     my $self = shift;
     my $args = shift;
 
-    print STDERR "BUILD CXGN::Trial::TrialDesignStore::AbstractTrial\n";
+    $logger->debug("BUILD CXGN::Trial::TrialDesignStore::AbstractTrial");
     $self->set_nd_experiment_type_id(SGN::Model::Cvterm->get_cvterm_row($self->get_bcs_schema(), 'genotyping_layout', 'experiment_type')->cvterm_id());
     $self->set_stock_type_id($self->get_tissue_sample_cvterm_id);
     $self->set_stock_relationship_type_id($self->get_tissue_sample_of_cvterm_id);
@@ -48,7 +50,7 @@ sub BUILD {
 sub validate_design {
     my $self = shift;
 
-    print STDERR "validating design\n";
+    $logger->debug("validating design");
 
     my $chado_schema = $self->get_bcs_schema();
     my $design_type = $self->get_design_type();

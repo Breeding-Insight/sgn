@@ -6,6 +6,8 @@ use Spreadsheet::ParseExcel;
 use JSON;
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "location excel";
 }
@@ -21,7 +23,7 @@ sub parse {
     #try to open the excel file and report any errors
     my $excel_obj = $parser->parse($filename);
     if ( !$excel_obj ) {
-        print STDERR "parse error: ".$parser->error()."\n";
+        $logger->error("parse error: ".$parser->error()."");
         push @errors, $parser->error();
         $parse_result{'error'} = \@errors;
         return \%parse_result;
@@ -31,7 +33,7 @@ sub parse {
     my ( $row_min, $row_max ) = $worksheet->row_range();
     my ( $col_min, $col_max ) = $worksheet->col_range();
     if (($col_max - $col_min)  < 1 || ($row_max - $row_min) < 1 ) { #must have header with at least plot_name and one trait, as well as one row of phenotypes
-        print STDERR "Location file is missing header and/or location data";
+        $logger->error("Location file is missing header and/or location data");
         push @errors, "Location file is missing header and/or location data";
         $parse_result{'error'} = \@errors;
         return \%parse_result;
@@ -153,7 +155,7 @@ sub parse {
             push @errors, "Row $row_num, column J: NOAA Station ID is undefined.\n";
         }
 
-        print STDERR "Row is $name, $abbreviation, $country_code, $country_name, $program, $type, $latitude, $longitude, $altitude, $noaa_station_id\n";
+        $logger->debug("Row is $name, $abbreviation, $country_code, $country_name, $program, $type, $latitude, $longitude, $altitude, $noaa_station_id");
         push @rows, [$name,$abbreviation,$country_code,$country_name,$program,$type,$latitude,$longitude,$altitude,$noaa_station_id];
     }
 
@@ -161,7 +163,7 @@ sub parse {
         $parse_result{'error'} = \@errors;
     }
     else {
-        print STDERR "Parsed file with no errors, returning with valid new location data.\n";
+        $logger->debug("Parsed file with no errors, returning with valid new location data.");
         $parse_result{'success'} = \@rows;
     }
     return \%parse_result;

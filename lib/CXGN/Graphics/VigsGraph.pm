@@ -6,6 +6,7 @@ use GD::Image;
 use Data::Dumper;
 use Bio::SeqIO;
 use Bio::BLAST2::Database;
+my $logger = Log::Log4perl->get_logger();
 
 # get all arguments from Vigs.pm (Ajax controllers), subroutine view
 has 'bwafile' => ( is=>'rw' );
@@ -80,8 +81,8 @@ sub target_graph {
 		push @target_keys, $e->[0]; 
 	}
 
-	#    print STDERR "TARGET KEYS: ".join(",", @target_keys);
-	#    print STDERR "\n";
+	#    $logger->error("TARGET KEYS: ".join(",", @target_keys));
+	#    $logger->error("");
 
 	# foreach match (blue squares in the graph), saves in $s_targets the coverage in each position
 	foreach my $s (@target_keys) { 
@@ -90,7 +91,7 @@ sub target_graph {
 		}
 		my %s_targets = ();
 		foreach my $m (@{$matches->{$s}}) { 
-			# print STDERR "m: ".$m->start()."\n";
+			# $logger->error("m: ".$m->start()."");
 			foreach my $n ($m->start()-1 .. $m->end()-1) {
 			# foreach my $n ($m->start()-1 .. $m->end()) {
 				# using coverage in algorithm
@@ -99,7 +100,7 @@ sub target_graph {
 				# } else {
 				# 	$s_targets{$n} = $s_targets{$n} + 1;
 				# }
-				# print STDERR "m: ".($m->start() - 1)." - ".($m->end() - 1).", $n -> $s_targets{$n}\n";
+				# $logger->error("m: ".($m->start() - 1)." - ".($m->end() - 1).", $n -> $s_targets{$n}");
 				
 				$s_targets{$n} = 1;
 			}   
@@ -115,7 +116,7 @@ sub target_graph {
 			# else {
 			# 	$target_scores[$pos] = $s_targets{$pos};
 			# }
-			# print STDERR "Pos:$pos,  $target_scores[$pos]\n";
+			# $logger->error("Pos:$pos,  $target_scores[$pos]");
 			$target_scores[$pos]++;
 		}
 		%s_targets = ();
@@ -141,7 +142,7 @@ sub off_target_graph {
 
 	foreach my $s (@coverage_keys) { 
 		foreach my $m (@{$matches->{$s}}) {
-			# print STDERR "$s, ".$m->start()."-".$m->end()."\n";
+			# $logger->error("$s, ".$m->start()."-".$m->end()."");
 			foreach my $n ($m->start()-1 .. $m->end()-1) {
 				# using coverage in algorithm
 				# if (!$off_t_counts{$n}) {
@@ -256,7 +257,7 @@ sub get_best_coverage {
     # detect a high gap in the number of reads mapped between subjects
     for (my $i=1; $i<@subjects; $i++) {
 	if ($subjects[$i-1]->[1] * 0.5 > $subjects[$i]->[1]) { 
-	     # print STDERR "COVERAGE: $i\n";
+	     # $logger->error("COVERAGE: $i");
 	    return $i;
 	}
     }
@@ -272,7 +273,7 @@ sub subjects_by_match_count {
 	my $primseqi;
 	my $desc;
 	
-	# print STDERR "BLAST db: $db\n";
+	# $logger->error("BLAST db: $db");
 	
 	if ($db) {
 		$fs = Bio::BLAST2::Database->open(full_file_basename => "$db",);
@@ -309,7 +310,7 @@ sub get_matches {
     foreach my $key (sort{$#{$$matches_h{$b}}<=>$#{$$matches_h{$a}}} keys(%{$matches_h})) {
 	my @subject_a;
 	for (my $i=0; $i<@{$$matches_h{$key}}; $i++) {
-#	    print STDERR "start: $$h{'start'}, end: $$h{'end'}\n";
+#	    $logger->error("start: $$h{'start'}, end: $$h{'end'}");
 	    # to remove duplicates
 	    if ($i > 0 && $$matches_h{$key}[$i]{'start'} != $$matches_h{$key}[$i-1]{'start'}) {
 		push(@subject_a, "$$matches_h{$key}[$i]{'start'}-$$matches_h{$key}[$i]{'end'}");

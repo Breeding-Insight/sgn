@@ -4,6 +4,8 @@ package CXGN::List::Validate::Plugin::PlotsOrSubplotsOrPlants;
 use Moose;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "plots_or_subplots_or_plants";
 }
@@ -17,7 +19,7 @@ sub validate {
     my $plot_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'plot', 'stock_type')->cvterm_id();
     my $subplot_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'subplot', 'stock_type')->cvterm_id();
 
-    #print STDERR "PLOT TYPE ID $type_id\n";
+    #$logger->error("PLOT TYPE ID $type_id");
 
     my @missing = ();
     foreach my $l (@$list) {

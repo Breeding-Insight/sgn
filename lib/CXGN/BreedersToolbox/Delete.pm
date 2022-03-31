@@ -5,6 +5,8 @@ use Moose;
 
 use Data::Dumper;
 
+my $logger = Log::Log4perl->get_logger();
+
 has bcs_schema => (is => 'rw');
 has metadata_schema => (is=> 'rw');
 has phenome_schema => (is => 'rw');
@@ -29,10 +31,10 @@ has phenome_schema => (is => 'rw');
 #     my $user_id = shift;
 #     my $md_file_id = shift;
 # 
-#     print STDERR "Get the md_file entry... ";
+#     $logger->error("Get the md_file entry... ");
 #     my $srs = $self->metadata_schema->resultset("MdFiles")->search( { file_id => $md_file_id } );
 # 
-#     print STDERR "Retrieved ".$srs->count()." entries.\n";
+#     $logger->error("Retrieved ".$srs->count()." entries.");
 #     if ($srs->count() == 0) {
 # 	return "The file specified does not exist."
 #     }
@@ -40,25 +42,25 @@ has phenome_schema => (is => 'rw');
 #     my $file_row = $srs->first();
 #     my $metadata_id = $file_row->metadata_id()->metadata_id();
 # 
-#     print STDERR "Get the associated md_metadata info... ($metadata_id, $user_id)";
+#     $logger->error("Get the associated md_metadata info... ($metadata_id, $user_id)");
 # 
 #     my $frs = $self->metadata_schema->resultset("MdMetadata")->search( { metadata_id => $metadata_id, create_person_id=>$user_id });
 # 
-#     print STDERR "Retrieved ".$frs->count()." entries.\n";
+#     $logger->error("Retrieved ".$frs->count()." entries.");
 #     if ($frs->count()==0) {
 # 	return "You don't have the necessary privileges to delete this file";
 #     }
 # 
-#     print STDERR "Get the entries from the linking table... ";
+#     $logger->error("Get the entries from the linking table... ");
 #     my $prs = $self->phenome_schema -> resultset("NdExperimentMdFiles")->search( { file_id => $md_file_id });
 # 
-#     print STDERR "Retrieved ".$prs->count()." entries.\n";
+#     $logger->error("Retrieved ".$prs->count()." entries.");
 #     if ($prs->count() == 0) {
-# 	print STDERR "No experiments have been loaded for file with md_file_id $md_file_id\n";
+# 	$logger->error("No experiments have been loaded for file with md_file_id $md_file_id");
 #     }
 #     else {
 # 	foreach my $prs_row ($prs->rows()) {
-# 	    print STDERR "Deleting the MdExperiment entries... ";
+# 	    $logger->error("Deleting the MdExperiment entries... ");
 # 
 # 	    # first delete the entry in the linking table...
 # 	    #
@@ -70,13 +72,13 @@ has phenome_schema => (is => 'rw');
 #     }
 # 
 #     # set md_files and/or metadata to obsolote
-#     print STDERR "Update the md_file table to obsolete... ";
+#     $logger->error("Update the md_file table to obsolete... ");
 #     my $mdmd_row = $self->metadata_schema->resultset("MdMetadata")->find( { metadata_id => $metadata_id } );
 #     if ($mdmd_row) {
 # 	$mdmd_row -> update( { obsolete => 1 });
 #     }
-#     print STDERR "Done.\n";
-#     print STDERR "Delete complete.\n";
+#     $logger->error("Done.");
+#     $logger->error("Delete complete.");
 # 
 # }
 
@@ -119,9 +121,9 @@ has phenome_schema => (is => 'rw');
 # 	    my $nd_experiment_rs = $self->bcs_schema()->resultset("NaturalDiversity::NdExperimentProject")->search( { project_id => $trial_id });
 # 	    my @nd_experiment_ids = map { $_->nd_experiment_id } $nd_experiment_rs->all();
 
-# 	    print STDERR "ND EXPERIMENTS: ".(join ",", @nd_experiment_ids)."\n";
+# 	    $logger->error("ND EXPERIMENTS: ".(join ",", @nd_experiment_ids)."");
 
-# 	    print STDERR "DELETING trial layout for trial id $trial_id...\n";
+# 	    $logger->error("DELETING trial layout for trial id $trial_id...");
 # 	    return $self->_delete_field_layout_experiment($trial_id);
 # 	}
 # 	);
@@ -140,7 +142,7 @@ has phenome_schema => (is => 'rw');
 #     while (my ($md_id) = $h->fetchrow_array()) {
 # 	my $mdmd_row = $self->metadata_schema->resultset("MdMetadata")->find( { metadata_id => $md_id } );
 # 	if ($mdmd_row) {
-# 	    print STDERR "Update the md_metadata table to obsolete... for $md_id";
+# 	    $logger->error("Update the md_metadata table to obsolete... for $md_id");
 # 	    $mdmd_row -> update( { obsolete => 1 });
 # 	}
 #     }
@@ -152,7 +154,7 @@ has phenome_schema => (is => 'rw');
 
 #     while (my ($file_id) = $h->fetchrow_array()) {
 # 	my $ndemdf_rs = $self->phenome_schema->resultset("NdExperimentMdFiles")->search( { file_id=>$file_id });
-# 	print STDERR "Delete phenome.nd_experiment_md_files row for file_id $file_id...\n";
+# 	$logger->error("Delete phenome.nd_experiment_md_files row for file_id $file_id...");
 # 	foreach my $row ($ndemdf_rs->all()) {
 # 	    $row->delete();
 # 	}
@@ -165,7 +167,7 @@ has phenome_schema => (is => 'rw');
 #     my @nd_experiment_ids = @_;
 
 
-#     print STDERR "Deleting the MdExperiment entries... ";
+#     $logger->error("Deleting the MdExperiment entries... ");
 
 #     # retrieve the associated phenotype ids (they won't be deleted by the cascade)
 #     #
@@ -175,7 +177,7 @@ has phenome_schema => (is => 'rw');
 #     my $phenotype_rs = $self->bcs_schema()->resultset("NaturalDiversity::NdExperimentPhenotype")->search( { nd_experiment_id=> { -in => [ @nd_experiment_ids ] }}, { join => 'phenotype' });
 #     if ($phenotype_rs->count() > 0) {
 # 	foreach my $p ($phenotype_rs->all()) {
-# 	    print STDERR "Deleting phenotype_id ".$p->phenotype_id()."\n";
+# 	    $logger->error("Deleting phenotype_id ".$p->phenotype_id()."");
 # 	    $p->delete();
 # 	    $phenotypes_deleted++;
 # 	}
@@ -186,7 +188,7 @@ has phenome_schema => (is => 'rw');
 #     my $delete_rs = $self->bcs_schema()->resultset("NaturalDiversity::NdExperiment")->search({ nd_experiment_id => { -in => [ @nd_experiment_ids] }});
 #     $nd_experiments_deleted = $delete_rs->count();
 #     $delete_rs->delete_all();
-#     print STDERR "Done.\n";
+#     $logger->error("Done.");
 
 #     return { phenotypes_deleted => $phenotypes_deleted,
 # 	     nd_experiments_deleted => $nd_experiments_deleted
@@ -211,15 +213,15 @@ has phenome_schema => (is => 'rw');
 #     # check if there are still associated phenotypes...
 #     #
 #     if ($self->trial_has_phenotype_data()) {
-# 	print STDERR "Attempt to delete field layout that still has associated phenotype data.\n";
+# 	$logger->error("Attempt to delete field layout that still has associated phenotype data.");
 # 	return { error => "Trial still has associated phenotyping experiment, cannot delete." };
 #     }
 
 #     my $field_layout_type_id = $self->bcs_schema->resultset("Cv::Cvterm")->find( { name => "field_layout" })->cvterm_id();
-#     print STDERR "Field layout type id = $field_layout_type_id\n";
+#     $logger->error("Field layout type id = $field_layout_type_id");
 
 #     my $plot_type_id = $self->bcs_schema->resultset("Cv::Cvterm")->find( { name => 'plot' })->cvterm_id();
-#     print STDERR "Plot type id = $plot_type_id\n";
+#     $logger->error("Plot type id = $plot_type_id");
 
 #     my $q = "SELECT stock_id FROM nd_experiment_project JOIN nd_experiment USING (nd_experiment_id) JOIN nd_experiment_stock ON (nd_experiment.nd_experiment_id = nd_experiment_stock.nd_experiment_id) JOIN stock USING(stock_id) WHERE nd_experiment.type_id=? AND project_id=? AND stock.type_id=?";
 #     my $h = $self->bcs_schema->storage()->dbh()->prepare($q);
@@ -228,7 +230,7 @@ has phenome_schema => (is => 'rw');
 #     my $plots_deleted = 0;
 #     while (my ($plot_id) = $h->fetchrow_array()) {
 # 	my $plot = $self->bcs_schema()->resultset("Stock::Stock")->find( { stock_id => $plot_id });
-# 	print STDERR "Deleting associated plot ".$plot->name()." (".$plot->stock_id().") \n";
+# 	$logger->error("Deleting associated plot ".$plot->name()." (".$plot->stock_id().") ");
 # 	$plots_deleted++;
 # 	$plot->delete();
 #     }
@@ -239,7 +241,7 @@ has phenome_schema => (is => 'rw');
 
 #     my ($nd_experiment_id) = $h->fetchrow_array();
 #     if ($nd_experiment_id) {
-# 	print STDERR "Delete corresponding nd_experiment entry  ($nd_experiment_id)...\n";
+# 	$logger->error("Delete corresponding nd_experiment entry  ($nd_experiment_id)...");
 # 	my $nde = $self->bcs_schema()->resultset("NaturalDiversity::NdExperiment")->find( { nd_experiment_id => $nd_experiment_id });
 # 	$nde->delete();
 #     }

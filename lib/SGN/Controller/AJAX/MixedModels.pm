@@ -13,6 +13,8 @@ use CXGN::Dataset::File;
 use CXGN::Phenotypes::File;
 use CXGN::MixedModels;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' };
 
 __PACKAGE__->config(
@@ -238,7 +240,7 @@ sub result_file_to_hash {
     my $c = shift;
     my $file = shift;
 
-    print STDERR "result_file_to_hash(): Processing file $file...\n";
+    $logger->debug("result_file_to_hash(): Processing file $file...");
     my @lines = read_file($file);
     chomp(@lines);
 
@@ -261,7 +263,7 @@ sub result_file_to_hash {
 	push @accession_names, $accession_name;
 	$html .= "<tr><td>".join("</td><td>", $accession_name, @values)."</td></tr>\n";
 	for(my $n=0; $n<@values; $n++) {
-	    print STDERR "Building hash for accession $accession_name and trait $trait_cols[$n]\n";
+	    $logger->debug("Building hash for accession $accession_name and trait $trait_cols[$n]");
 	    $analysis_data{$accession_name}->{$trait_cols[$n]} = [ $values[$n], $timestamp, $operator, "", "" ];
 	    
 	}
@@ -269,7 +271,7 @@ sub result_file_to_hash {
     }
     $html .= "</table>";
 
-    print STDERR "Analysis data formatted: ".Dumper(\%analysis_data);
+    $logger->error("Analysis data formatted: ".Dumper(\%analysis_data));
     
     return (\%analysis_data, $html, \@accession_names, \@trait_cols);
 }

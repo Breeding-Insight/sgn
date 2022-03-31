@@ -25,6 +25,8 @@ use Try::Tiny;
 use SGN::Model::Cvterm;
 use CXGN::BrAPI::v2::ExternalReferences;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
 	isa => 'Bio::Chado::Schema',
 	is => 'rw',
@@ -99,7 +101,7 @@ has 'external_references' => (
 sub BUILD {
     my $self = shift;
 
-    print STDERR "RUNNING BUILD FOR LOCATION.PM...\n";
+    $logger->debug("RUNNING BUILD FOR LOCATION.PM...");
     my $location;
     if ($self->nd_geolocation_id){
         $location = $self->bcs_schema->resultset("NaturalDiversity::NdGeolocation")->find( { nd_geolocation_id => $self->nd_geolocation_id });
@@ -121,7 +123,7 @@ sub BUILD {
         $self->external_references($self->external_references);
     }
 
-    print STDERR "Breeding programs are: ".$self->breeding_programs()."\n";
+    $logger->debug("Breeding programs are: ".$self->breeding_programs()."");
 
     return $self;
 }
@@ -194,7 +196,7 @@ sub store_location {
 
     # Add new location if no id supplied
     if (!$nd_geolocation_id) {
-        print STDERR "Checks completed, adding new location $name\n";
+        $logger->debug("Checks completed, adding new location $name");
         my $coderef = sub {
             my $new_row = $schema->resultset('NaturalDiversity::NdGeolocation')
               ->new({
@@ -255,16 +257,16 @@ sub store_location {
         };
 
         if ($transaction_error) {
-            print STDERR "Error creating location $name: $transaction_error\n";
+            $logger->error("Error creating location $name: $transaction_error");
             return { error => $transaction_error };
         } else {
-            print STDERR "Location $name added successfully\n";
+            $logger->debug("Location $name added successfully");
             return { success => "Location $name added successfully\n", nd_geolocation_id=>$self->location()->nd_geolocation_id() };
         }
     }
     # Edit existing location if id supplied
     elsif ($nd_geolocation_id) {
-        print STDERR "Checks completed, editing existing location $name\n";
+        $logger->debug("Checks completed, editing existing location $name");
         try {
             my $row = $schema->resultset("NaturalDiversity::NdGeolocation")->find({ nd_geolocation_id => $nd_geolocation_id });
             $row->description($name);
@@ -284,10 +286,10 @@ sub store_location {
         };
 
         if ($error) {
-            print STDERR "Error editing location $name: $error\n";
+            $logger->error("Error editing location $name: $error");
             return { error => $error };
         } else {
-            print STDERR "Location $name was successfully updated\n";
+            $logger->debug("Location $name was successfully updated");
             return { success => "Location $name was successfully updated\n", nd_geolocation_id=>$self->location()->nd_geolocation_id() };
         }
     }
@@ -298,11 +300,11 @@ sub delete_location {
     my $row = $self->bcs_schema->resultset("NaturalDiversity::NdGeolocation")->find({ nd_geolocation_id=> $self->nd_geolocation_id() });
     my $name = $row->description();
     my @experiments = $row->nd_experiments;
-    #print STDERR "Associated experiments: ".Dumper(@experiments)."\n";
+    #$logger->error("Associated experiments: ".Dumper(@experiments)."");
 
     if (@experiments) {
         my $error = "Location $name cannot be deleted because there are ".scalar @experiments." measurements associated with it from at least one trial.\n";
-        print STDERR $error;
+        $logger->error($error);
         return { error => $error };
     }
 	else {
@@ -354,12 +356,12 @@ sub _store_breeding_programs {
     my @existing_programs = split ("&", $existing_programs);
 
     foreach my $existing_program (@existing_programs) {
-        # print STDERR "Removing existing program $existing_program\n";
+        # $logger->error("Removing existing program $existing_program");
         $existing_program = _trim($existing_program);
         $self->_remove_ndgeolocationprop('breeding_program', 'project_property', $existing_program)
     }
     foreach my $new_program (@new_programs) {
-        # print STDERR "Storing new program $new_program\n";
+        # $logger->error("Storing new program $new_program");
         $new_program = _trim($new_program);
         $self->location->create_geolocationprops({ 'breeding_program' => $new_program}, {cv_name => 'project_property' });
     }
@@ -370,7 +372,7 @@ sub _store_ndgeolocationprop {
     my $type = shift;
     my $cv = shift;
     my $value = shift;
-    #print STDERR " Storing value $value with type $type\n";
+    #$logger->error(" Storing value $value with type $type");
     my $type_id = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, $type, $cv)->cvterm_id();
     my $row = $self->bcs_schema()->resultset("NaturalDiversity::NdGeolocationprop")->find( { type_id=>$type_id, nd_geolocation_id=> $self->nd_geolocation_id() } );
 
@@ -398,7 +400,7 @@ sub _remove_ndgeolocationprop {
         return 0;
     }
     else {
-        print STDERR "Error removing ndgeolocationprop from location ".$self->ndgeolocation_id().". Please check this manually.\n";
+        $logger->error("Error removing ndgeolocationprop from location ".$self->ndgeolocation_id().". Please check this manually.");
         return 0;
     }
 

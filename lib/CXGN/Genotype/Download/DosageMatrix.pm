@@ -51,6 +51,8 @@ use CXGN::Genotype::Search;
 use CXGN::Stock::StockLookup;
 use DateTime;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -232,7 +234,7 @@ sub download {
         $basepath_config
     );
     if ($compute_from_parents) {
-        print STDERR Dumper "Computing genotype dosages DosageMatrix From Parents......";
+        $logger->error(Dumper("Computing genotype dosages DosageMatrix From Parents......"));
         return $genotypes_search->get_cached_file_dosage_matrix_compute_from_parents(@required_config);
     }
     else {

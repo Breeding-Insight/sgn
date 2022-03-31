@@ -17,6 +17,8 @@ use Data::Dumper;
 use Bio::Chado::Schema;
 use JSON;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -74,7 +76,7 @@ sub store_pcr_marker_info {
 
     my %marker_hash = %$marker_details;
     my @marker_names = keys %marker_hash;
-#    print STDERR "MARKER NAMES =".Dumper(\@marker_names)."\n";
+#    $logger->error("MARKER NAMES =".Dumper(\@marker_names)."");
 
     my %pcr_marker_info;
     $pcr_marker_info{'marker_type'} = $marker_type;

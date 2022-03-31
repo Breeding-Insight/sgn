@@ -18,6 +18,8 @@ use JSON;
 
 extends 'CXGN::BrAPI::v1::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub seasons {
     my $self = shift;
     my $year_filter = shift;
@@ -194,7 +196,7 @@ sub search_results {
         field_trials_only => 1
     });
     my ($data, $total_count) = $trial_search->search();
-    #print STDERR Dumper $data;
+    #$logger->error(Dumper($data));
 
 	my $supported_crop = $c->config->{"supportedCrop"};
 
@@ -665,7 +667,7 @@ sub observation_units {
         }
     );
     my ($data, $unique_traits) = $phenotypes_search->search();
-    #print STDERR Dumper $data;
+    #$logger->error(Dumper($data));
 
     my @data_window;
     my $total_count = 0;
@@ -765,7 +767,7 @@ sub studies_table {
         exclude_phenotype_outlier=>$exclude_phenotype_outlier
 	);
 	my @data = $phenotypes_search->get_phenotype_matrix();
-	#print STDERR Dumper \@data;
+	#$logger->error(Dumper(\@data));
 
 	my %result;
 	my @data_files;
@@ -773,9 +775,9 @@ sub studies_table {
 	if ($format eq 'json') {
 		$total_count = scalar(@data)-1;
 		my @header_names = @{$data[0]};
-		#print STDERR Dumper \@header_names;
+		#$logger->error(Dumper(\@header_names));
 		my @trait_names = @header_names[39 .. $#header_names];
-		#print STDERR Dumper \@trait_names;
+		#$logger->error(Dumper(\@trait_names));
 		my @header_ids;
 		foreach my $t (@trait_names) {
             if ($t eq 'notes'){
@@ -795,7 +797,7 @@ sub studies_table {
 			}
 		}
 
-		#print STDERR Dumper \@data_window;
+		#$logger->error(Dumper(\@data_window));
 
 		%result = (
 			headerRow => ['studyYear', 'programDbId', 'programName', 'programDescription', 'studyDbId', 'studyName', 'studyDescription', 'studyDesign', 'plotWidth', 'plotLength', 'fieldSize', 'fieldTrialIsPlannedToBeGenotyped', 'fieldTrialIsPlannedToCross', 'plantingDate', 'harvestDate', 'locationDbId', 'locationName', 'germplasmDbId', 'germplasmName', 'germplasmSynonyms', 'observationLevel', 'observationUnitDbId', 'observationUnitName', 'replicate', 'blockNumber', 'plotNumber', 'rowNumber', 'colNumber', 'entryType', 'plantNumber', 'plantedSeedlotStockDbId', 'plantedSeedlotStockUniquename', 'plantedSeedlotCurrentCount', 'plantedSeedlotCurrentWeightGram', 'plantedSeedlotBoxName', 'plantedSeedlotTransactionCount', 'plantedSeedlotTransactionWeight', 'plantedSeedlotTransactionDescription', 'availableGermplasmSeedlotUniquenames'],
@@ -843,7 +845,7 @@ sub observation_units_granular {
         }
     );
     my ($data, $unique_traits) = $phenotypes_search->search();
-    #print STDERR Dumper $data;
+    #$logger->error(Dumper($data));
     my @data_out;
     foreach my $d (@$data){
         my $observations = $d->{observations};
@@ -890,7 +892,7 @@ sub get_stockprop_hash {
 	while (my $r = $prop_rs->next()){
 		push @{ $prop_hash->{$r->get_column('name')} }, $r->get_column('value');
 	}
-	#print STDERR Dumper $prop_hash;
+	#$logger->error(Dumper($prop_hash));
 	return $prop_hash;
 }
 

@@ -27,6 +27,8 @@ use File::Spec;
 use CXGN::Cview::Chromosome;
 use CXGN::Cview::Marker::AGP;
 
+my $logger = Log::Log4perl->get_logger();
+
 use base qw | CXGN::Cview::Chromosome |;
 
 
@@ -111,7 +113,7 @@ sub add_bac {
 
     push @{$self->{contig_members}->{$contig_name}}, $bac_name;
 
-    #print STDERR "Added bac $bac_name to contig $contig_name\n";
+    #$logger->error("Added bac $bac_name to contig $contig_name");
 #     my $bac_marker = CXGN::Cview::Marker::Physical->new($self);
 #     my $bac_offset = $coord + (($bac_end - $bac_start)/2);
 #     $bac_marker->set_offset($bac_offset/$SCALE);
@@ -122,7 +124,7 @@ sub add_bac {
 #     $bac_marker->get_label()->set_url("/gbrowse/YYYYYY");
     
 #     $self->add_marker($bac_marker);
-#    print STDERR "Added a bac $bac_name at ".($bac_offset/$SCALE).",  end = ".(($coord + $bac_end)/$SCALE)."\n";
+#    $logger->error("Added a bac $bac_name at ".($bac_offset/$SCALE).",  end = ".(($coord + $bac_end)/$SCALE)."");
        
 }
 
@@ -192,7 +194,7 @@ sub add_contig {
 
     my $offset = $coord + (($contig_end - $contig_start) /2);
     
-    #print STDERR "Adding contig $contig_name...\n";
+    #$logger->error("Adding contig $contig_name...");
 
     my $contig_marker = CXGN::Cview::Marker::Physical->new($self);
     $contig_marker->set_offset(($offset)/$SCALE);
@@ -205,7 +207,7 @@ sub add_contig {
 #    $contig_marker->set_url("/gbrowse/gbrowse/ITAG_devel_genomic/?name=$contig_name");
     $self->{contigs}->{$contig_name}=$contig_marker; # keep a hash for fast access.
     $self->add_marker($contig_marker);
-    #print STDERR "Added new contig: $contig_name offset=".(($offset)/$SCALE)." \n";    
+    #$logger->error("Added new contig: $contig_name offset=".(($offset)/$SCALE)." ");
     
 }
     
@@ -225,7 +227,7 @@ sub fetch {
     my $self = shift;
     my $file = shift;
 
-    #print STDERR "CACHEFILE = $file\n\n\n";
+    #$logger->error("CACHEFILE = $file\n\n");
     
     my $assoc = CXGN::Genomic::BACMarkerAssoc->new($self->{dbh});    
     my $cachefile = File::Spec->catfile($self->get_cache_dir(), "itag_chr".$self->get_name());
@@ -280,10 +282,10 @@ sub fetch {
 	    if (/^C(\d+)/) { 
 		$current_chr = $1;
 	    }
-	    #print STDERR "Current chr: $current_chr\n";
+	    #$logger->error("Current chr: $current_chr");
 	    if ($current_chr != $self->get_name()) { 
-		#print STDERR "Skipping chr $current_chr because not ".$self->get_name()."\n";
-		#print STDERR ".";
+		#$logger->error("Skipping chr $current_chr because not ".$self->get_name()."");
+		#$logger->error(".");
 		next; 
 	    }
 	    	    
@@ -304,7 +306,7 @@ sub fetch {
 	my @contig_order = sort { my ($x, $y) = (); if ($a=~/contig(\d+)/i) { $x = $1; } if ($b=~/contig(\d+)/) { $y = $1; } return $x <=> $y; } (keys %contigs);
 	
 	#foreach my $c (@contig_order) { 
-	#    print STDERR "Contig: $c\n";
+	#    $logger->error("Contig: $c");
 	#}
 	my $old_contig_name = "";
 
@@ -314,14 +316,14 @@ sub fetch {
 		
 		$contig_end   = $contig_coords{$c}->[-1]->[2];
 		
-		#print STDERR "Contig start $contig_start. Contig end $contig_end.\n";
+		#$logger->error("Contig start $contig_start. Contig end $contig_end.");
 
 		$self->add_contig($contig_start, $contig_end, $c, $coord);
 		
 		foreach my $b (@{$contigs{$c}}) { 
 		    my ($bac_name, $bac_start, $bac_end) = @$b;
 
-		    #print STDERR "    $bac_name $bac_start $bac_end\n";
+		    #$logger->error("    $bac_name $bac_start $bac_end");
 		    $self->add_bac($c, $bac_name);
 		    #$coord += $bac_end;
 		}

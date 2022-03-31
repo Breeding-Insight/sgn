@@ -8,6 +8,8 @@ use CXGN::Trial::TrialLayout::Phenotyping;
 use CXGN::Trial::TrialLayout::Genotyping;
 use CXGN::Trial::TrialLayout::SamplingTrial;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
     is       => 'rw',
     isa      => 'DBIx::Class::Schema',
@@ -49,7 +51,7 @@ sub create {
         return CXGN::Trial::TrialLayout::SamplingTrial->new($args);
     }
 
-    print STDERR "unknown experiment_type ".$args->{experiment_type}."\n";
+    $logger->error("unknown experiment_type ".$args->{experiment_type}."");
     return undef;
 }
 

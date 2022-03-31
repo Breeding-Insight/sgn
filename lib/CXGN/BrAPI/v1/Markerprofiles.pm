@@ -11,6 +11,8 @@ use CXGN::BrAPI::JSONResponse;
 
 extends 'CXGN::BrAPI::v1::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub markerprofiles_search {
     my $self = shift;
     my $inputs = shift;
@@ -256,7 +258,7 @@ sub markerprofiles_allelematrix {
             }
         }
     }
-    #print STDERR Dumper \@scores;
+    #$logger->error(Dumper(\@scores));
 
     my @scores_seen;
     if (!$data_format || $data_format eq 'json' ){

@@ -21,6 +21,8 @@ use Data::Dumper;
 use Text::CSV;
 use CXGN::List::Validate;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name {
     return "analysis phenotype spreadsheet csv";
 }
@@ -44,7 +46,7 @@ sub validate {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
@@ -54,20 +56,20 @@ sub validate {
         @columns = $csv->fields();
     } else {
         $parse_result{'error'} = "Could not parse header row.";
-        print STDERR "Could not parse header.\n";
+        $logger->error("Could not parse header.");
         return \%parse_result;
     }
 
     my $num_cols = scalar(@columns);
     if ($num_cols < 2){
         $parse_result{'error'} = 'Header row must contain:  "stock_names" followed by at least one trait.';
-        print STDERR "Incorrect header.\n";
+        $logger->error("Incorrect header.");
         return \%parse_result;
     }
 
     if ( $columns[0] ne "stock_names" ) {
             $parse_result{'error'} = 'File contents incorrect. Header row must contain: "stock_names" followed by all measured traits.';
-            print STDERR "File contents incorrect.\n";
+            $logger->error("File contents incorrect.");
             return \%parse_result;
     }
 
@@ -84,13 +86,13 @@ sub validate {
             @columns = $csv->fields();
         } else {
             $parse_result{'error'} = "Could not parse row $row.";
-            print STDERR "Could not parse row $row.\n";
+            $logger->error("Could not parse row $row.");
             return \%parse_result;
         }
 
         if (scalar(@columns) != $num_cols){
             $parse_result{'error'} = 'All lines must have same number of columns as header! Error on row: '.$row;
-            print STDERR "Line $row does not have complete columns.\n";
+            $logger->error("Line $row does not have complete columns.");
             return \%parse_result;
         }
 
@@ -98,12 +100,12 @@ sub validate {
 
         for my $col_num ($num_col_before_traits .. $num_cols-1) {
             my $value_string = $columns[$col_num];
-            #print STDERR $value_string."\n";
+            #$logger->error($value_string."");
             if ($timestamp_included) {
                 my ($value, $timestamp) = split /,/, $value_string;
                 if (!$timestamp =~ m/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\S)(\d{4})/) {
                     $parse_result{'error'} = "Timestamp needs to be of form YYYY-MM-DD HH:MM:SS-0000 or YYYY-MM-DD HH:MM:SS+0000";
-                    print STDERR "value: $timestamp\n";
+                    $logger->debug("value: $timestamp");
                     return \%parse_result;
                 }
             }
@@ -163,7 +165,7 @@ sub parse {
 
     if (!$fh) {
         $parse_result{'error'} = "Could not read file.";
-        print STDERR "Could not read file.\n";
+        $logger->error("Could not read file.");
         return \%parse_result;
     }
 
@@ -173,7 +175,7 @@ sub parse {
         @header_columns = $csv->fields();
     } else {
         $parse_result{'error'} = "Could not parse header row.";
-        print STDERR "Could not parse header row.\n";
+        $logger->error("Could not parse header row.");
         return \%parse_result;
     }
     my $num_cols = scalar(@header_columns);
@@ -185,7 +187,7 @@ sub parse {
             @columns = $csv->fields();
         } else {
             $parse_result{'error'} = "Could not parse row $row.";
-            print STDERR "Could not parse row $row.\n";
+            $logger->error("Could not parse row $row.");
             return \%parse_result;
         }
 
@@ -201,7 +203,7 @@ sub parse {
                 if ($columns[$col_num]){
                     $value_string = $columns[$col_num];
                 }
-                #print STDERR $value_string."\n";
+                #$logger->error($value_string."");
                 my $timestamp = '';
                 my $value = '';
                 if ($timestamp_included){
@@ -212,7 +214,7 @@ sub parse {
                 if (!defined($timestamp)){
                     $timestamp = '';
                 }
-                #print STDERR $trait_value." : ".$timestamp."\n";
+                #$logger->error($trait_value." : ".$timestamp."");
 
                 if ( defined($value) && defined($timestamp) ) {
                     if ($value ne '.'){
@@ -237,7 +239,7 @@ sub parse {
     $parse_result{'data'} = \%data;
     $parse_result{'units'} = \@observation_units;
     $parse_result{'variables'} = \@traits;
-    #print STDERR Dumper \%parse_result;
+    #$logger->error(Dumper(\%parse_result));
 
     return \%parse_result;
 }

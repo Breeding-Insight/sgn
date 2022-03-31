@@ -9,6 +9,8 @@ use List::MoreUtils qw /any /;
 use CXGN::People::Person;
 use CXGN::Login;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -29,7 +31,7 @@ sub generate_sampling_trial_POST : Args(0) {
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $sampling_data = decode_json $c->req->param("sampling_data");
-    print STDERR Dumper $sampling_data;
+    $logger->error(Dumper($sampling_data));
 
     if ( !$sampling_data->{elements} || !$sampling_data->{description} || !$sampling_data->{location} || !$sampling_data->{year} || !$sampling_data->{name} || !$sampling_data->{breeding_program} || !$sampling_data->{sampling_facility} || !$sampling_data->{sample_type} ) {
         $c->stash->{rest} = { error => "Please provide all parameters in the basic sampling trial information section" };
@@ -65,7 +67,7 @@ sub generate_sampling_trial_POST : Args(0) {
 
     if ($@) {
         $c->stash->{rest} = { error => "Design failed. Error: $@" };
-        print STDERR "Design failed because of $@\n";
+        $logger->error("Design failed because of $@");
         $c->detach();
     }
 
@@ -91,7 +93,7 @@ sub generate_sampling_trial_POST : Args(0) {
         delete($_->{is_a_control});
         delete($_->{plot_num_per_block});
     }
-    #print STDERR Dumper($design);
+    #$logger->error(Dumper($design));
 
     $c->stash->{rest} = {success => 1, design=>$design};
 }
@@ -135,7 +137,7 @@ sub parse_sampling_trial_file_POST : Args(0) {
     my $error;
 
     if ($upload_original_name =~ /\s/ || $upload_original_name =~ /\// || $upload_original_name =~ /\\/ ) {
-        print STDERR "File name must not have spaces or slashes.\n";
+        $logger->debug("File name must not have spaces or slashes.");
         $c->stash->{rest} = {error => "Uploaded file name must not contain spaces or slashes." };
         return;
     }
@@ -205,7 +207,7 @@ sub parse_sampling_trial_file_POST : Args(0) {
         }
         else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error=$return_error.$error_string."<br>";
@@ -215,7 +217,7 @@ sub parse_sampling_trial_file_POST : Args(0) {
         $c->stash->{rest} = {error_string => $return_error, missing_accessions => $parse_errors->{'missing_accessions'}};
         return;
     }
-    #print STDERR Dumper $parsed_data;
+    #$logger->error(Dumper($parsed_data));
 
     #Turn parased data into same format as generate_genotype_trial above
     my %design;
@@ -279,7 +281,7 @@ sub store_sampling_trial_POST : Args(0) {
 
     my $schema = $c->dbic_schema("Bio::Chado::Schema");
     my $sampling_data = decode_json $c->req->param("sampling_data");
-    #print STDERR Dumper $plate_info;
+    #$logger->error(Dumper($plate_info));
     if ( !$sampling_data->{design} || !$sampling_data->{description} || !$sampling_data->{location} || !$sampling_data->{year} || !$sampling_data->{name} || !$sampling_data->{breeding_program} || !$sampling_data->{sampling_facility} || !$sampling_data->{sample_type} ) {
         $c->stash->{rest} = { error => "Please provide all parameters in the sampling trial information section" };
         $c->detach();
@@ -314,9 +316,9 @@ sub store_sampling_trial_POST : Args(0) {
         $field_trial_ids{$r->get_column('trial_id')}++;
     }
     my @field_trial_ids = keys %field_trial_ids;
-    #print STDERR Dumper \@field_trial_ids;
+    #$logger->error(Dumper(\@field_trial_ids));
 
-    print STDERR "Creating the sampling trial...\n";
+    $logger->debug("Creating the sampling trial...");
 
     my $message;
     my $coderef = sub {
@@ -345,7 +347,7 @@ sub store_sampling_trial_POST : Args(0) {
     try {
         $schema->txn_do($coderef);
     } catch {
-        print STDERR "Transaction Error: $_\n";
+        $logger->error("Transaction Error: $_");
         $c->stash->{rest} = {error => "Error saving sampling trial in the database: $_"};
         $c->detach;
     };
@@ -358,7 +360,7 @@ sub store_sampling_trial_POST : Args(0) {
         $c->stash->{rest} = {error => "Error saving sampling trial in the database: $error"};
         $c->detach;
     }
-    #print STDERR Dumper(%message);
+    #$logger->error(Dumper(%message));
 
     my $dbh = $c->dbc->dbh();
     my $bs = CXGN::BreederSearch->new( { dbh=>$dbh, dbname=>$c->config->{dbname}, } );
@@ -366,7 +368,7 @@ sub store_sampling_trial_POST : Args(0) {
 
     my $saved_layout = CXGN::Trial::TrialLayout->new({schema => $schema, trial_id => $message->{trial_id}, experiment_type=>'sampling_layout'});
     my $saved_design = $saved_layout->get_design();
-    #print STDERR Dumper $saved_design;
+    #$logger->error(Dumper($saved_design));
 
     $c->stash->{rest} = {
         message => "Successfully stored the sampling trial.",

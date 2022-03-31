@@ -4,6 +4,8 @@ package CXGN::List::Validate::Plugin::VectorConstructs;
 use Moose;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub name { 
     return "vector_constructs";
 }
@@ -15,7 +17,7 @@ sub validate {
 
     my $type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'vector_construct', 'stock_type')->cvterm_id();
     
-    #print STDERR "Vector Construct TYPE ID $type_id\n";
+    #$logger->error("Vector Construct TYPE ID $type_id");
 
     my @missing = ();
     foreach my $l (@$list) { 

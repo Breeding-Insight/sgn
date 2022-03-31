@@ -7,6 +7,8 @@ use List::MoreUtils qw | any |;
 use Data::Dumper;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -89,10 +91,10 @@ sub delete_population :Path('/ajax/population/delete') Args(0) {
     };
     my $return;
     if ($error) {
-        print STDERR "Error deleting population $population_name: $error\n";
+        $logger->error("Error deleting population $population_name: $error");
         $return = { error => "Error deleting population $population_name: $error" };
     } else {
-        print STDERR "population $population_name deleted successfully\n";
+        $logger->debug("population $population_name deleted successfully");
         $return = { success => "Population $population_name deleted successfully!" };
     }
 
@@ -124,10 +126,10 @@ sub remove_population_member :Path('/ajax/population/remove_member') Args(0) {
     };
     my $return;
     if ($error) {
-        print STDERR "Error removing member from population: $error\n";
+        $logger->error("Error removing member from population: $error");
         $return = { error => "Error removing member from population: $error" };
     } else {
-        print STDERR "Member removed successfully\n";
+        $logger->debug("Member removed successfully");
         $return = { success => "Removed successfully!" };
     }
 

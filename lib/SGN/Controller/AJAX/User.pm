@@ -6,6 +6,9 @@ use IO::File;
 use Data::Dumper;
 use HTML::Entities;
 
+my $logger = Log::Log4perl->get_logger();
+
+
 BEGIN { extends 'Catalyst::Controller::REST' };
 
 __PACKAGE__->config(
@@ -23,7 +26,7 @@ sub login : Path('/ajax/user/login') Args(0) {
     my $password = $c->req->param("password");
     my $goto_url = $c->req->param("goto_url");
 
-    print STDERR "Goto URL = $goto_url\n";
+    $logger->debug("Goto URL = $goto_url");
 
     my $login = CXGN::Login->new($c->dbc->dbh());
     my $login_info = $login->login_user($username, $password);
@@ -58,7 +61,7 @@ sub new_account :Path('/ajax/user/new') Args(0) {
     my $self = shift;
     my $c = shift;
 
-    print STDERR "Adding new account...\n";
+    $logger->debug("Adding new account...");
     if ($c->config->{is_mirror}) {
 	$c->stash->{template} = '/system_message.mas';
 	$c->stash->{message} = "This site is a mirror site and does not support adding users. Please go to the main site to create an account.";
@@ -124,12 +127,12 @@ sub new_account :Path('/ajax/user/new') Args(0) {
     $new_user -> set_organization($organization);
     $new_user -> store();
 
-    print STDERR "Generated sp_person_id ".$new_user->get_sp_person_id()."\n";
-    print STDERR "Update password and confirm code...\n";
+    $logger->debug("Generated sp_person_id ".$new_user->get_sp_person_id());
+    $logger->debug("Update password and confirm code...");
     $new_user->update_password($password);
     $new_user->update_confirm_code($confirm_code);
 
-    print STDERR "Store Person object...\n";
+    $logger->debug("Store Person object...");
     #this is being added because the person object still uses two different objects, despite the fact that we've merged the tables
     my $person_id=$new_user->get_sp_person_id();
     my $new_person=CXGN::People::Person->new($c->dbc->dbh(),$person_id);
@@ -184,7 +187,7 @@ sub change_account_info_action :Path('/ajax/user/update') Args(0) {
 
     if (!$args->{change_password} && ! $args->{change_username} && !$args->{change_email}) {
 	my $error = "No actions were requested. Please select which fields you would like to update by checking the appropriate checkbox(es) on the form and entering your new information.";
-	print STDERR $error;
+    $logger->error($error);
 	$c->stash->{rest} =  { error => $error };
 	return;
     }
@@ -192,7 +195,7 @@ sub change_account_info_action :Path('/ajax/user/update') Args(0) {
     chomp($args->{current_password});
     if (! $person->verify_password($args->{current_password})) {
 	my $error = "Your current password does not match SGN records.";
-	print STDERR $error;
+    $logger->error($error);
 	$c->stash->{rest} = { error => "$error" };
 	return;
     }
@@ -208,7 +211,7 @@ sub change_account_info_action :Path('/ajax/user/update') Args(0) {
 	my $new_username = $args->{new_username};
 	if(length($new_username) < 7) {
 	    my $error = "Username must be at least 7 characters long.";
-	    print STDERR $error;
+        $logger->error($error);
 	    $c->stash->{rest} = { error => $error  };
 	    return;
 	}
@@ -216,7 +219,7 @@ sub change_account_info_action :Path('/ajax/user/update') Args(0) {
 	my $other_user = CXGN::People::Login->get_login($c->dbc->dbh(), $new_username);
 	if (defined $other_user->get_sp_person_id() &&
 	    ($person -> get_sp_person_id() != $other_user->get_sp_person_id())) {
-	    print STDERR "Username alread in use.\n";
+        $logger->debug("Username alread in use.");
 	    $c->stash->{rest} = { error =>  "Username \"$new_username\" is already in use. Please select a different username." };
 	    return;
 	}
@@ -229,23 +232,23 @@ sub change_account_info_action :Path('/ajax/user/update') Args(0) {
 	#unless change_password is set, new_password won't be in the args hash because of the prestore test
 	my ($new_password, $confirm_password) = ($args->{new_password}, $args->{confirm_password});
 	if(length($args->{new_password}) < 7) {
-	    print STDERR "Password too short\n";
+        $logger->debug("Password too short");
 	    $c->stash->{rest} = { error => "Passwords must be at least 7 characters long. Please try again." };
 	    return;
 	}
 	#format check
 	if($args->{new_password} !~ /^[a-zA-Z0-9~!@#$^&*_.=:;<>?]+$/) {
-	    print STDERR "Illegal characters in password\n";
+        $logger->debug("Illegal characters in password");
 	    $c->stash->{rest} = { error => "An error occurred. Please use your browser's back button to try again.. The Password can't contain spaces or these symbols: <u><b>` ( ) [ ] { } - + ' \" / \\ , |</b></u>." };
 	    return;
 	}
 	if($args->{new_password} ne $args->{confirm_password}) {
-	    print STDERR "Password don't match.\n";
+        $logger->debug("Password don't match.");
 	    $c->stash->{rest} = { error => "New password entries do not match. You must enter your new password twice to verify accuracy." };
 	    return;
 	}
 
-	print STDERR "Saving new password to the database\n";
+    $logger->debug("Saving new password to the database");
 	$person->update_password($args->{new_password});
     }
 
@@ -254,17 +257,17 @@ sub change_account_info_action :Path('/ajax/user/update') Args(0) {
 	#unless change_email is set, private_email won't be in the args hash because of the prestore test
 	my ($private_email, $confirm_email) = ($args->{private_email}, $args->{confirm_email});
 	if($private_email !~ m/^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+$/) {
-	    print STDERR "Invalid email address\n";
+	    $logger->debug("Invalid email address");
 	    $c->stash->{rest} = { error => "An error occurred. Please use your browser's back button to try again. The E-mail address \"$private_email\" does not appear to be a valid e-mail address." };
 	    return;
 	}
 	if($private_email ne $confirm_email) {
-	    print STDERR "Emails don't match\n";
+	    $logger->debug("Emails don't match");
 	    $c->stash->{rest} = { error => "An error occurred. Please use your browser's back button to try again. New e-mail address entries do not match. You must enter your new e-mail address twice to verify accuracy." };
 	    return;
 	}
 
-	print STDERR "Saving private email '$private_email' to the database\n";
+	$logger->debug("Saving private email '$private_email' to the database");
 	$person->set_private_email($private_email);
 	my $confirm_code = $self->tempname();
 	$person->set_confirm_code($confirm_code);
@@ -330,7 +333,7 @@ sub reset_password :Path('/ajax/user/reset_password') Args(0) {
         my $reset_link = $c->config->{main_production_site_url}."/user/reset_password_form?reset_password_token=$email_reset_token";
         my $person = CXGN::People::Login->new( $c->dbc->dbh(), $pid);
         $person->update_confirm_code($email_reset_token);
-        print STDERR "Sending reset link $reset_link\n";
+        $logger->debug("Sending reset link $reset_link");
         $self->send_reset_email_message($c, $pid, $email, $reset_link);
         push @reset_links, $reset_link;
         push @reset_tokens, $email_reset_token;
@@ -415,7 +418,7 @@ END_HEREDOC
 sub tempname {
     my $self = shift;
     my $rand_string = "";
-    my $dev_urandom = new IO::File "</dev/urandom" || print STDERR "Can't open /dev/urandom";
+    my $dev_urandom = new IO::File "</dev/urandom" || $logger->error("Can't open /dev/urandom");
     $dev_urandom->read( $rand_string, 16 );
     my @bytes = unpack( "C16", $rand_string );
     $rand_string = "";
@@ -442,7 +445,7 @@ sub get_login_button_html :Path('/ajax/user/login_button_html') Args(0) {
 	my $html = "";
 	# if the site is a mirror, gray out the login/logout links
 	if( $c->config->{'is_mirror'} ) {
-	    print STDERR "generating login button for mirror site...\n";
+	    $logger->debug("generating login button for mirror site...");
 	    $html = <<HTML;
 	    <a style="line-height: 1.2; text-decoration: underline; background: none" href="$production_site" title="log in on main site">main site</a>
 	} elsif ( $c->config->{disable_login} ) {
@@ -455,7 +458,7 @@ sub get_login_button_html :Path('/ajax/user/login_button_html') Args(0) {
 HTML
 
     } elsif ( $c->req->uri->path_query =~ "logout=yes") {
-	print STDERR "generating login button for logout...\n";
+	$logger->debug("generating login button for logout...");
 	$html = <<HTML;
   <li class="dropdown">
       <div class="btn-group" role="group" aria-label="..." style="height:34px; margin: 1px 0px 0px 0px" >
@@ -467,7 +470,7 @@ HTML
 HTML
 
 } elsif ( $c->user_exists ) {
-    print STDERR "Generate login button for logged in user...\n";
+    $logger->debug("Generate login button for logged in user...");
     my $sp_person_id = $c->user->get_object->get_sp_person_id;
     my $username = $c->user->get_username();
     $html = <<HTML;
@@ -485,7 +488,7 @@ HTML
 HTML
 
   } else {
-      print STDERR "generating regular login button..\n";
+      $logger->debug("generating regular login button..");
       $html = qq |
       <li class="dropdown">
         <div class="btn-group" role="group" aria-label="..." style="height:34px; margin: 1px 0px 0px 0px" >
@@ -496,7 +499,7 @@ HTML
 
 };
 	if ($@) {
-	    print STDERR "ERROR: $@\n";
+        $logger->error("ERROR: $@");
 	    $c->stash->{rest} = { error => $@ };
 	}
 	return $c->stash->{rest} = { html => $html, logged_in => $c->user_exists };
@@ -524,9 +527,12 @@ sub quick_create_user :Path('/ajax/user/quick_create_account') Args(0) {
     my $logged_in_user_type=$logged_in_user->get_user_type();
 
     my ($username, $password, $confirm_password, $email_address, $new_user_type, $first_name, $last_name) =
-	map { print STDERR $_." ".$c->req->param($_)."\n"; $c->req->param($_) } qw | username password confirm_password confirm_email user_type first_name last_name |;
+	map {
+        $logger->debug($_." ".$c->req->param($_));
+        $c->req->param($_)
+    } qw | username password confirm_password confirm_email user_type first_name last_name |;
 
-    print STDERR "$username, $password, $confirm_password, $email_address, $new_user_type, $first_name, $last_name\n";
+    $logger->debug("$username, $password, $confirm_password, $email_address, $new_user_type, $first_name, $last_name");
 
     my $new_user_login=CXGN::People::Login->new($c->dbc->dbh);
 

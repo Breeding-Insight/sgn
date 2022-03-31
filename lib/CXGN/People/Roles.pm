@@ -25,6 +25,8 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use Text::Unidecode;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
 	isa => 'Bio::Chado::Schema',
 	is => 'rw',
@@ -40,7 +42,7 @@ sub add_sp_role {
 	$sth->execute($name);
 	my $count = $sth->rows;
 	if ($count > 0){
-		print STDERR "A role with that name already exists.\n";
+		$logger->error("A role with that name already exists.");
 		return;
 	}
 	eval {
@@ -68,7 +70,7 @@ sub get_breeding_program_roles {
 		push(@breeding_program_roles, [$username, $sp_person_id, $sp_role] );
 	}
 
-	#print STDERR Dumper \@breeding_program_roles;
+	#$logger->error(Dumper(\@breeding_program_roles));
 	return \@breeding_program_roles;
 }
 

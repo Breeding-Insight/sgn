@@ -13,6 +13,8 @@ use CXGN::Cross;
 
 extends 'CXGN::BrAPI::v1::Common';
 
+my $logger = Log::Log4perl->get_logger();
+
 sub search {
     my $self = shift;
     my $params = shift;
@@ -329,7 +331,7 @@ sub germplasm_pedigree {
             while (my ($crossing_experiment_id, $crossing_experiment_name, $description, $family_id, $family_name, $year) = $h->fetchrow_array()){
                 push @membership_info, [$crossing_experiment_id, $crossing_experiment_name, $description, $family_id, $family_name, $year]
             }
-             # print STDERR Dumper(\@membership_info);
+             # $logger->error(Dumper(\@membership_info));
         }
 
         %result = (
@@ -365,7 +367,7 @@ sub germplasm_progeny {
     my $mother_cvterm = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, 'female_parent', 'stock_relationship')->cvterm_id();
     my $father_cvterm = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, 'male_parent', 'stock_relationship')->cvterm_id();
     my $accession_cvterm = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, 'accession', 'stock_type')->cvterm_id();
-    #print STDERR Dumper $stock_id;
+    #$logger->error(Dumper($stock_id));
     my $stock = $self->bcs_schema()->resultset("Stock::Stock")->find({
         'type_id'=> $accession_cvterm,
         'stock_id'=> $stock_id,

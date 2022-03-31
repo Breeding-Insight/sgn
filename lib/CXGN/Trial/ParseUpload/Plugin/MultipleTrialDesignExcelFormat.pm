@@ -10,9 +10,11 @@ use CXGN::Stock::Seedlot;
 use CXGN::Calendar;
 use CXGN::Trial;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub _validate_with_plugin {
 
-  # print STDERR "Starting validation\t".localtime()."\n";
+  # $logger->error("Starting validation\t".localtime()."");
 
   my $self = shift;
   my $filename = $self->get_filename();
@@ -93,7 +95,7 @@ sub _validate_with_plugin {
 
   for my $row ( 1 .. $row_max ) {
 
-      #print STDERR "Check 01 ".localtime();
+      #$logger->error("Check 01 ".localtime());
     my $row_name = $row+1;
     my $plot_name;
     my $accession_name;
@@ -572,7 +574,7 @@ sub _validate_with_plugin {
       return;
   }
 
-  # print STDERR "Check 3.1.3 ".localtime();
+  # $logger->error("Check 3.1.3 ".localtime());
   return 1; #returns true if validation is passed
 
 }
@@ -781,7 +783,7 @@ sub _parse_with_plugin {
     if ($acc_synonyms_lookup{$accession_name}){
         my @accession_names = keys %{$acc_synonyms_lookup{$accession_name}};
         if (scalar(@accession_names)>1){
-            print STDERR "There is more than one uniquename for this synonym $accession_name. this should not happen!\n";
+            $logger->warn("There is more than one uniquename for this synonym $accession_name. this should not happen!");
         }
         $accession_name = $accession_names[0];
     }

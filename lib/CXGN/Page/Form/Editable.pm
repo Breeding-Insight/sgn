@@ -29,6 +29,8 @@ package CXGN::Page::Form::Editable;
 
 use base qw / CXGN::Page::Form::Static /;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub new {
 	my $class = shift;
 	my $self = $class->SUPER::new(@_);
@@ -74,7 +76,7 @@ sub propagate_input {
     foreach my $f ($self->get_fields()) { 
 	my $setter = $f->get_object_setter();
 	
-	#print STDERR "FUNCTION: " .$setter." field contents: ".($args{$f->get_field_name()})." field name: ".$f->get_field_name()." getter: ".$f->get_object_getter()." setter: ".$f->get_object_setter()."\n";
+	#$logger->error("FUNCTION: " .$setter." field contents: ".($args{$f->get_field_name()})." field name: ".$f->get_field_name()." getter: ".$f->get_object_getter()." setter: ".$f->get_object_setter()."");
 	
 	if ($setter)
 	{
@@ -147,7 +149,7 @@ sub validate {
     my %error_hash = ();
     foreach my $f ($self->get_fields()) { 
 	my $error =  $f->validate();
-	#print STDERR "validate ".$f->get_field_name()." - error $error\n";
+	#$logger->error("validate ".$f->get_field_name()." - error $error");
 	if ($error) { 
 	    $error_hash{$f->get_field_name()}=$error;
 	}
@@ -178,7 +180,7 @@ sub store {
     # commit the changes to the database using the store method on
     # each object
     #
-    #print STDERR "STORING OBJECT...\n";
+    #$logger->error("STORING OBJECT...");
     
     my %distinct_objects = $self->get_distinct_objects();
     
@@ -197,8 +199,8 @@ sub store {
       }
     }
     foreach my $k (keys %distinct_objects) { 
-	#print STDERR " DUMP:" .Data::Dumper::Dumper($distinct_objects{$k});
-	#print STDERR " STORING OBJECT: ".ref($distinct_objects{$k})."\n";
+	#$logger->error(" DUMP:" .Data::Dumper::Dumper($distinct_objects{$k}));
+	#$logger->error(" STORING OBJECT: ".ref($distinct_objects{$k})."");
 	my $id = $distinct_objects{$k}->store();
 	$self->set_insert_id($k, $id);
     }

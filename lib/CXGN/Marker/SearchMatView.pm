@@ -51,6 +51,8 @@ use strict;
 use warnings;
 use Moose;
 
+my $logger = Log::Log4perl->get_logger();
+
 
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
@@ -501,13 +503,13 @@ sub query {
         push(@args, $offset);
     }
 
-    # print STDERR "QUERY:\n";
-    # print STDERR "$query\n";
+    # $logger->error("QUERY:");
+    # $logger->error("$query");
     # use Data::Dumper;
-    # print STDERR "ARGS:\n";
-    # print STDERR Dumper \@args;
-    # print STDERR "TOTAL MARKERS:\n";
-    # print STDERR "$marker_count\n";
+    # $logger->error("ARGS:");
+    # $logger->error(Dumper(\@args));
+    # $logger->error("TOTAL MARKERS:");
+    # $logger->error("$marker_count");
 
     # Perform the Query
     my $h = $dbh->prepare($query);

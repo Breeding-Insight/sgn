@@ -29,6 +29,8 @@ use File::Basename;
 use CXGN::Tools::Run;
 use CXGN::Phenotypes::File;
 
+my $logger = Log::Log4perl->get_logger();
+
 =head2 dependent_variables() 
 
 sets the dependent variables (a listref of traits)
@@ -129,9 +131,9 @@ sub generate_model {
 
     my @addends = ();
 
-    print STDERR join("\n", ("DV", Dumper($dependent_variables), "FF", Dumper($fixed_factors), "RF", Dumper($random_factors), "TF", $tempfile, "FFI", Dumper($fixed_factors_interaction), "VSI: ", Dumper($variable_slope_intersects)));
+    $logger->debug(join(""), ("DV", Dumper($dependent_variables), "FF", Dumper($fixed_factors), "RF", Dumper($random_factors), "TF", $tempfile, "FFI", Dumper($fixed_factors_interaction), "VSI: ", Dumper($variable_slope_intersects)));
 
-    print STDERR Dumper($fixed_factors);
+    $logger->error(Dumper($fixed_factors));
     my $model = "";
 
     if (! $dependent_variables || scalar(@$dependent_variables)==0) {
@@ -160,7 +162,7 @@ sub generate_model {
     foreach my $variable_slope_groups (@$variable_slope_intersects) {
 	if (exists($variable_slope_groups->[0]) && exists($variable_slope_groups->[1])) {
 	    my $term = " (1+$variable_slope_groups->[0] \| $variable_slope_groups->[1]) ";
-	    print STDERR "TERM: $term\n";
+	    $logger->debug("TERM: $term");
 	    $formatted_variable_slope_intersects .= $term;
 	    push @addends, $formatted_variable_slope_intersects;
 	}
@@ -224,9 +226,9 @@ sub run_model {
     # run r script to create model
     #
     my $cmd = "R CMD BATCH  '--args datafile=\"".$self->tempfile()."\" paramfile=\"".$self->tempfile().".params\"' " .  " R/mixed_models.R ".$self->tempfile().".out";
-    print STDERR "running R command $cmd...\n";
+    $logger->debug("running R command $cmd...");
 
-    print STDERR "running R command ".$self->tempfile()."...\n";
+    $logger->debug("running R command ".$self->tempfile()."...");
 
     my $ctr = CXGN::Tools::Run->new( { backend => $backend, working_dir => dirname($self->tempfile()), backend => $backend, submit_host => $cluster_host } );
 

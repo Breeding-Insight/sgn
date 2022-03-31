@@ -25,6 +25,8 @@ use MooseX::FollowPBP;
 use Moose::Util::TypeConstraints;
 use Try::Tiny;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
 		 is       => 'rw',
 		 isa      => 'DBIx::Class::Schema',
@@ -45,7 +47,7 @@ sub get_trial {
 	    name => $trial_name,
 	   });
   if (!$trial) {
-    print STDERR "The trial $trial_name was not found\n";
+    $logger->debug("The trial $trial_name was not found");
     return;
   }
   return $trial;

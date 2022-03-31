@@ -162,7 +162,7 @@ sub design_layout_map_view {
     my @sorted_block = sort@block_numbers;
 	my @uniq_block = uniq(@sorted_block);
     @check_names = uniq(@check_names);
-    #print STDERR Dumper(\@check_names);
+    #$logger->error(Dumper(\@check_names));
 	my ($min_rep, $max_rep) = minmax @rep_numbers;
 	my ($min_block, $max_block) = minmax @block_numbers;
 	my ($min_col, $max_col) = minmax @col_numbers;

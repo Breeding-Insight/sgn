@@ -28,6 +28,8 @@ use Bio::Chado::Schema;
 use Try::Tiny;
 use SGN::Model::Cvterm;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'schema' => (
     is  => 'rw',
     isa =>  'DBIx::Class::Schema',
@@ -58,7 +60,7 @@ sub parse {
     my $self = shift;
     my @errors;
     my ($contents , $identifier_prefix, $db_name ) = @_;
-    print STDERR "Identifier prefix = $identifier_prefix, db_name = $db_name\n";
+    $logger->debug("Identifier prefix = $identifier_prefix, db_name = $db_name");
     my $hashref; #hashref of hashrefs for storing the uploaded data , to be used for checking the fields
     ## multiple values are kept
     my ($op_name, $project_id, $location_id, $stock_id, $cvterm_accession, $value, $date, $count);
@@ -70,25 +72,25 @@ sub parse {
 	$code =~ s/^\s+|\s+$//g;
 	if ($code =~ m/^O/) { #operator name
             (undef, $op_name) = split(/:/, $code) ;
-            print STDERR "FOUND operator name $op_name\n";
+            $logger->debug("FOUND operator name $op_name");
         }
         if ($code =~ m/^D/) {
             (undef, $date) = split(/:/, $code); #this date overrides the date recorded in each line
         }
         if ($code =~ m/^P/) { #project_id
-            print STDERR "Found project $code\n";
+            $logger->debug("Found project $code");
             (undef, $project_id) = split(/:/, $code) ;
         }
         if ($code =~ m/^L/) { #nd_geolocation_id
-            print STDERR "Found location $code \n";
+            $logger->debug("Found location $code ");
             (undef, $location_id) = split(/:/, $code) ;
         }
         if ($code =~ m/^$identifier_prefix(\d+)/ ) {
-            print STDERR "Found stock $code\n";
+            $logger->debug("Found stock $code");
             $stock_id = $1;
         }
         if ($code =~ m/^($db_name:\d+)/ ) {
-            print STDERR "Found cvterm : $code \n";
+            $logger->debug("Found cvterm : $code ");
             $cvterm_accession = $code;
 
         }
@@ -96,7 +98,7 @@ sub parse {
         #values are recorded only manualy and not from the barcode.
         ##################################
             #if ( defined($value) && ($value ne '') ) { #need to include 0
-            #    print STDERR " **** parse ... parsing : $op_name \t $project_id \t $location_id \t $date .. stock_id = $stock_id accession = $cvterm_accession time = $time, value = $value \n\n";
+            #    $logger->error(" **** parse ... parsing : $op_name \t $project_id \t $location_id \t $date .. stock_id = $stock_id accession = $cvterm_accession time = $time, value = $value \n");
             #    #do we allow multiple measurements per one plant per DAY ?
             #    $hashref->{$op_name . "\t" . $project_id . "\t" . $location_id . "\t" . $date}->{$stock_id}->{$cvterm_accession}->{time}  = $time;
             #    $hashref->{$op_name . "\t" . $project_id . "\t" . $location_id . "\t" . $date}->{$stock_id}->{$cvterm_accession}->{value} = $value;
@@ -111,7 +113,7 @@ sub parse {
             $hashref->{join("\t", $op_name , $project_id , $location_id , $date, $count)}->{$stock_id}->{$cvterm_accession}->{value} = $value; # one value per line.
         }
         if ($code !~ /^O|^P|^L|^D|^$identifier_prefix|^$db_name:\d+|^\d/ ) {
-            print STDERR  "Cannot find code ' $code ' in the database! \n\n";
+            $logger->error( "Cannot find code ' $code ' in the database! \n");
             push @errors, " Data ' $code ' cannot be stored in the database! \n Please check your barcode input\n";
         }
 
@@ -146,18 +148,18 @@ sub verify {
     my @warnings;
     foreach my $key (keys %$hashref) {
         my ($op, $project_id, $location_id, $date, $count) = split(/\t/, $key);
-        print STDERR "***** verify found key $key !!!!!!!\n\n";
-        print STDERR "verify :  ... . . . .op = $op, project_id = $project_id, location_id = $location_id, date = $date\n\n";
+        $logger->debug("***** verify found key $key !!!!!!!\n");
+        $logger->debug("verify :  ... . . . .op = $op, project_id = $project_id, location_id = $location_id, date = $date\n");
         if (!$project_id) { push @warnings, "Did not scan a project name, will generate a new 'UNKNOWN' project"; }
         if (!$location_id) { push @warnings, "Did not scan a location, will generate a new 'UNKNOWN' location"; }
         foreach my $stock_id (keys %{$hashref->{$key} } ) {
             #check if the stock exists
-            print STDERR "verify .. Looking for stock_id $stock_id\n";
+            $logger->debug("verify .. Looking for stock_id $stock_id");
             my $stock = $schema->resultset("Stock::Stock")->find( { stock_id => $stock_id } );
             if (!$stock) { push @errors, "Stock $stock_id does not exist in the database!\n"; }
             foreach my $cvterm_accession (keys %{$hashref->{$key}->{$stock_id} } ) {
                 #push @verify 
-                print STDERR "verify ... Looking for accession $cvterm_accession..\n";
+                $logger->debug("verify ... Looking for accession $cvterm_accession..");
                 my ($db_name, $accession) = split (/:/, $cvterm_accession);
                 if (!$db_name) { push @errors, "could not find valid db_name in accession $cvterm_accession\n";}
                 if (!$accession) { push @errors, "Could not find valid cvterm accession in $cvterm_accession\n";}
@@ -182,7 +184,7 @@ sub verify {
     }
     $self->warnings(\@warnings);
     foreach my $err (@errors) {
-        print STDERR " *!*!*!error = $err\n";
+        $logger->error(" *!*!*!error = $err");
     }
     $self->verify_errors(\@errors);
 }
@@ -197,23 +199,23 @@ sub store {
         # find the cvterm for a phenotyping experiment
         my $pheno_cvterm = SGN::Model::Cvterm->get_cvterm_row($schema, 'phenotyping_experiment', 'experiment_type');
 
-        print STDERR " ***store: phenotyping experiment cvterm = " . $pheno_cvterm->cvterm_id . "\n";
+        $logger->debug(" ***store: phenotyping experiment cvterm = " . $pheno_cvterm->cvterm_id . "");
         ##
         ##  $hashref->{$op_name . "\t" . $project_id . "\t" . $location_id . "\t" . $date}->{$stock_id}->{$cvterm_accession}->{time} = $time, ->{value} = $value
         foreach my $key (keys %$hashref) {
             my ($op, $project_id, $location_id, $date, $count) = split /\t/, $key;
-            print STDERR " *** store: op = $op, project_id = $project_id, location_id = $location_id, date = $date\n";
+            $logger->debug(" *** store: op = $op, project_id = $project_id, location_id = $location_id, date = $date");
             foreach my $stock_id (keys %{$hashref->{$key} } ) {
-                print STDERR " *** store: loading information for stock $stock_id \n";
+                $logger->debug(" *** store: loading information for stock $stock_id ");
                 foreach my $cvterm_accession (keys %{$hashref->{$key}->{$stock_id} } ) {
-                    print STDERR " ** store: cvterm_accession = $cvterm_accession\n";
+                    $logger->debug(" ** store: cvterm_accession = $cvterm_accession");
                     my $time = $hashref->{$key}->{$stock_id}->{$cvterm_accession}->{time};
                     my $value = $hashref->{$key}->{$stock_id}->{$cvterm_accession}->{value};
-                    print STDERR " ** store: time = $time, value = $value\n";
+                    $logger->debug(" ** store: time = $time, value = $value");
                     my ($db_name, $accession) = split (/:/, $cvterm_accession);
                     my $db = $schema->resultset("General::Db")->search(
                         {'me.name' => $db_name, } );
-                    print STDERR " ** store: found db $db_name , accession = $accession \n";
+                    $logger->debug(" ** store: found db $db_name , accession = $accession ");
                     if ($db) {
                         my $dbxref = $db->search_related("dbxrefs", { accession => $accession, });
                         if ($dbxref) {
@@ -232,7 +234,7 @@ sub store {
                                         description => $location,
                                     } );
                                 $location_id = $location->get_column('nd_geolocation_id') ;
-                                print STDERR " ** store loaded location " . $location->description . "\n" ;
+                                $logger->debug(" ** store loaded location " . $location->description . "") ;
                             }
                             if (!$project_id) {
                                 $project = $schema->resultset("Project::Project")->find_or_create(
@@ -241,27 +243,27 @@ sub store {
                                         description => "Plants assayed at " . $location->description . " in date $date",
                                     } );
                                 $project_id = $project->project_id ;
-                                print STDERR " ** store: loaded new project " . $project->name . "\n";
+                                $logger->debug(" ** store: loaded new project " . $project->name . "");
                             }
-                            print STDERR " ** store: location = $location_id, project = $project_id\n";
+                            $logger->debug(" ** store: location = $location_id, project = $project_id");
                             ###store a new nd_experiment. One experiment per stock
                             my $experiment = $schema->resultset('NaturalDiversity::NdExperiment')->create(
                                 {
                                     nd_geolocation_id => $location_id,
                                     type_id => $pheno_cvterm->cvterm_id(),
                                 } );
-                            print STDERR " ** store: created new experiment " . $experiment->nd_experiment_id . "\n";
+                            $logger->debug(" ** store: created new experiment " . $experiment->nd_experiment_id . "");
                             #link to the project
                             $experiment->find_or_create_related('nd_experiment_projects', {
                                 project_id => $project_id
                                                                 } );
-                            print STDERR " ** store: linking experiment " . $experiment->nd_experiment_id . " with project $project_id \n";
+                            $logger->debug(" ** store: linking experiment " . $experiment->nd_experiment_id . " with project $project_id ");
                             #link the experiment to the stock
                             $experiment->find_or_create_related('nd_experiment_stocks' , {
                                 stock_id => $stock_id,
                                 type_id  =>  $pheno_cvterm->cvterm_id,
                                                                 });
-                            print STDERR " ** store: linking experiment " . $experiment->nd_experiment_id . " to stock $stock_id \n";
+                            $logger->debug(" ** store: linking experiment " . $experiment->nd_experiment_id . " to stock $stock_id ");
                             #the date and time string is a property of the nd_experiment
                             $experiment->create_nd_experimentprops(
                                 { date => $date } ,
@@ -271,7 +273,7 @@ sub store {
                                 { time => $time } ,
                                 { autocreate => 1 , cv_name => 'local' }
                                 );
-                            print STDERR " ***  store: created cvtermprops for date ($date) and time ($time)\n";
+                            $logger->debug(" ***  store: created cvtermprops for date ($date) and time ($time)");
                             my $uniquename = "Stock: " . $stock_id . ", trait: " . $cvterm->name . " date: $date" . " barcode operator = $op" ;
                             my $phenotype = $cvterm->find_or_create_related(
                                 "phenotype_cvalues", {
@@ -279,7 +281,7 @@ sub store {
                                     value => $value ,
                                     uniquename => $uniquename,
                                 });
-                            print STDERR " ** store: added phenotype value $value , observable = " . $cvterm->name ." uniquename = $uniquename \n";
+                            $logger->debug(" ** store: added phenotype value $value , observable = " . $cvterm->name ." uniquename = $uniquename ");
                             #link the phenotpe to the experiment
                             $experiment->find_or_create_related('nd_experiment_phenotypes' , {
                                 phenotype_id => $phenotype->phenotype_id });

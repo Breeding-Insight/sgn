@@ -38,6 +38,8 @@ use CXGN::Calendar;
 use JSON;
 use CXGN::Phenotypes::HighDimensionalPhenotypeProtocol;
 
+my $logger = Log::Log4perl->get_logger();
+
 has 'bcs_schema' => (
     isa => 'Bio::Chado::Schema',
     is => 'rw',
@@ -165,7 +167,7 @@ sub search {
         }
     }
 
-    # print STDERR Dumper \@all_stock_ids;
+    # $logger->error(Dumper(\@all_stock_ids));
     my $stock_ids_sql = join ',', @all_stock_ids;
 
     my %data_matrix;
@@ -180,7 +182,7 @@ sub search {
             JOIN phenome.nd_experiment_md_json USING(nd_experiment_id)
             JOIN metadata.md_json USING(json_id)
             WHERE stock.stock_id IN ($stock_ids_sql) AND nd_experiment_protocol.nd_protocol_id = ? AND metadata.md_json.json_type = 'nirs_spectra';";
-        print STDERR Dumper $q;
+        $logger->error(Dumper($q));
         my $h = $dbh->prepare($q);
         $h->execute($nd_protocol_id);
         while (my ($stock_uniquename, $stock_id, $spectra, $device_type) = $h->fetchrow_array()) {
@@ -202,7 +204,7 @@ sub search {
             JOIN phenome.nd_experiment_md_json USING(nd_experiment_id)
             JOIN metadata.md_json USING(json_id)
             WHERE stock.stock_id IN ($stock_ids_sql) AND nd_experiment_protocol.nd_protocol_id = ? AND metadata.md_json.json_type = 'transcriptomics';";
-        print STDERR Dumper $q;
+        $logger->error(Dumper($q));
         my $h = $dbh->prepare($q);
         $h->execute($nd_protocol_id);
         while (my ($stock_uniquename, $stock_id, $transcriptomics) = $h->fetchrow_array()) {
@@ -223,7 +225,7 @@ sub search {
             JOIN phenome.nd_experiment_md_json USING(nd_experiment_id)
             JOIN metadata.md_json USING(json_id)
             WHERE stock.stock_id IN ($stock_ids_sql) AND nd_experiment_protocol.nd_protocol_id = ? AND metadata.md_json.json_type = 'metabolomics';";
-        print STDERR Dumper $q;
+        $logger->error(Dumper($q));
         my $h = $dbh->prepare($q);
         $h->execute($nd_protocol_id);
         while (my ($stock_uniquename, $stock_id, $metabolomics) = $h->fetchrow_array()) {
@@ -247,9 +249,9 @@ sub search {
     my $identifier_metadata = $protocol->header_column_details;
     my $identifier_names = $protocol->header_column_names;
 
-    # print STDERR Dumper \%data_matrix;
-    # print STDERR Dumper $identifier_metadata;
-    # print STDERR Dumper $identifier_names;
+    # $logger->error(Dumper(\%data_matrix));
+    # $logger->error(Dumper($identifier_metadata));
+    # $logger->error(Dumper($identifier_names));
     return (\%data_matrix, $identifier_metadata, $identifier_names);
 }
 

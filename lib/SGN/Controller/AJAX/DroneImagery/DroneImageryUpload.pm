@@ -34,6 +34,8 @@ use Text::CSV;
 use SGN::Controller::AJAX::DroneImagery::DroneImagery;
 #use Inline::Python;
 
+my $logger = Log::Log4perl->get_logger();
+
 BEGIN { extends 'Catalyst::Controller::REST' }
 
 __PACKAGE__->config(
@@ -71,7 +73,7 @@ sub upload_drone_imagery_POST : Args(0) {
     my $metadata_schema = $c->dbic_schema("CXGN::Metadata::Schema");
     my $phenome_schema = $c->dbic_schema("CXGN::Phenome::Schema");
     my ($user_id, $user_name, $user_role) = _check_user_login($c);
-    print STDERR Dumper $c->req->params();
+    $logger->error(Dumper($c->req->params()));
 
     my $selected_trial_id = $c->req->param('drone_run_field_trial_id');
     if (!$selected_trial_id) {
@@ -455,17 +457,17 @@ sub upload_drone_imagery_POST : Args(0) {
                 $c->detach();
             }
             unlink $upload_tempfile;
-            print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+            $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
             my ($check_image_width, $check_image_height) = imgsize($archived_filename_with_path);
             if ($check_image_width > 16384) {
                 my $cmd_resize = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/Resize.py --image_path \''.$archived_filename_with_path.'\' --outfile_path \''.$archived_filename_with_path.'\' --width 16384';
-                print STDERR Dumper $cmd_resize;
+                $logger->error(Dumper($cmd_resize));
                 my $status_resize = system($cmd_resize);
             }
             elsif ($check_image_height > 16384) {
                 my $cmd_resize = $c->config->{python_executable}.' '.$c->config->{rootpath}.'/DroneImageScripts/ImageProcess/Resize.py --image_path \''.$archived_filename_with_path.'\' --outfile_path \''.$archived_filename_with_path.'\' --height 16384';
-                print STDERR Dumper $cmd_resize;
+                $logger->error(Dumper($cmd_resize));
                 my $status_resize = system($cmd_resize);
             }
 
@@ -513,11 +515,11 @@ sub upload_drone_imagery_POST : Args(0) {
             $c->detach();
         }
         unlink $upload_tempfile;
-        print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+        $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
         my $image = SGN::Image->new( $c->dbc->dbh, undef, $c );
         my $zipfile_return = $image->upload_drone_imagery_zipfile($archived_filename_with_path, $user_id, $selected_drone_run_id);
-        print STDERR Dumper $zipfile_return;
+        $logger->error(Dumper($zipfile_return));
         if ($zipfile_return->{error}) {
             $c->stash->{rest} = { error => "Problem saving images!".$zipfile_return->{error} };
             $c->detach();
@@ -533,7 +535,7 @@ sub upload_drone_imagery_POST : Args(0) {
                 print $fh "$_,$temp_file_raw_image\n";
             }
         close($fh);
-        print STDERR "Drone image stitch temp file $temp_file_image_file_names\n";
+        $logger->debug("Drone image stitch temp file $temp_file_image_file_names");
 
         $dir = $c->tempfiles_subdir('/upload_drone_imagery_stitched_result');
         my $temp_file_stitched_result_band1 = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'upload_drone_imagery_stitched_result/fileXXXX').".png";
@@ -567,11 +569,11 @@ sub upload_drone_imagery_POST : Args(0) {
                 $c->detach();
             }
             unlink $upload_tempfile_panel;
-            print STDERR "Archived Drone Image Panel File: $archived_filename_with_path_panel\n";
+            $logger->debug("Archived Drone Image Panel File: $archived_filename_with_path_panel");
 
             $image = SGN::Image->new( $c->dbc->dbh, undef, $c );
             my $zipfile_return_panel = $image->upload_drone_imagery_zipfile($archived_filename_with_path_panel, $user_id, $selected_drone_run_id);
-            print STDERR Dumper $zipfile_return_panel;
+            $logger->error(Dumper($zipfile_return_panel));
             if ($zipfile_return_panel->{error}) {
                 $c->stash->{rest} = { error => "Problem saving panel images!".$zipfile_return_panel->{error} };
                 $c->detach();
@@ -584,7 +586,7 @@ sub upload_drone_imagery_POST : Args(0) {
                     print $fh "$_\n";
                 }
             close($fh);
-            print STDERR "Drone image stitch temp file panel $temp_file_image_file_names_panel\n";
+            $logger->debug("Drone image stitch temp file panel $temp_file_image_file_names_panel");
 
             # $cmd = $c->config->{python_executable}." ".$c->config->{rootpath}."/DroneImageScripts/ImageProcess/AlignImagesMicasense.py --log_file_path '".$c->config->{error_log}."' --file_with_image_paths '$temp_file_image_file_names' --file_with_panel_image_paths '$temp_file_image_file_names_panel' --output_path '$dir' --output_path_band1 '$temp_file_stitched_result_band1' --output_path_band2 '$temp_file_stitched_result_band2' --output_path_band3 '$temp_file_stitched_result_band3' --output_path_band4 '$temp_file_stitched_result_band4' --output_path_band5 '$temp_file_stitched_result_band5' --final_rgb_output_path '$temp_file_stitched_result_rgb' --final_rnre_output_path '$temp_file_stitched_result_rnre' --work_megapix $stitching_work_pix";
 
@@ -608,7 +610,7 @@ sub upload_drone_imagery_POST : Args(0) {
         else {
             die "Camera info not supported for stitching: $new_drone_run_camera_info\n";
         }
-        print STDERR Dumper $cmd;
+        $logger->error(Dumper($cmd));
         my $status = system($cmd);
 
         foreach my $m (@stitched_bands) {
@@ -640,7 +642,7 @@ sub upload_drone_imagery_POST : Args(0) {
                 $c->detach();
             }
             unlink $upload_tempfile;
-            print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+            $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
             my $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
             $image->set_sp_person_id($user_id);
@@ -651,7 +653,7 @@ sub upload_drone_imagery_POST : Args(0) {
             push @return_drone_run_band_project_ids, $selected_drone_run_band_id;
         }
     } elsif ($new_drone_run_band_stitching eq 'yes_automated') {
-        print STDERR Dumper $c->req->params();
+        $logger->error(Dumper($c->req->params()));
         my $upload_file = $c->req->upload('upload_drone_images_zipfile');
         my $upload_panel_file = $c->req->upload('upload_drone_images_panel_zipfile');
         my $drone_run_raw_image_boundaries_first_plot_corner = $c->req->param('drone_run_raw_image_boundaries_first_plot_corner');
@@ -704,11 +706,11 @@ sub upload_drone_imagery_POST : Args(0) {
             $c->detach();
         }
         unlink $upload_tempfile;
-        print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+        $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
         my $image = SGN::Image->new( $c->dbc->dbh, undef, $c );
         my $zipfile_return = $image->upload_drone_imagery_zipfile($archived_filename_with_path, $user_id, $selected_drone_run_id);
-        print STDERR Dumper $zipfile_return;
+        $logger->error(Dumper($zipfile_return));
         if ($zipfile_return->{error}) {
             $c->stash->{rest} = { error => "Problem saving images!".$zipfile_return->{error} };
             $c->detach();
@@ -728,7 +730,7 @@ sub upload_drone_imagery_POST : Args(0) {
                 print $fh "$_,$base_path,$temp_file_raw_image_blue,$temp_file_raw_image_green,$temp_file_raw_image_red,$temp_file_raw_image_nir,$temp_file_raw_image_red_edge\n";
             }
         close($fh);
-        print STDERR "Drone image raw boundaries temp file $temp_file_image_file_names\n";
+        $logger->debug("Drone image raw boundaries temp file $temp_file_image_file_names");
 
         my @stitched_bands;
         if ($new_drone_run_camera_info eq 'micasense_5') {
@@ -753,11 +755,11 @@ sub upload_drone_imagery_POST : Args(0) {
                 $c->detach();
             }
             unlink $upload_tempfile_panel;
-            print STDERR "Archived Drone Image Panel File: $archived_filename_with_path_panel\n";
+            $logger->debug("Archived Drone Image Panel File: $archived_filename_with_path_panel");
 
             $image = SGN::Image->new( $c->dbc->dbh, undef, $c );
             my $zipfile_return_panel = $image->upload_drone_imagery_zipfile($archived_filename_with_path_panel, $user_id, $selected_drone_run_id);
-            print STDERR Dumper $zipfile_return_panel;
+            $logger->error(Dumper($zipfile_return_panel));
             if ($zipfile_return_panel->{error}) {
                 $c->stash->{rest} = { error => "Problem saving panel images!".$zipfile_return_panel->{error} };
                 $c->detach();
@@ -770,7 +772,7 @@ sub upload_drone_imagery_POST : Args(0) {
                     print $fh "$_\n";
                 }
             close($fh);
-            print STDERR "Drone image stitch temp file panel $temp_file_image_file_names_panel\n";
+            $logger->debug("Drone image stitch temp file panel $temp_file_image_file_names_panel");
 
             my $trial_layout = CXGN::Trial::TrialLayout->new( { schema => $schema, trial_id => $selected_trial_id, experiment_type=>'field_layout' });
             my $trial_design = $trial_layout->get_design();
@@ -829,7 +831,7 @@ sub upload_drone_imagery_POST : Args(0) {
         else {
             die "Camera info not supported for stitching: $new_drone_run_camera_info\n";
         }
-        print STDERR Dumper $cmd;
+        $logger->error(Dumper($cmd));
         my $status = system($cmd);
 
         my $csv = Text::CSV->new({ sep_char => ',' });
@@ -842,7 +844,7 @@ sub upload_drone_imagery_POST : Args(0) {
                 push @raw_image_boundaries_temp_images, \@columns;
             }
         close($fh);
-        print STDERR Dumper \@raw_image_boundaries_temp_images;
+        $logger->error(Dumper(\@raw_image_boundaries_temp_images));
 
         foreach my $m (@stitched_bands) {
             my $project_rs = $schema->resultset("Project::Project")->create({
@@ -873,7 +875,7 @@ sub upload_drone_imagery_POST : Args(0) {
                 $c->detach();
             }
             unlink $upload_tempfile;
-            print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+            $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
             my $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
             $image->set_sp_person_id($user_id);
@@ -918,17 +920,17 @@ sub upload_drone_imagery_POST : Args(0) {
             $c->detach();
         }
         unlink $upload_tempfile;
-        print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+        $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
         my $image = SGN::Image->new( $c->dbc->dbh, undef, $c );
         my $zipfile_return = $image->upload_drone_imagery_zipfile($archived_filename_with_path, $user_id, $selected_drone_run_id);
-        print STDERR Dumper $zipfile_return;
+        $logger->error(Dumper($zipfile_return));
         if ($zipfile_return->{error}) {
             $c->stash->{rest} = { error => "Problem saving images!".$zipfile_return->{error} };
             $c->detach();
         }
         my $image_paths = $zipfile_return->{image_files};
-        # print STDERR Dumper $image_paths;
+        # $logger->error(Dumper($image_paths));
 
         my $dir = $c->tempfiles_subdir('/upload_drone_imagery_raw_images');
         my $base_path = $c->config->{basepath}."/";
@@ -943,7 +945,7 @@ sub upload_drone_imagery_POST : Args(0) {
                 print $fh "$_,$base_path,$temp_file_raw_image_blue,$temp_file_raw_image_green,$temp_file_raw_image_red,$temp_file_raw_image_nir,$temp_file_raw_image_red_edge\n";
             }
         close($fh);
-        # print STDERR $temp_file_image_file_names."\n";
+        # $logger->error($temp_file_image_file_names."");
 
         my @stitched_bands;
         my %raw_image_bands;
@@ -969,11 +971,11 @@ sub upload_drone_imagery_POST : Args(0) {
                 $c->detach();
             }
             unlink $upload_tempfile_panel;
-            print STDERR "Archived Drone Image Panel File: $archived_filename_with_path_panel\n";
+            $logger->debug("Archived Drone Image Panel File: $archived_filename_with_path_panel");
 
             $image = SGN::Image->new( $c->dbc->dbh, undef, $c );
             my $zipfile_return_panel = $image->upload_drone_imagery_zipfile($archived_filename_with_path_panel, $user_id, $selected_drone_run_id);
-            print STDERR Dumper $zipfile_return_panel;
+            $logger->error(Dumper($zipfile_return_panel));
             if ($zipfile_return_panel->{error}) {
                 $c->stash->{rest} = { error => "Problem saving panel images!".$zipfile_return_panel->{error} };
                 $c->detach();
@@ -1011,7 +1013,7 @@ sub upload_drone_imagery_POST : Args(0) {
             die "Camera info not supported for raw image upload: $new_drone_run_camera_info\n";
         }
 
-        print STDERR Dumper $cmd;
+        $logger->error(Dumper($cmd));
         my $status = system($cmd);
 
         my $alignment_output_path_name = basename($alignment_output_path);
@@ -1030,7 +1032,7 @@ sub upload_drone_imagery_POST : Args(0) {
         if (!$alignment_archived_filename_with_path) {
             return { error => "Could not save file $alignment_output_path_name in archive." };
         }
-        print STDERR "Archived Alignment Matrices File: $alignment_archived_filename_with_path\n";
+        $logger->debug("Archived Alignment Matrices File: $alignment_archived_filename_with_path");
 
         my $alignment_md_row = $metadata_schema->resultset("MdMetadata")->create({create_person_id => $user_id});
         my $alignment_file_row = $metadata_schema->resultset("MdFiles")->create({
@@ -1129,7 +1131,7 @@ sub upload_drone_imagery_POST : Args(0) {
         my $upload_tempfile = $upload_file->tempname;
         my $time = DateTime->now();
         my $timestamp = $time->ymd()."_".$time->hms();
-        print STDERR Dumper [$upload_original_name, $upload_tempfile];
+        $logger->error(Dumper([$upload_original_name, $upload_tempfile]));
 
         my $uploader = CXGN::UploadFile->new({
             tempfile => $upload_tempfile,
@@ -1148,11 +1150,11 @@ sub upload_drone_imagery_POST : Args(0) {
             $c->detach();
         }
         unlink $upload_tempfile;
-        print STDERR "Archived Drone Image ODM Zip File: $archived_filename_with_path\n";
+        $logger->debug("Archived Drone Image ODM Zip File: $archived_filename_with_path");
 
         my $image = SGN::Image->new( $c->dbc->dbh, undef, $c );
         my $zipfile_return = $image->upload_drone_imagery_zipfile($archived_filename_with_path, $user_id, $selected_drone_run_id);
-        # print STDERR Dumper $zipfile_return;
+        # $logger->error(Dumper($zipfile_return));
         if ($zipfile_return->{error}) {
             $c->stash->{rest} = { error => "Problem saving images!".$zipfile_return->{error} };
             $c->detach();
@@ -1179,7 +1181,7 @@ sub upload_drone_imagery_POST : Args(0) {
                 $c->stash->{rest} = { error => "Could not save file $i in archive." };
                 $c->detach();
             }
-            print STDERR "Archived Drone Image ODM IMG File: $archived_filename_with_path_odm_img\n";
+            $logger->debug("Archived Drone Image ODM IMG File: $archived_filename_with_path_odm_img");
             $example_archived_filename_with_path_odm_img = $archived_filename_with_path_odm_img;
         }
 
@@ -1194,7 +1196,7 @@ sub upload_drone_imagery_POST : Args(0) {
             $c->detach();
         }
 
-        print STDERR $example_archived_filename_with_path_odm_img."\n";
+        $logger->debug($example_archived_filename_with_path_odm_img."");
         my @img_path_split = split '\/', $example_archived_filename_with_path_odm_img;
         my $image_path_img_name = pop(@img_path_split);
         my $image_path_project_name = pop(@img_path_split);
@@ -1202,7 +1204,7 @@ sub upload_drone_imagery_POST : Args(0) {
         # my $image_path_remaining_host = $image_path_remaining =~ s/cxgn\/sgn\/static\/documents\/tempfiles/tmp\/breedbase\-site/gr;
         my $hostpath = $c->config->{hostpath_archive};
         my $image_path_remaining_host = $image_path_remaining =~ s/\/home\/production/$hostpath/gr;
-        print STDERR Dumper [$image_path_img_name, $image_path_project_name, $image_path_remaining, $image_path_remaining_host];
+        $logger->error(Dumper([$image_path_img_name, $image_path_project_name, $image_path_remaining, $image_path_remaining_host]));
 
         my $dir = $c->tempfiles_subdir('/upload_drone_imagery_raw_images');
         my $temp_file_docker_log = $c->config->{basepath}."/".$c->tempfile( TEMPLATE => 'upload_drone_imagery_raw_images/fileXXXX');
@@ -1238,18 +1240,18 @@ sub upload_drone_imagery_POST : Args(0) {
                     $c->detach();
                 }
                 unlink $upload_panel_tempfile;
-                print STDERR "Archived Drone Image ODM Zip File: $archived_filename_panel_with_path\n";
+                $logger->debug("Archived Drone Image ODM Zip File: $archived_filename_panel_with_path");
 
                 # my $dtm_string = '';
                 # my $ua       = LWP::UserAgent->new();
                 # my $response = $ua->post( $c->config->{main_production_site_url}."/RunODMDocker.php", { 'file_path' => $image_path_remaining_host, 'dtm_string' => $dtm_string } );
                 # my $content  = $response->decoded_content();
-                # print STDERR Dumper $content;
+                # $logger->error(Dumper($content));
 
                 my $odm_radiometric_calibration = $new_drone_run_band_stitching_odm_radiocalibration ? '--radiometric-calibration camera' : '';
 
                 my $odm_command = 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v '.$image_path_remaining_host.':/datasets/code opendronemap/odm --project-path /datasets --rerun-all --dsm --dtm '.$odm_radiometric_calibration.' > '.$temp_file_docker_log;
-                print STDERR $odm_command."\n";
+                $logger->debug($odm_command."");
                 my $odm_status = system($odm_command);
 
                 my $odm_b1 = "$image_path_remaining/odm_orthophoto/b1.png";
@@ -1277,7 +1279,7 @@ sub upload_drone_imagery_POST : Args(0) {
             }
             elsif ($new_drone_run_camera_info eq 'ccd_color' || $new_drone_run_camera_info eq 'cmos_color') {
                 my $odm_command = 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v '.$image_path_remaining_host.':/datasets/code opendronemap/odm --project-path /datasets --rerun-all --dsm --dtm > '.$temp_file_docker_log;
-                print STDERR $odm_command."\n";
+                $logger->debug($odm_command."");
                 my $odm_status = system($odm_command);
 
                 my $odm_dsm_png = "$image_path_remaining/odm_dem/dsm.png";
@@ -1332,7 +1334,7 @@ sub upload_drone_imagery_POST : Args(0) {
                     $c->detach();
                 }
                 unlink $upload_tempfile;
-                print STDERR "Archived Drone Image File: $archived_filename_with_path\n";
+                $logger->debug("Archived Drone Image File: $archived_filename_with_path");
 
                 my $image = SGN::Image->new( $schema->storage->dbh, undef, $c );
                 $image->set_sp_person_id($user_id);

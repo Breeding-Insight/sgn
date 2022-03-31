@@ -7,9 +7,10 @@ use SGN::Model::Cvterm;
 use Data::Dumper;
 use CXGN::List::Validate;
 use CXGN::Stock::Seedlot;
+my $logger = Log::Log4perl->get_logger();
 
 sub _validate_with_plugin {
-    print STDERR "Check 3.1.1 ".localtime();
+    $logger->error("Check 3.1.1 ".localtime());
   my $self = shift;
   my $filename = $self->get_filename();
   my $schema = $self->get_chado_schema();
@@ -36,7 +37,7 @@ sub _validate_with_plugin {
     return;
   }
 
-    print STDERR "Check 3.1.2 ".localtime();
+    $logger->error("Check 3.1.2 ".localtime());
 
   $worksheet = ( $excel_obj->worksheets() )[0]; #support only one worksheet
   if (!$worksheet) {
@@ -164,7 +165,7 @@ sub _validate_with_plugin {
   my @pairs;
   my %seen_plot_numbers;
   for my $row ( 1 .. $row_max ) {
-      #print STDERR "Check 01 ".localtime();
+      #$logger->error("Check 01 ".localtime());
     my $row_name = $row+1;
     my $plot_name;
     my $stock_name;
@@ -221,7 +222,7 @@ sub _validate_with_plugin {
       next;
     }
 
-      #print STDERR "Check 02 ".localtime();
+      #$logger->error("Check 02 ".localtime());
 
     #plot_name must not be blank
     if (!$plot_name || $plot_name eq '' ) {
@@ -242,7 +243,7 @@ sub _validate_with_plugin {
         $seen_plot_names{$plot_name}=$row_name;
     }
 
-      #print STDERR "Check 03 ".localtime();
+      #$logger->error("Check 03 ".localtime());
 
     #stock_name must not be blank and must exist in the database
     if (!$stock_name || $stock_name eq '') {
@@ -252,7 +253,7 @@ sub _validate_with_plugin {
         $seen_entry_names{$stock_name}++;
     }
 
-      #print STDERR "Check 04 ".localtime();
+      #$logger->error("Check 04 ".localtime());
 
     #plot number must not be blank
     if (!$plot_number || $plot_number eq '') {
@@ -370,7 +371,7 @@ sub _validate_with_plugin {
         return;
     }
 
-    print STDERR "Check 3.1.3 ".localtime();
+    $logger->error("Check 3.1.3 ".localtime());
 
     return 1; #returns true if validation is passed
 
@@ -501,7 +502,7 @@ sub _parse_with_plugin {
     if ($stock_synonyms_lookup{$stock_name}){
         my @stock_names = keys %{$stock_synonyms_lookup{$stock_name}};
         if (scalar(@stock_names)>1){
-            print STDERR "There is more than one uniquename for this synonym $stock_name. this should not happen!\n";
+            $logger->warn("There is more than one uniquename for this synonym $stock_name. this should not happen!");
         }
         $stock_name = $stock_names[0];
     }
@@ -535,7 +536,7 @@ sub _parse_with_plugin {
     }
 
   }
-  #print STDERR Dumper \%design;
+  #$logger->error(Dumper(\%design));
   $self->_set_parsed_data(\%design);
 
   return 1;

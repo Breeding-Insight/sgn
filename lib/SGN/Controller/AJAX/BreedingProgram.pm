@@ -39,6 +39,8 @@ use File::Copy;
 use Digest::MD5;
 use DateTime;
 
+my $logger = Log::Log4perl->get_logger();
+
 __PACKAGE__->config(
     default   => 'application/json',
     stash_key => 'rest',
@@ -340,7 +342,7 @@ sub program_seedlots :Chained('ajax_breeding_program') PathPart('seedlots') Args
     my $c = shift;
     my $program = $c->stash->{program};
     my $result = $program->get_seedlots;
-#    print STDERR "SEEDLOTS =".Dumper($result)."\n";
+#    $logger->error("SEEDLOTS =".Dumper($result)."");
     my @seedlot_data;
     foreach my $r (@$result){
         my ($seedlot_id, $seedlot_name, $content_id, $content_name, $content_type) = @$r;
@@ -386,7 +388,7 @@ sub add_product_profile_POST : Args(0) {
     $product_profile->parent_id($program_id);
 	my $project_prop_id = $product_profile->store_by_rank();
 
-#    print STDERR "PROJECT PROP ID =".Dumper($project_prop_id)."\n";
+#    $logger->error("PROJECT PROP ID =".Dumper($project_prop_id)."");
     if ($@) {
         $c->stash->{rest} = { error => "Error storing product profile. ($@)" };
         return;
@@ -405,7 +407,7 @@ sub get_product_profiles :Chained('ajax_breeding_program') PathPart('product_pro
 
     my $profile_obj = CXGN::BreedersToolbox::ProductProfile->new({ bcs_schema => $schema, parent_id => $program_id });
     my $profiles = $profile_obj->get_product_profile_info();
-#    print STDERR "PRODUCT PROFILE RESULTS =".Dumper($profiles)."\n";
+#    $logger->error("PRODUCT PROFILE RESULTS =".Dumper($profiles)."");
     my @profile_summary;
     foreach my $profile(@$profiles){
         my @trait_list = ();
@@ -431,7 +433,7 @@ sub get_product_profiles :Chained('ajax_breeding_program') PathPart('product_pro
 
         push @profile_summary, [$profile_name_link, $profile_scope, $trait_string, $profile_submitter, $uploaded_date] ;
     }
-#    print STDERR "TRAIT LIST =".Dumper(\@profile_summary)."\n";
+#    $logger->error("TRAIT LIST =".Dumper(\@profile_summary)."");
 
     $c->stash->{rest} = {data => \@profile_summary};
 
@@ -499,7 +501,7 @@ sub get_profile_detail :Path('/ajax/breeders/program/profile_detail') :Args(1) {
 
         push @all_details, [@trait_row];
     }
-#    print STDERR "ALL DETAILS =".Dumper(\@all_details)."\n";
+#    $logger->error("ALL DETAILS =".Dumper(\@all_details)."");
     $c->stash->{rest} = {data => \@all_details};
 
 }
@@ -532,7 +534,7 @@ sub create_profile_template_POST : Args(0) {
     my $dbh = $c->dbc->dbh();
     my @trait_ids;
     my @trait_list = @{_parse_list_from_json($c->req->param('trait_list_json'))};
-#    print STDERR "TRAIT LIST =".Dumper(\@trait_list)."\n";
+#    $logger->error("TRAIT LIST =".Dumper(\@trait_list)."");
 
     my %errors;
     my @error_messages;
@@ -598,8 +600,8 @@ sub create_profile_template_POST : Args(0) {
 
     my $result = $file_row->file_id;
 
-#    print STDERR "FILE =".Dumper($file_destination)."\n";
-#    print STDERR "FILE ID =".Dumper($file_id)."\n";
+#    $logger->error("FILE =".Dumper($file_destination)."");
+#    $logger->error("FILE ID =".Dumper($file_id)."");
 
     $c->stash->{rest} = {
         success => 1,
@@ -673,9 +675,9 @@ sub upload_profile_POST : Args(0) {
     my $time = DateTime->now();
     my $timestamp = $time->ymd()."_".$time->hms();
     my $uploaded_date = $time->ymd();
-#    print STDERR "PROGRAM ID =".Dumper($program_id)."\n";
-#    print STDERR "PROFILE NAME =".Dumper($new_profile_name)."\n";
-#    print STDERR "PROFILE SCOPE =".Dumper($new_profile_scope)."\n";
+#    $logger->error("PROGRAM ID =".Dumper($program_id)."");
+#    $logger->error("PROFILE NAME =".Dumper($new_profile_name)."");
+#    $logger->error("PROFILE SCOPE =".Dumper($new_profile_scope)."");
 
     ## Store uploaded temporary file in archive
     my $uploader = CXGN::UploadFile->new({
@@ -697,7 +699,7 @@ sub upload_profile_POST : Args(0) {
     my $parser = CXGN::Trial::ParseUpload->new(chado_schema => $schema, filename => $archived_filename_with_path);
     $parser->load_plugin('ProfileXLS');
     my $parsed_data = $parser->parse();
-    print STDERR "PARSED DATA =".Dumper($parsed_data)."\n";
+    $logger->debug("PARSED DATA =".Dumper($parsed_data)."");
 
     my $profile_detail_string;
     if ($parsed_data){
@@ -711,7 +713,7 @@ sub upload_profile_POST : Args(0) {
             $c->stash->{rest} = {error_string => "Could not get parsing errors"};
         } else {
             $parse_errors = $parser->get_parse_errors();
-            #print STDERR Dumper $parse_errors;
+            #$logger->error(Dumper($parse_errors));
 
             foreach my $error_string (@{$parse_errors->{'error_messages'}}){
                 $return_error .= $error_string."<br>";
@@ -732,7 +734,7 @@ sub upload_profile_POST : Args(0) {
 
     if ($@) {
         $c->stash->{rest} = { error => $@ };
-        print STDERR "An error condition occurred, was not able to upload profile. ($@).\n";
+        $logger->debug("An error condition occurred, was not able to upload profile. ($@).");
         $c->detach();
     }
 

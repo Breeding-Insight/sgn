@@ -62,6 +62,8 @@ use SGN::Controller::AJAX::DroneImagery::DroneImagery;
 use Storable qw(dclone);
 use Statistics::Descriptive;
 
+my $logger = Log::Log4perl->get_logger();
+
 sub perform_drone_imagery_analytics {
     my ($schema, $a_env, $b_env, $ro_env, $row_ro_env, $env_variance_percent, $protocol_id, $statistics_select, $analytics_select, $tolparinv, $use_area_under_curve, $legendre_order_number, $permanent_environment_structure, $legendre_coeff_exec_array, $trait_name_encoder_hash, $trait_name_encoder_rev_hash, $stock_info_hash, $plot_id_map_hash, $sorted_trait_names_array, $accession_id_factor_map_hash, $rep_time_factors_array, $ind_rep_factors_array, $unique_accession_names_array, $plot_id_count_map_reverse_hash, $sorted_scaled_ln_times_array, $time_count_map_reverse_hash, $accession_id_factor_map_reverse_hash, $seen_times_hash, $plot_id_factor_map_reverse_hash, $trait_to_time_map_hash, $unique_plot_names_array, $stock_name_row_col_hash, $phenotype_data_original_hash, $plot_rep_time_factor_map_hash, $stock_row_col_hash, $stock_row_col_id_hash, $polynomial_map_hash, $plot_ids_ordered_array, $csv, $timestamp, $user_name, $stats_tempfile, $grm_file, $grm_rename_tempfile, $tmp_stats_dir, $stats_out_tempfile, $stats_out_tempfile_row, $stats_out_tempfile_col, $stats_out_tempfile_residual, $stats_out_tempfile_2dspl, $stats_prep2_tempfile, $stats_out_param_tempfile, $parameter_tempfile, $parameter_asreml_tempfile, $stats_tempfile_2, $permanent_environment_structure_tempfile, $permanent_environment_structure_env_tempfile, $permanent_environment_structure_env_tempfile2, $permanent_environment_structure_env_tempfile_mat, $sim_env_changing_mat_tempfile, $sim_env_changing_mat_full_tempfile, $yhat_residual_tempfile, $blupf90_solutions_tempfile, $coeff_genetic_tempfile, $coeff_pe_tempfile, $stats_out_tempfile_varcomp, $time_min, $time_max, $header_string, $env_sim_exec, $min_row, $max_row, $min_col, $max_col, $mean_row, $sig_row, $mean_col, $sig_col, $sim_env_change_over_time, $correlation_between_times, $field_trial_id_list, $simulated_environment_real_data_trait_id, $fixed_effect_type, $perform_cv) = @_;
     my @legendre_coeff_exec = @$legendre_coeff_exec_array;
@@ -92,7 +94,7 @@ sub perform_drone_imagery_analytics {
     my $col_number_span = 1 + $max_col - $min_col;
     my $row_number_span = 1 + $max_row - $min_row;
 
-    print STDERR "CALC $permanent_environment_structure\n";
+    $logger->debug("CALC $permanent_environment_structure");
 
     my $number_plots = scalar(@unique_plot_names);
     my $number_traits = scalar(@sorted_trait_names);
@@ -150,7 +152,7 @@ sub perform_drone_imagery_analytics {
     my ($parameter_tempfile_cv4_2_fh, $parameter_tempfile_cv4_2) = tempfile("drone_stats_XXXXX", DIR=> $tmp_stats_dir);
     my ($parameter_tempfile_cv5_2_fh, $parameter_tempfile_cv5_2) = tempfile("drone_stats_XXXXX", DIR=> $tmp_stats_dir);
 
-    print STDERR "RUN FIRST ENV ESTIMATION\n";
+    $logger->debug("RUN FIRST ENV ESTIMATION");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
         $statistical_ontology_term = "Multivariate linear mixed model genetic BLUPs using genetic relationship matrix and row and column spatial effects computed using Sommer R|SGNSTAT:0000001"; #In the JS this is set to either the genetic or spatial BLUP term (Multivariate linear mixed model 2D spline spatial BLUPs using genetic relationship matrix and row and column spatial effects computed using Sommer R|SGNSTAT:0000003) when saving analysis results
 
@@ -419,8 +421,8 @@ sub perform_drone_imagery_analytics {
 
         $statistics_cmd = $statistics_cmd_reading.$statistics_cmd_model;
 
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -432,8 +434,8 @@ sub perform_drone_imagery_analytics {
         };
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -441,7 +443,7 @@ sub perform_drone_imagery_analytics {
             my $current_env_row_count = 0;
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -480,7 +482,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
                 if ($csv->parse($header_2dspl)) {
@@ -519,7 +521,7 @@ sub perform_drone_imagery_analytics {
             close($fh_2dspl);
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -551,7 +553,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -577,7 +579,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -603,7 +605,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -629,7 +631,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -655,7 +657,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -681,7 +683,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -707,7 +709,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -733,7 +735,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -759,7 +761,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -785,7 +787,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -811,7 +813,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -832,7 +834,7 @@ sub perform_drone_imagery_analytics {
         }
 
         if ($run_stats_fault == 1) {
-            print STDERR "ERROR IN R CMD\n";
+            $logger->error("ERROR IN R CMD");
             return {error=>'Error in R! Try a larger tolerance'};
         }
     }
@@ -1000,8 +1002,8 @@ sub perform_drone_imagery_analytics {
                 statistics_cmd_cv_2 => $statistics_cmd_cv_2
             };
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -1012,8 +1014,8 @@ sub perform_drone_imagery_analytics {
             };
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -1021,7 +1023,7 @@ sub perform_drone_imagery_analytics {
                 my $current_env_row_count = 0;
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -1062,7 +1064,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                    print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                    $logger->debug("Opened $stats_out_tempfile_2dspl");
                     my $header_2dspl = <$fh_2dspl>;
                     my @header_cols_2dspl;
                     if ($csv->parse($header_2dspl)) {
@@ -1103,7 +1105,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_2dspl);
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -1133,7 +1135,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -1157,7 +1159,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -1181,7 +1183,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -1205,7 +1207,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -1229,7 +1231,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -1253,7 +1255,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -1277,7 +1279,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -1301,7 +1303,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -1325,7 +1327,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -1349,7 +1351,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -1373,7 +1375,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -1393,7 +1395,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -1432,7 +1434,7 @@ sub perform_drone_imagery_analytics {
 
         my @pheno_var;
         open(my $fh_r, '<', $stats_out_param_tempfile) or die "Could not open file '$stats_out_param_tempfile' $!";
-            print STDERR "Opened $stats_out_param_tempfile\n";
+            $logger->debug("Opened $stats_out_param_tempfile");
 
             while (my $row = <$fh_r>) {
                 my @columns;
@@ -1442,11 +1444,11 @@ sub perform_drone_imagery_analytics {
                 push @pheno_var, \@columns;
             }
         close($fh_r);
-        # print STDERR Dumper \@pheno_var;
+        # $logger->error(Dumper(\@pheno_var));
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -1471,7 +1473,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -1503,7 +1505,7 @@ sub perform_drone_imagery_analytics {
         $parameter_tempfile_cv4 .= '.f90';
         $parameter_tempfile_cv5 .= '.f90';
 
-        print STDERR Dumper $stats_tempfile_2;
+        $logger->error(Dumper($stats_tempfile_2));
         my $data_cv_cmd = 'R -e "mat <- read.csv(\''.$stats_tempfile_2.'\', header=FALSE, sep=\' \');
         randomized_positions <- sample(length(mat[,1]));
         cv_step_size <- length(mat[,1]) %/% 5;
@@ -1710,14 +1712,14 @@ sub perform_drone_imagery_analytics {
 
         $stats_out_tempfile .= '.log';
         $cmd_f90 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-        print STDERR Dumper $cmd_f90;
+        $logger->error(Dumper($cmd_f90));
         my $status = system($cmd_f90);
 
         my @log_output_rows;
         open(my $fh_log, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-            print STDERR "Opened $stats_out_tempfile\n";
+            $logger->debug("Opened $stats_out_tempfile");
             while (my $row = <$fh_log>) {
-                print STDERR $row;
+                $logger->error($row);
                 push @log_output_rows, $row;
             }
         close($fh_log);
@@ -1725,20 +1727,20 @@ sub perform_drone_imagery_analytics {
         my $log_output = join '', @log_output_rows;
         my ($gen_var_string) = $log_output =~ /Genetic variance\(s\) for effect  2(.*?)correlations/gs;
         @rr_coeff_genetic_covariance_original = split ' ', $gen_var_string;
-        print STDERR Dumper \@rr_coeff_genetic_covariance_original;
+        $logger->error(Dumper(\@rr_coeff_genetic_covariance_original));
         my ($env_var_string) = $log_output =~ /Genetic variance\(s\) for effect  $legendre_order_number_env_var_pos(.*?)correlations/gs;
         @rr_coeff_env_covariance_original = split ' ', $env_var_string;
-        print STDERR Dumper \@rr_coeff_env_covariance_original;
+        $logger->error(Dumper(\@rr_coeff_env_covariance_original));
         my (@gen_cor_string) = $log_output =~ /correlations(.*?)eigenvectors/gs;
         @rr_coeff_genetic_correlation_original = split ' ', $gen_cor_string[0];
-        print STDERR Dumper \@rr_coeff_genetic_correlation_original;
+        $logger->error(Dumper(\@rr_coeff_genetic_correlation_original));
         @rr_coeff_env_correlation_original = split ' ', $gen_cor_string[1];
-        print STDERR Dumper \@rr_coeff_env_correlation_original;
+        $logger->error(Dumper(\@rr_coeff_env_correlation_original));
         my ($res_se_string) = $log_output =~ /SE for R(.*?)\* FINISHED \(AIREMLF90\)/gs;
-        print STDERR Dumper $res_se_string;
+        $logger->error(Dumper($res_se_string));
         # $rr_residual_variance_original = ($res_se_string**2)*$number_plots;
         $rr_residual_variance_original = $res_se_string;
-        print STDERR Dumper $rr_residual_variance_original;
+        $logger->error(Dumper($rr_residual_variance_original));
 
         @param_file_rows_6 = (
             '(CO)VARIANCES'
@@ -1803,12 +1805,12 @@ sub perform_drone_imagery_analytics {
 
         $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
         open(my $fh_yhat_res, '<', $yhat_residual_tempfile) or die "Could not open file '$yhat_residual_tempfile' $!";
-            print STDERR "Opened $yhat_residual_tempfile\n";
+            $logger->debug("Opened $yhat_residual_tempfile");
 
             my $pred_res_counter = 0;
             my $trait_counter = 0;
             while (my $row = <$fh_yhat_res>) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $pred = $vals[0];
                 my $residual = $vals[1];
@@ -1834,10 +1836,10 @@ sub perform_drone_imagery_analytics {
 
         $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
         open(my $fh_sol, '<', $blupf90_solutions_tempfile) or die "Could not open file '$blupf90_solutions_tempfile' $!";
-            print STDERR "Opened $blupf90_solutions_tempfile\n";
+            $logger->debug("Opened $blupf90_solutions_tempfile");
 
             my $head = <$fh_sol>;
-            print STDERR $head;
+            $logger->error($head);
 
             my $solution_file_counter = 0;
             my $grm_sol_counter = 0;
@@ -1845,7 +1847,7 @@ sub perform_drone_imagery_analytics {
             my $pe_sol_counter = 0;
             my $pe_sol_trait_counter = 0;
             while (defined(my $row = <$fh_sol>)) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $level = $vals[2];
                 my $value = $vals[3];
@@ -1882,11 +1884,11 @@ sub perform_drone_imagery_analytics {
             }
         close($fh_sol);
 
-        # print STDERR Dumper \%rr_genetic_coefficients_original;
-        # print STDERR Dumper \%rr_temporal_coefficients_original;
+        # $logger->error(Dumper(\%rr_genetic_coefficients_original));
+        # $logger->error(Dumper(\%rr_temporal_coefficients_original));
 
         open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
-        print STDERR "OPENED $coeff_genetic_tempfile\n";
+        $logger->debug("OPENED $coeff_genetic_tempfile");
 
         while ( my ($accession_name, $coeffs) = each %rr_genetic_coefficients_original) {
             my @line = ($accession_name, @$coeffs);
@@ -1901,7 +1903,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -1940,7 +1942,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -1960,7 +1962,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $Fpc, ">", $coeff_pe_tempfile) || die "Can't open file ".$coeff_pe_tempfile;
-        print STDERR "OPENED $coeff_pe_tempfile\n";
+        $logger->debug("OPENED $coeff_pe_tempfile");
 
         while ( my ($plot_name, $coeffs) = each %rr_temporal_coefficients_original) {
             my @line = ($plot_name, @$coeffs);
@@ -1975,7 +1977,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -2013,7 +2015,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -2034,22 +2036,22 @@ sub perform_drone_imagery_analytics {
 
         if ($perform_cv) {
             my $cmd_f90_cv1 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1;
+            $logger->error(Dumper($cmd_f90_cv1));
             my $status_cv1 = system($cmd_f90_cv1);
 
             open(my $fh_log_cv1, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1);
 
             my $yhat_residual_tempfile_cv1 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1, '<', $yhat_residual_tempfile_cv1) or die "Could not open file '$yhat_residual_tempfile_cv1' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1");
 
                 while (my $row = <$fh_yhat_res_cv1>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2058,22 +2060,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1);
 
             my $cmd_f90_cv2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2;
+            $logger->error(Dumper($cmd_f90_cv2));
             my $status_cv2 = system($cmd_f90_cv2);
 
             open(my $fh_log_cv2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2);
 
             my $yhat_residual_tempfile_cv2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2, '<', $yhat_residual_tempfile_cv2) or die "Could not open file '$yhat_residual_tempfile_cv2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2");
 
                 while (my $row = <$fh_yhat_res_cv2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2082,22 +2084,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2);
 
             my $cmd_f90_cv3 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3;
+            $logger->error(Dumper($cmd_f90_cv3));
             my $status_cv3 = system($cmd_f90_cv3);
 
             open(my $fh_log_cv3, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3);
 
             my $yhat_residual_tempfile_cv3 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3, '<', $yhat_residual_tempfile_cv3) or die "Could not open file '$yhat_residual_tempfile_cv3' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3");
 
                 while (my $row = <$fh_yhat_res_cv3>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2106,22 +2108,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3);
 
             my $cmd_f90_cv4 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4;
+            $logger->error(Dumper($cmd_f90_cv4));
             my $status_cv4 = system($cmd_f90_cv4);
 
             open(my $fh_log_cv4, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4);
 
             my $yhat_residual_tempfile_cv4 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4, '<', $yhat_residual_tempfile_cv4) or die "Could not open file '$yhat_residual_tempfile_cv4' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4");
 
                 while (my $row = <$fh_yhat_res_cv4>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2130,22 +2132,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4);
 
             my $cmd_f90_cv5 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5;
+            $logger->error(Dumper($cmd_f90_cv5));
             my $status_cv5 = system($cmd_f90_cv5);
 
             open(my $fh_log_cv5, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5);
 
             my $yhat_residual_tempfile_cv5 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5, '<', $yhat_residual_tempfile_cv5) or die "Could not open file '$yhat_residual_tempfile_cv5' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5");
 
                 while (my $row = <$fh_yhat_res_cv5>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2154,22 +2156,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv5);
 
             my $cmd_f90_cv1_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1_2;
+            $logger->error(Dumper($cmd_f90_cv1_2));
             my $status_cv1_2 = system($cmd_f90_cv1_2);
 
             open(my $fh_log_cv1_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1_2);
 
             my $yhat_residual_tempfile_cv1_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1_2, '<', $yhat_residual_tempfile_cv1_2) or die "Could not open file '$yhat_residual_tempfile_cv1_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1_2");
 
                 while (my $row = <$fh_yhat_res_cv1_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2178,22 +2180,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1_2);
 
             my $cmd_f90_cv2_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2_2;
+            $logger->error(Dumper($cmd_f90_cv2_2));
             my $status_cv2_2 = system($cmd_f90_cv2_2);
 
             open(my $fh_log_cv2_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2_2);
 
             my $yhat_residual_tempfile_cv2_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2_2, '<', $yhat_residual_tempfile_cv2_2) or die "Could not open file '$yhat_residual_tempfile_cv2_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2_2");
 
                 while (my $row = <$fh_yhat_res_cv2_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2202,22 +2204,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2_2);
 
             my $cmd_f90_cv3_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3_2;
+            $logger->error(Dumper($cmd_f90_cv3_2));
             my $status_cv3_2 = system($cmd_f90_cv3_2);
 
             open(my $fh_log_cv3_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3_2);
 
             my $yhat_residual_tempfile_cv3_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3_2, '<', $yhat_residual_tempfile_cv3_2) or die "Could not open file '$yhat_residual_tempfile_cv3_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3_2");
 
                 while (my $row = <$fh_yhat_res_cv3_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2226,22 +2228,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3_2);
 
             my $cmd_f90_cv4_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4_2;
+            $logger->error(Dumper($cmd_f90_cv4_2));
             my $status_cv4_2 = system($cmd_f90_cv4_2);
 
             open(my $fh_log_cv4_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4_2);
 
             my $yhat_residual_tempfile_cv4_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4_2, '<', $yhat_residual_tempfile_cv4_2) or die "Could not open file '$yhat_residual_tempfile_cv4_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4_2");
 
                 while (my $row = <$fh_yhat_res_cv4_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2250,22 +2252,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4_2);
 
             my $cmd_f90_cv5_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5_2;
+            $logger->error(Dumper($cmd_f90_cv5_2));
             my $status_cv5_2 = system($cmd_f90_cv5_2);
 
             open(my $fh_log_cv5_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5_2);
 
             my $yhat_residual_tempfile_cv5_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5_2, '<', $yhat_residual_tempfile_cv5_2) or die "Could not open file '$yhat_residual_tempfile_cv5_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5_2");
 
                 while (my $row = <$fh_yhat_res_cv5_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -2283,7 +2285,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -2308,7 +2310,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -2342,7 +2344,7 @@ sub perform_drone_imagery_analytics {
         #     );
         #
         #     open(my $Fp, ">", $parameter_asreml_tempfile) || die "Can't open file ".$parameter_asreml_tempfile;
-        #         print STDERR "WRITE ASREML PARAMFILE $parameter_asreml_tempfile\n";
+        #         $logger->debug("WRITE ASREML PARAMFILE $parameter_asreml_tempfile");
         #         foreach (@param_file_rows) {
         #             print $Fp "$_\n";
         #         }
@@ -2351,7 +2353,7 @@ sub perform_drone_imagery_analytics {
         #     my $parameter_asreml_tempfile_basename = basename($parameter_asreml_tempfile);
         #     $stats_out_tempfile .= '.log';
         #     $cmd_asreml = 'cd '.$tmp_stats_dir.'; asreml '.$parameter_asreml_tempfile_basename.' > '.$stats_out_tempfile;
-        #     print STDERR Dumper $cmd_asreml;
+        #     $logger->error(Dumper($cmd_asreml));
         #     my $status = system($cmd_asreml);
         # }
 
@@ -2508,8 +2510,8 @@ sub perform_drone_imagery_analytics {
                 statistics_cmd_cv_2 => $statistics_cmd_cv_2
             };
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -2521,8 +2523,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -2531,7 +2533,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -2561,12 +2563,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -2577,7 +2579,7 @@ sub perform_drone_imagery_analytics {
                         my $z_ratio = $columns[3];
                         if (defined $value && $value ne '') {
                             if ($solution_file_counter < $row_number_span) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             elsif ($solution_file_counter < $row_number_span + $number_accessions) {
                                 my $stock_name = $accession_id_factor_map_reverse{$solution_file_counter - $row_number_span + 1};
@@ -2596,7 +2598,7 @@ sub perform_drone_imagery_analytics {
                                 $current_gen_row_count++;
                             }
                             elsif ($solution_file_counter < $col_number_span + $row_number_span + $number_accessions) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             else {
                                 my $plot_name = $row_col_ordered_plots_names[$current_env_row_count];
@@ -2620,7 +2622,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -2644,7 +2646,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -2668,7 +2670,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -2692,7 +2694,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -2716,7 +2718,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -2740,7 +2742,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -2764,7 +2766,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -2788,7 +2790,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -2812,7 +2814,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -2836,7 +2838,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -2860,7 +2862,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -2881,7 +2883,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -2896,7 +2898,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -2921,7 +2923,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -3083,8 +3085,8 @@ sub perform_drone_imagery_analytics {
                 statistics_cmd_cv_2 => $statistics_cmd_cv_2
             };
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -3096,8 +3098,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -3106,7 +3108,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -3136,12 +3138,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -3189,7 +3191,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -3213,7 +3215,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -3237,7 +3239,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -3261,7 +3263,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -3285,7 +3287,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -3309,7 +3311,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -3333,7 +3335,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -3357,7 +3359,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -3381,7 +3383,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -3405,7 +3407,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -3429,7 +3431,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -3450,7 +3452,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -3465,7 +3467,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -3490,7 +3492,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -3763,8 +3765,8 @@ sub perform_drone_imagery_analytics {
 
         $statistics_cmd = $statistics_cmd_reading.$statistics_cmd_model;
 
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -3777,8 +3779,8 @@ sub perform_drone_imagery_analytics {
 
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -3787,7 +3789,7 @@ sub perform_drone_imagery_analytics {
             my @row_col_ordered_plots_names;
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -3826,7 +3828,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -3839,7 +3841,7 @@ sub perform_drone_imagery_analytics {
                 my $solution_file_counter_g_index = 0;
                 my $solution_file_counter_p_index = 0;
                 while (defined(my $row = <$fh>)) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @columns;
                     if ($csv->parse($row)) {
                         @columns = $csv->fields();
@@ -3901,7 +3903,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -3925,7 +3927,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -3949,7 +3951,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -3973,7 +3975,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -3997,7 +3999,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -4021,7 +4023,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -4045,7 +4047,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -4069,7 +4071,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -4093,7 +4095,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -4117,7 +4119,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -4141,7 +4143,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -4161,19 +4163,19 @@ sub perform_drone_imagery_analytics {
             }
 
             if ($run_stats_fault == 1) {
-                print STDERR "ERROR IN R CMD\n";
+                $logger->error("ERROR IN R CMD");
                 return {error=>'Error in R! Try a larger tolerance'};
             }
         }
     }
-    print STDERR "ORIGINAL $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_original\n";
-    print STDERR "ORIGINAL $statistics_select ENV EFFECT SUM $env_effect_sum_original\n";
-    print STDERR Dumper [$genetic_effect_min_original, $genetic_effect_max_original, $env_effect_min_original, $env_effect_max_original];
+    $logger->debug("ORIGINAL $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_original");
+    $logger->debug("ORIGINAL $statistics_select ENV EFFECT SUM $env_effect_sum_original");
+    $logger->error(Dumper([$genetic_effect_min_original, $genetic_effect_max_original, $env_effect_min_original, $env_effect_max_original]));
 
     my @model_sum_square_original_cv_values = ($model_sum_square_cv1_original, $model_sum_square_cv2_original, $model_sum_square_cv3_original, $model_sum_square_cv4_original, $model_sum_square_cv5_original);
     my @model_sum_square_original_cv_2_values = ($model_sum_square_cv1_2_original, $model_sum_square_cv2_2_original, $model_sum_square_cv3_2_original, $model_sum_square_cv4_2_original, $model_sum_square_cv5_2_original);
-    print STDERR Dumper \@model_sum_square_original_cv_values;
-    print STDERR Dumper \@model_sum_square_original_cv_2_values;
+    $logger->error(Dumper(\@model_sum_square_original_cv_values));
+    $logger->error(Dumper(\@model_sum_square_original_cv_2_values));
     my $model_sum_square_original_cv_stat = Statistics::Descriptive::Full->new();
     $model_sum_square_original_cv_stat->add_data(@model_sum_square_original_cv_values);
     my $model_sum_square_original_cv_result = {
@@ -4194,7 +4196,7 @@ sub perform_drone_imagery_analytics {
     my $phenotype_max_altered = -1000000000;
     my $phenotype_variance_altered;
 
-    print STDERR "SUBTRACT ENV ESTIMATE\n";
+    $logger->debug("SUBTRACT ENV ESTIMATE");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups') {
 
         foreach my $p (@unique_plot_names) {
@@ -4229,7 +4231,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, 'NA';
                 }
             }
@@ -4340,7 +4342,7 @@ sub perform_drone_imagery_analytics {
                         push @data_matrix_phenotypes_row, $new_val;
                     }
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                     push @data_matrix_phenotypes_row, 'NA';
                 }
@@ -4410,7 +4412,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                 }
             }
@@ -4430,7 +4432,7 @@ sub perform_drone_imagery_analytics {
     $phenotypes_altered_stat->add_data(@phenotype_data_altered_values);
     $phenotype_variance_altered = $phenotypes_altered_stat->variance();
 
-    print STDERR Dumper [$phenotype_min_altered, $phenotype_max_altered];
+    $logger->error(Dumper([$phenotype_min_altered, $phenotype_max_altered]));
 
     my ($result_blup_data_altered, $result_blup_data_delta_altered, $result_blup_spatial_data_altered, $result_blup_pe_data_altered, $result_blup_pe_data_delta_altered, $result_residual_data_altered, $result_fitted_data_altered, %fixed_effects_altered, %rr_genetic_coefficients_altered, %rr_temporal_coefficients_altered);
     my (@rr_coeff_genetic_covariance_altered, @rr_coeff_env_covariance_altered, @rr_coeff_genetic_correlation_altered, @rr_coeff_env_correlation_altered, $rr_residual_variance_altered);
@@ -4457,10 +4459,10 @@ sub perform_drone_imagery_analytics {
     my $residual_sum_square_altered = 0;
     my $residual_sum_altered = 0;
 
-    print STDERR "RUN ENV ESTIMATE ON ALTERED PHENO\n";
+    $logger->debug("RUN ENV ESTIMATE ON ALTERED PHENO");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -4472,8 +4474,8 @@ sub perform_drone_imagery_analytics {
         };
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -4481,7 +4483,7 @@ sub perform_drone_imagery_analytics {
             my $current_env_row_count = 0;
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -4520,7 +4522,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
                 if ($csv->parse($header_2dspl)) {
@@ -4559,7 +4561,7 @@ sub perform_drone_imagery_analytics {
             close($fh_2dspl);
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -4591,7 +4593,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -4617,7 +4619,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -4643,7 +4645,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -4669,7 +4671,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -4695,7 +4697,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -4721,7 +4723,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -4747,7 +4749,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -4773,7 +4775,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -4799,7 +4801,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -4825,7 +4827,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -4851,7 +4853,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -4872,7 +4874,7 @@ sub perform_drone_imagery_analytics {
         }
 
         if ($run_stats_fault == 1) {
-            print STDERR "ERROR IN R CMD\n";
+            $logger->error("ERROR IN R CMD");
             return {error=>'Error in R! Try a larger tolerance'};
         }
     }
@@ -4885,8 +4887,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -4898,8 +4900,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -4907,7 +4909,7 @@ sub perform_drone_imagery_analytics {
                 my $current_env_row_count = 0;
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -4948,7 +4950,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                    print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                    $logger->debug("Opened $stats_out_tempfile_2dspl");
                     my $header_2dspl = <$fh_2dspl>;
                     my @header_cols_2dspl;
                     if ($csv->parse($header_2dspl)) {
@@ -4989,7 +4991,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_2dspl);
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -5019,7 +5021,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -5043,7 +5045,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -5067,7 +5069,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -5091,7 +5093,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -5115,7 +5117,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -5139,7 +5141,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -5163,7 +5165,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -5187,7 +5189,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -5211,7 +5213,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -5235,7 +5237,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -5259,7 +5261,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -5279,7 +5281,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -5287,12 +5289,12 @@ sub perform_drone_imagery_analytics {
     }
     elsif ($statistics_select eq 'blupf90_grm_random_regression_gdd_blups' || $statistics_select eq 'blupf90_grm_random_regression_dap_blups' || $statistics_select eq 'airemlf90_grm_random_regression_gdd_blups' || $statistics_select eq 'airemlf90_grm_random_regression_dap_blups') {
 
-        print STDERR Dumper $statistics_cmd;
+        $logger->error(Dumper($statistics_cmd));
         my $status_r = system($statistics_cmd);
 
         my @pheno_var;
         open(my $fh_r, '<', $stats_out_param_tempfile) or die "Could not open file '$stats_out_param_tempfile' $!";
-            print STDERR "Opened $stats_out_param_tempfile\n";
+            $logger->debug("Opened $stats_out_param_tempfile");
 
             while (my $row = <$fh_r>) {
                 my @columns;
@@ -5302,7 +5304,7 @@ sub perform_drone_imagery_analytics {
                 push @pheno_var, \@columns;
             }
         close($fh_r);
-        # print STDERR Dumper \@pheno_var;
+        # $logger->error(Dumper(\@pheno_var));
 
         my $stats_tempfile_2_basename = basename($stats_tempfile_2);
         my $grm_file_basename = basename($grm_rename_tempfile);
@@ -5313,7 +5315,7 @@ sub perform_drone_imagery_analytics {
         my $effect_grm_levels = scalar(@unique_accession_names);
         my $effect_pe_levels = scalar(@ind_rep_factors);
 
-        print STDERR Dumper $stats_tempfile_2;
+        $logger->error(Dumper($stats_tempfile_2));
         my $data_cv_cmd = 'R -e "mat <- read.csv(\''.$stats_tempfile_2.'\', header=FALSE, sep=\' \');
         randomized_positions <- sample(length(mat[,1]));
         cv_step_size <- length(mat[,1]) %/% 5;
@@ -5427,14 +5429,14 @@ sub perform_drone_imagery_analytics {
         my $parameter_tempfile_cv4_2_basename = basename($parameter_tempfile_cv4_2);
         my $parameter_tempfile_cv5_2_basename = basename($parameter_tempfile_cv5_2);
 
-        print STDERR Dumper $cmd_f90;
+        $logger->error(Dumper($cmd_f90));
         my $status = system($cmd_f90);
 
         my @log_output_rows;
         open(my $fh_log, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-            print STDERR "Opened $stats_out_tempfile\n";
+            $logger->debug("Opened $stats_out_tempfile");
             while (my $row = <$fh_log>) {
-                print STDERR $row;
+                $logger->error($row);
                 push @log_output_rows, $row;
             }
         close($fh_log);
@@ -5442,20 +5444,20 @@ sub perform_drone_imagery_analytics {
         my $log_output = join '', @log_output_rows;
         my ($gen_var_string) = $log_output =~ /Genetic variance\(s\) for effect  2(.*?)correlations/gs;
         @rr_coeff_genetic_covariance_altered = split ' ', $gen_var_string;
-        print STDERR Dumper \@rr_coeff_genetic_covariance_altered;
+        $logger->error(Dumper(\@rr_coeff_genetic_covariance_altered));
         my ($env_var_string) = $log_output =~ /Genetic variance\(s\) for effect  $legendre_order_number_env_var_pos(.*?)correlations/gs;
         @rr_coeff_env_covariance_altered = split ' ', $env_var_string;
-        print STDERR Dumper \@rr_coeff_env_covariance_altered;
+        $logger->error(Dumper(\@rr_coeff_env_covariance_altered));
         my (@gen_cor_string) = $log_output =~ /correlations(.*?)eigenvectors/gs;
         @rr_coeff_genetic_correlation_altered = split ' ', $gen_cor_string[0];
-        print STDERR Dumper \@rr_coeff_genetic_correlation_altered;
+        $logger->error(Dumper(\@rr_coeff_genetic_correlation_altered));
         @rr_coeff_env_correlation_altered = split ' ', $gen_cor_string[1];
-        print STDERR Dumper \@rr_coeff_env_correlation_altered;
+        $logger->error(Dumper(\@rr_coeff_env_correlation_altered));
         my ($res_se_string) = $log_output =~ /SE for R(.*?)\* FINISHED \(AIREMLF90\)/gs;
-        print STDERR Dumper $res_se_string;
+        $logger->error(Dumper($res_se_string));
         # $rr_residual_variance_altered = ($res_se_string**2)*$number_plots;
         $rr_residual_variance_altered = $res_se_string;
-        print STDERR Dumper $rr_residual_variance_altered;
+        $logger->error(Dumper($rr_residual_variance_altered));
 
         @param_file_rows_6 = (
             '(CO)VARIANCES'
@@ -5520,12 +5522,12 @@ sub perform_drone_imagery_analytics {
 
         $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
         open(my $fh_yhat_res, '<', $yhat_residual_tempfile) or die "Could not open file '$yhat_residual_tempfile' $!";
-            print STDERR "Opened $yhat_residual_tempfile\n";
+            $logger->debug("Opened $yhat_residual_tempfile");
 
             my $pred_res_counter = 0;
             my $trait_counter = 0;
             while (my $row = <$fh_yhat_res>) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $pred = $vals[0];
                 my $residual = $vals[1];
@@ -5549,10 +5551,10 @@ sub perform_drone_imagery_analytics {
 
         $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
         open(my $fh_sol, '<', $blupf90_solutions_tempfile) or die "Could not open file '$blupf90_solutions_tempfile' $!";
-            print STDERR "Opened $blupf90_solutions_tempfile\n";
+            $logger->debug("Opened $blupf90_solutions_tempfile");
 
             my $head = <$fh_sol>;
-            print STDERR $head;
+            $logger->error($head);
 
             my $solution_file_counter = 0;
             my $grm_sol_counter = 0;
@@ -5560,7 +5562,7 @@ sub perform_drone_imagery_analytics {
             my $pe_sol_counter = 0;
             my $pe_sol_trait_counter = 0;
             while (defined(my $row = <$fh_sol>)) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $level = $vals[2];
                 my $value = $vals[3];
@@ -5597,8 +5599,8 @@ sub perform_drone_imagery_analytics {
             }
         close($fh_sol);
 
-        # print STDERR Dumper \%rr_genetic_coefficients_altered;
-        # print STDERR Dumper \%rr_temporal_coefficients_altered;
+        # $logger->error(Dumper(\%rr_genetic_coefficients_altered));
+        # $logger->error(Dumper(\%rr_temporal_coefficients_altered));
 
         open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
 
@@ -5615,7 +5617,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -5651,7 +5653,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -5685,7 +5687,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -5721,7 +5723,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -5742,22 +5744,22 @@ sub perform_drone_imagery_analytics {
 
         if ($perform_cv) {
             my $cmd_f90_cv1 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1;
+            $logger->error(Dumper($cmd_f90_cv1));
             my $status_cv1 = system($cmd_f90_cv1);
 
             open(my $fh_log_cv1, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1);
 
             my $yhat_residual_tempfile_cv1 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1, '<', $yhat_residual_tempfile_cv1) or die "Could not open file '$yhat_residual_tempfile_cv1' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1");
 
                 while (my $row = <$fh_yhat_res_cv1>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5766,22 +5768,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1);
 
             my $cmd_f90_cv2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2;
+            $logger->error(Dumper($cmd_f90_cv2));
             my $status_cv2 = system($cmd_f90_cv2);
 
             open(my $fh_log_cv2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2);
 
             my $yhat_residual_tempfile_cv2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2, '<', $yhat_residual_tempfile_cv2) or die "Could not open file '$yhat_residual_tempfile_cv2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2");
 
                 while (my $row = <$fh_yhat_res_cv2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5790,22 +5792,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2);
 
             my $cmd_f90_cv3 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3;
+            $logger->error(Dumper($cmd_f90_cv3));
             my $status_cv3 = system($cmd_f90_cv3);
 
             open(my $fh_log_cv3, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3);
 
             my $yhat_residual_tempfile_cv3 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3, '<', $yhat_residual_tempfile_cv3) or die "Could not open file '$yhat_residual_tempfile_cv3' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3");
 
                 while (my $row = <$fh_yhat_res_cv3>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5814,22 +5816,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3);
 
             my $cmd_f90_cv4 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4;
+            $logger->error(Dumper($cmd_f90_cv4));
             my $status_cv4 = system($cmd_f90_cv4);
 
             open(my $fh_log_cv4, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4);
 
             my $yhat_residual_tempfile_cv4 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4, '<', $yhat_residual_tempfile_cv4) or die "Could not open file '$yhat_residual_tempfile_cv4' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4");
 
                 while (my $row = <$fh_yhat_res_cv4>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5838,22 +5840,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4);
 
             my $cmd_f90_cv5 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5;
+            $logger->error(Dumper($cmd_f90_cv5));
             my $status_cv5 = system($cmd_f90_cv5);
 
             open(my $fh_log_cv5, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5);
 
             my $yhat_residual_tempfile_cv5 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5, '<', $yhat_residual_tempfile_cv5) or die "Could not open file '$yhat_residual_tempfile_cv5' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5");
 
                 while (my $row = <$fh_yhat_res_cv5>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5862,22 +5864,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv5);
 
             my $cmd_f90_cv1_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1_2;
+            $logger->error(Dumper($cmd_f90_cv1_2));
             my $status_cv1_2 = system($cmd_f90_cv1_2);
 
             open(my $fh_log_cv1_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1_2);
 
             my $yhat_residual_tempfile_cv1_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1_2, '<', $yhat_residual_tempfile_cv1_2) or die "Could not open file '$yhat_residual_tempfile_cv1_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1_2");
 
                 while (my $row = <$fh_yhat_res_cv1_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5886,22 +5888,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1_2);
 
             my $cmd_f90_cv2_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2_2;
+            $logger->error(Dumper($cmd_f90_cv2_2));
             my $status_cv2_2 = system($cmd_f90_cv2_2);
 
             open(my $fh_log_cv2_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2_2);
 
             my $yhat_residual_tempfile_cv2_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2_2, '<', $yhat_residual_tempfile_cv2_2) or die "Could not open file '$yhat_residual_tempfile_cv2_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2_2");
 
                 while (my $row = <$fh_yhat_res_cv2_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5910,22 +5912,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2_2);
 
             my $cmd_f90_cv3_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3_2;
+            $logger->error(Dumper($cmd_f90_cv3_2));
             my $status_cv3_2 = system($cmd_f90_cv3_2);
 
             open(my $fh_log_cv3_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3_2);
 
             my $yhat_residual_tempfile_cv3_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3_2, '<', $yhat_residual_tempfile_cv3_2) or die "Could not open file '$yhat_residual_tempfile_cv3_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3_2");
 
                 while (my $row = <$fh_yhat_res_cv3_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5934,22 +5936,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3_2);
 
             my $cmd_f90_cv4_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4_2;
+            $logger->error(Dumper($cmd_f90_cv4_2));
             my $status_cv4_2 = system($cmd_f90_cv4_2);
 
             open(my $fh_log_cv4_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4_2);
 
             my $yhat_residual_tempfile_cv4_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4_2, '<', $yhat_residual_tempfile_cv4_2) or die "Could not open file '$yhat_residual_tempfile_cv4_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4_2");
 
                 while (my $row = <$fh_yhat_res_cv4_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5958,22 +5960,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4_2);
 
             my $cmd_f90_cv5_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5_2;
+            $logger->error(Dumper($cmd_f90_cv5_2));
             my $status_cv5_2 = system($cmd_f90_cv5_2);
 
             open(my $fh_log_cv5_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5_2);
 
             my $yhat_residual_tempfile_cv5_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5_2, '<', $yhat_residual_tempfile_cv5_2) or die "Could not open file '$yhat_residual_tempfile_cv5_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5_2");
 
                 while (my $row = <$fh_yhat_res_cv5_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -5991,8 +5993,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -6004,8 +6006,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -6014,7 +6016,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -6043,12 +6045,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -6059,7 +6061,7 @@ sub perform_drone_imagery_analytics {
                         my $z_ratio = $columns[3];
                         if (defined $value && $value ne '') {
                             if ($solution_file_counter < $row_number_span) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             elsif ($solution_file_counter < $row_number_span + $number_accessions) {
                                 my $stock_name = $accession_id_factor_map_reverse{$solution_file_counter - $row_number_span + 1};
@@ -6078,7 +6080,7 @@ sub perform_drone_imagery_analytics {
                                 $current_gen_row_count++;
                             }
                             elsif ($solution_file_counter < $col_number_span + $row_number_span + $number_accessions) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             else {
                                 my $plot_name = $row_col_ordered_plots_names[$current_env_row_count];
@@ -6102,7 +6104,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -6126,7 +6128,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -6150,7 +6152,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -6174,7 +6176,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -6198,7 +6200,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -6222,7 +6224,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -6246,7 +6248,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -6270,7 +6272,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -6294,7 +6296,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -6318,7 +6320,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -6342,7 +6344,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -6363,7 +6365,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -6378,7 +6380,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -6403,7 +6405,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -6424,8 +6426,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -6437,8 +6439,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -6447,7 +6449,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -6476,12 +6478,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -6529,7 +6531,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -6553,7 +6555,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -6577,7 +6579,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -6601,7 +6603,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -6625,7 +6627,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -6649,7 +6651,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -6673,7 +6675,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -6697,7 +6699,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -6721,7 +6723,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -6745,7 +6747,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -6769,7 +6771,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -6790,15 +6792,15 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
         }
     }
     elsif ($statistics_select eq 'asreml_grm_multivariate_spatial_genetic_blups') {
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
@@ -6811,8 +6813,8 @@ sub perform_drone_imagery_analytics {
 
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -6821,7 +6823,7 @@ sub perform_drone_imagery_analytics {
             my @row_col_ordered_plots_names;
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -6860,7 +6862,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -6873,7 +6875,7 @@ sub perform_drone_imagery_analytics {
                 my $solution_file_counter_g_index = 0;
                 my $solution_file_counter_p_index = 0;
                 while (defined(my $row = <$fh>)) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @columns;
                     if ($csv->parse($row)) {
                         @columns = $csv->fields();
@@ -6935,7 +6937,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -6959,7 +6961,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -6983,7 +6985,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -7007,7 +7009,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -7031,7 +7033,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -7055,7 +7057,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -7079,7 +7081,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -7103,7 +7105,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -7127,7 +7129,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -7151,7 +7153,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -7175,7 +7177,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -7195,19 +7197,19 @@ sub perform_drone_imagery_analytics {
             }
 
             if ($run_stats_fault == 1) {
-                print STDERR "ERROR IN R CMD\n";
+                $logger->error("ERROR IN R CMD");
                 return {error=>'Error in R! Try a larger tolerance'};
             }
         }
     }
-    print STDERR "ALTERED $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered\n";
-    print STDERR "ALTERED $statistics_select ENV EFFECT SUM $env_effect_sum_altered\n";
-    print STDERR Dumper [$genetic_effect_min_altered, $genetic_effect_max_altered, $env_effect_min_altered, $env_effect_max_altered];
+    $logger->debug("ALTERED $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered");
+    $logger->debug("ALTERED $statistics_select ENV EFFECT SUM $env_effect_sum_altered");
+    $logger->error(Dumper([$genetic_effect_min_altered, $genetic_effect_max_altered, $env_effect_min_altered, $env_effect_max_altered]));
 
     my @model_sum_square_altered_cv_values = ($model_sum_square_cv1_altered, $model_sum_square_cv2_altered, $model_sum_square_cv3_altered, $model_sum_square_cv4_altered, $model_sum_square_cv5_altered);
     my @model_sum_square_altered_cv_2_values = ($model_sum_square_cv1_2_altered, $model_sum_square_cv2_2_altered, $model_sum_square_cv3_2_altered, $model_sum_square_cv4_2_altered, $model_sum_square_cv5_2_altered);
-    print STDERR Dumper \@model_sum_square_altered_cv_values;
-    print STDERR Dumper \@model_sum_square_altered_cv_2_values;
+    $logger->error(Dumper(\@model_sum_square_altered_cv_values));
+    $logger->error(Dumper(\@model_sum_square_altered_cv_2_values));
     my $model_sum_square_altered_cv_stat = Statistics::Descriptive::Full->new();
     $model_sum_square_altered_cv_stat->add_data(@model_sum_square_altered_cv_values);
     my $model_sum_square_altered_cv_result = {
@@ -7268,7 +7270,7 @@ sub perform_drone_imagery_analytics {
 
         if ($sim_env_change_over_time eq 'changing_gradual') {
             open(my $sim_change_f, ">", $sim_env_changing_mat_tempfile) || die "Can't open file ".$sim_env_changing_mat_tempfile;
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile");
                 foreach (@sim_data_env_first) {
                     print $sim_change_f $_."\n";
                 }
@@ -7292,11 +7294,11 @@ sub perform_drone_imagery_analytics {
             chol2 <- chol(newc);
             finalx <- newx %*% chol2 * sd(x1) + mean(x1);
             write.table(finalx, file=\''.$sim_env_changing_mat_full_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-            # print STDERR Dumper $sim_change_cmd;
+            # $logger->error(Dumper($sim_change_cmd));
             my $status_sim_change = system($sim_change_cmd);
 
             open(my $sim_change_res, '<', $sim_env_changing_mat_full_tempfile) or die "Could not open file '$sim_env_changing_mat_full_tempfile' $!";
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile");
                 my $sim_change_line_counter = 0;
                 while (my $row = <$sim_change_res>) {
                     my @columns;
@@ -7351,7 +7353,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_pheno_f, ">", $permanent_environment_structure_env_tempfile) || die "Can't open file ".$permanent_environment_structure_env_tempfile;
-            print STDERR "OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile\n";
+            $logger->debug("OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile");
             foreach (@sim_data_diff_1) {
                 my $line = join "\t", @$_;
                 print $pe_pheno_f $line."\n";
@@ -7368,12 +7370,12 @@ sub perform_drone_imagery_analytics {
         range01 <- function(x){(x-min(x))/(max(x)-min(x))};
         cor_mat <- range01(cor_mat);
         write.table(cor_mat, file=\''.$permanent_environment_structure_env_tempfile2.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-        # print STDERR Dumper $pe_rel_cmd;
+        # $logger->error(Dumper($pe_rel_cmd));
         my $status_pe_rel = system($pe_rel_cmd);
 
         my %rel_pe_result_hash;
         open(my $pe_rel_res, '<', $permanent_environment_structure_env_tempfile2) or die "Could not open file '$permanent_environment_structure_env_tempfile2' $!";
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2");
             my $header_row = <$pe_rel_res>;
             my @header;
             if ($csv->parse($header_row)) {
@@ -7416,13 +7418,13 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_rel_out, ">", $permanent_environment_structure_env_tempfile_mat) || die "Can't open file ".$permanent_environment_structure_env_tempfile_mat;
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat");
             print $pe_rel_out $data_rel_pe;
         close($pe_rel_out);
     }
 
-    print STDERR "ADD SIMULATED ENV TO ALTERED PHENO linear_gradient\n";
-    print STDERR Dumper [$env_sim_min, $env_sim_max];
+    $logger->debug("ADD SIMULATED ENV TO ALTERED PHENO linear_gradient");
+    $logger->error(Dumper([$env_sim_min, $env_sim_max]));
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups') {
 
         foreach my $p (@unique_plot_names) {
@@ -7453,7 +7455,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, 'NA';
                 }
             }
@@ -7552,7 +7554,7 @@ sub perform_drone_imagery_analytics {
                         push @data_matrix_phenotypes_row, $val;
                     }
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                     push @data_matrix_phenotypes_row, 'NA';
                 }
@@ -7616,7 +7618,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                 }
             }
@@ -7632,7 +7634,7 @@ sub perform_drone_imagery_analytics {
         close($F);
     }
 
-    print STDERR Dumper [$phenotype_min_altered_env, $phenotype_max_altered_env];
+    $logger->error(Dumper([$phenotype_min_altered_env, $phenotype_max_altered_env]));
 
     my ($result_blup_data_altered_env, $result_blup_data_delta_altered_env, $result_blup_spatial_data_altered_env, $result_blup_pe_data_altered_env, $result_blup_pe_data_delta_altered_env, $result_residual_data_altered_env, $result_fitted_data_altered_env, %fixed_effects_altered_env, %rr_genetic_coefficients_altered_env, %rr_temporal_coefficients_altered_env);
     my (@rr_coeff_genetic_covariance_altered_env, @rr_coeff_env_covariance_altered_env, @rr_coeff_genetic_correlation_altered_env, @rr_coeff_env_correlation_altered_env, $rr_residual_variance_altered_env);
@@ -7659,10 +7661,10 @@ sub perform_drone_imagery_analytics {
     my $residual_sum_square_altered_env = 0;
     my $residual_sum_altered_env = 0;
 
-    print STDERR "RUN ENV ESTIMATE ON Altered Pheno With Sim Env linear_gradient\n";
+    $logger->debug("RUN ENV ESTIMATE ON Altered Pheno With Sim Env linear_gradient");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
-        #print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        #$logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -7674,8 +7676,8 @@ sub perform_drone_imagery_analytics {
         };
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -7683,7 +7685,7 @@ sub perform_drone_imagery_analytics {
             my $current_env_row_count = 0;
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -7722,7 +7724,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
                 if ($csv->parse($header_2dspl)) {
@@ -7761,7 +7763,7 @@ sub perform_drone_imagery_analytics {
             close($fh_2dspl);
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -7793,7 +7795,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -7819,7 +7821,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -7845,7 +7847,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -7871,7 +7873,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -7897,7 +7899,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -7923,7 +7925,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -7949,7 +7951,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -7975,7 +7977,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -8001,7 +8003,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -8027,7 +8029,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -8053,7 +8055,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -8074,7 +8076,7 @@ sub perform_drone_imagery_analytics {
         }
 
         if ($run_stats_fault == 1) {
-            print STDERR "ERROR IN R CMD\n";
+            $logger->error("ERROR IN R CMD");
             return {error=>'Error in R! Try a larger tolerance'};
         }
     }
@@ -8087,8 +8089,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -8099,8 +8101,8 @@ sub perform_drone_imagery_analytics {
             };
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -8108,7 +8110,7 @@ sub perform_drone_imagery_analytics {
                 my $current_env_row_count = 0;
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -8149,7 +8151,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                    print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                    $logger->debug("Opened $stats_out_tempfile_2dspl");
                     my $header_2dspl = <$fh_2dspl>;
                     my @header_cols_2dspl;
                     if ($csv->parse($header_2dspl)) {
@@ -8190,7 +8192,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_2dspl);
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -8220,7 +8222,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -8244,7 +8246,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -8268,7 +8270,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -8292,7 +8294,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -8316,7 +8318,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -8340,7 +8342,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -8364,7 +8366,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -8388,7 +8390,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -8412,7 +8414,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -8436,7 +8438,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -8460,7 +8462,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -8480,7 +8482,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -8488,12 +8490,12 @@ sub perform_drone_imagery_analytics {
     }
     elsif ($statistics_select eq 'blupf90_grm_random_regression_gdd_blups' || $statistics_select eq 'blupf90_grm_random_regression_dap_blups' || $statistics_select eq 'airemlf90_grm_random_regression_gdd_blups' || $statistics_select eq 'airemlf90_grm_random_regression_dap_blups') {
 
-        print STDERR Dumper $statistics_cmd;
+        $logger->error(Dumper($statistics_cmd));
         my $status_r = system($statistics_cmd);
 
         my @pheno_var;
         open(my $fh_r, '<', $stats_out_param_tempfile) or die "Could not open file '$stats_out_param_tempfile' $!";
-            print STDERR "Opened $stats_out_param_tempfile\n";
+            $logger->debug("Opened $stats_out_param_tempfile");
 
             while (my $row = <$fh_r>) {
                 my @columns;
@@ -8503,7 +8505,7 @@ sub perform_drone_imagery_analytics {
                 push @pheno_var, \@columns;
             }
         close($fh_r);
-        # print STDERR Dumper \@pheno_var;
+        # $logger->error(Dumper(\@pheno_var));
 
         my $stats_tempfile_2_basename = basename($stats_tempfile_2);
         my $grm_file_basename = basename($grm_rename_tempfile);
@@ -8515,7 +8517,7 @@ sub perform_drone_imagery_analytics {
         my $effect_grm_levels = scalar(@unique_accession_names);
         my $effect_pe_levels = scalar(@ind_rep_factors);
 
-        print STDERR Dumper $stats_tempfile_2;
+        $logger->error(Dumper($stats_tempfile_2));
         my $data_cv_cmd = 'R -e "mat <- read.csv(\''.$stats_tempfile_2.'\', header=FALSE, sep=\' \');
         randomized_positions <- sample(length(mat[,1]));
         cv_step_size <- length(mat[,1]) %/% 5;
@@ -8629,14 +8631,14 @@ sub perform_drone_imagery_analytics {
         my $parameter_tempfile_cv4_2_basename = basename($parameter_tempfile_cv4_2);
         my $parameter_tempfile_cv5_2_basename = basename($parameter_tempfile_cv5_2);
 
-        print STDERR Dumper $cmd_f90;
+        $logger->error(Dumper($cmd_f90));
         my $status = system($cmd_f90);
 
         my @log_output_rows;
         open(my $fh_log, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-            print STDERR "Opened $stats_out_tempfile\n";
+            $logger->debug("Opened $stats_out_tempfile");
             while (my $row = <$fh_log>) {
-                print STDERR $row;
+                $logger->error($row);
                 push @log_output_rows, $row;
             }
         close($fh_log);
@@ -8644,20 +8646,20 @@ sub perform_drone_imagery_analytics {
         my $log_output = join '', @log_output_rows;
         my ($gen_var_string) = $log_output =~ /Genetic variance\(s\) for effect  2(.*?)correlations/gs;
         @rr_coeff_genetic_covariance_altered_env = split ' ', $gen_var_string;
-        print STDERR Dumper \@rr_coeff_genetic_covariance_altered_env;
+        $logger->error(Dumper(\@rr_coeff_genetic_covariance_altered_env));
         my ($env_var_string) = $log_output =~ /Genetic variance\(s\) for effect  $legendre_order_number_env_var_pos(.*?)correlations/gs;
         @rr_coeff_env_covariance_altered_env = split ' ', $env_var_string;
-        print STDERR Dumper \@rr_coeff_env_covariance_altered_env;
+        $logger->error(Dumper(\@rr_coeff_env_covariance_altered_env));
         my (@gen_cor_string) = $log_output =~ /correlations(.*?)eigenvectors/gs;
         @rr_coeff_genetic_correlation_altered_env = split ' ', $gen_cor_string[0];
-        print STDERR Dumper \@rr_coeff_genetic_correlation_altered_env;
+        $logger->error(Dumper(\@rr_coeff_genetic_correlation_altered_env));
         @rr_coeff_env_correlation_altered_env = split ' ', $gen_cor_string[1];
-        print STDERR Dumper \@rr_coeff_env_correlation_altered_env;
+        $logger->error(Dumper(\@rr_coeff_env_correlation_altered_env));
         my ($res_se_string) = $log_output =~ /SE for R(.*?)\* FINISHED \(AIREMLF90\)/gs;
-        print STDERR Dumper $res_se_string;
+        $logger->error(Dumper($res_se_string));
         # $rr_residual_variance_altered_env = ($res_se_string**2)*$number_plots;
         $rr_residual_variance_altered_env = $res_se_string;
-        print STDERR Dumper $rr_residual_variance_altered_env;
+        $logger->error(Dumper($rr_residual_variance_altered_env));
 
         @param_file_rows_6 = (
             '(CO)VARIANCES'
@@ -8722,12 +8724,12 @@ sub perform_drone_imagery_analytics {
 
         $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
         open(my $fh_yhat_res, '<', $yhat_residual_tempfile) or die "Could not open file '$yhat_residual_tempfile' $!";
-            print STDERR "Opened $yhat_residual_tempfile\n";
+            $logger->debug("Opened $yhat_residual_tempfile");
 
             my $pred_res_counter = 0;
             my $trait_counter = 0;
             while (my $row = <$fh_yhat_res>) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $pred = $vals[0];
                 my $residual = $vals[1];
@@ -8751,10 +8753,10 @@ sub perform_drone_imagery_analytics {
 
         $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
         open(my $fh_sol, '<', $blupf90_solutions_tempfile) or die "Could not open file '$blupf90_solutions_tempfile' $!";
-            print STDERR "Opened $blupf90_solutions_tempfile\n";
+            $logger->debug("Opened $blupf90_solutions_tempfile");
 
             my $head = <$fh_sol>;
-            print STDERR $head;
+            $logger->error($head);
 
             my $solution_file_counter = 0;
             my $grm_sol_counter = 0;
@@ -8762,7 +8764,7 @@ sub perform_drone_imagery_analytics {
             my $pe_sol_counter = 0;
             my $pe_sol_trait_counter = 0;
             while (defined(my $row = <$fh_sol>)) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $level = $vals[2];
                 my $value = $vals[3];
@@ -8799,8 +8801,8 @@ sub perform_drone_imagery_analytics {
             }
         close($fh_sol);
 
-        # print STDERR Dumper \%rr_genetic_coefficients_altered;
-        # print STDERR Dumper \%rr_temporal_coefficients_altered;
+        # $logger->error(Dumper(\%rr_genetic_coefficients_altered));
+        # $logger->error(Dumper(\%rr_temporal_coefficients_altered));
 
         open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
 
@@ -8817,7 +8819,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -8853,7 +8855,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -8887,7 +8889,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -8923,7 +8925,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -8944,22 +8946,22 @@ sub perform_drone_imagery_analytics {
 
         if ($perform_cv) {
             my $cmd_f90_cv1 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1;
+            $logger->error(Dumper($cmd_f90_cv1));
             my $status_cv1 = system($cmd_f90_cv1);
 
             open(my $fh_log_cv1, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1);
 
             my $yhat_residual_tempfile_cv1 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1, '<', $yhat_residual_tempfile_cv1) or die "Could not open file '$yhat_residual_tempfile_cv1' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1");
 
                 while (my $row = <$fh_yhat_res_cv1>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -8968,22 +8970,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1);
 
             my $cmd_f90_cv2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2;
+            $logger->error(Dumper($cmd_f90_cv2));
             my $status_cv2 = system($cmd_f90_cv2);
 
             open(my $fh_log_cv2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2);
 
             my $yhat_residual_tempfile_cv2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2, '<', $yhat_residual_tempfile_cv2) or die "Could not open file '$yhat_residual_tempfile_cv2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2");
 
                 while (my $row = <$fh_yhat_res_cv2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -8992,22 +8994,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2);
 
             my $cmd_f90_cv3 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3;
+            $logger->error(Dumper($cmd_f90_cv3));
             my $status_cv3 = system($cmd_f90_cv3);
 
             open(my $fh_log_cv3, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3);
 
             my $yhat_residual_tempfile_cv3 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3, '<', $yhat_residual_tempfile_cv3) or die "Could not open file '$yhat_residual_tempfile_cv3' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3");
 
                 while (my $row = <$fh_yhat_res_cv3>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -9016,22 +9018,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3);
 
             my $cmd_f90_cv4 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4;
+            $logger->error(Dumper($cmd_f90_cv4));
             my $status_cv4 = system($cmd_f90_cv4);
 
             open(my $fh_log_cv4, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4);
 
             my $yhat_residual_tempfile_cv4 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4, '<', $yhat_residual_tempfile_cv4) or die "Could not open file '$yhat_residual_tempfile_cv4' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4");
 
                 while (my $row = <$fh_yhat_res_cv4>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -9040,22 +9042,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4);
 
             my $cmd_f90_cv5 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5;
+            $logger->error(Dumper($cmd_f90_cv5));
             my $status_cv5 = system($cmd_f90_cv5);
 
             open(my $fh_log_cv5, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5);
 
             my $yhat_residual_tempfile_cv5 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5, '<', $yhat_residual_tempfile_cv5) or die "Could not open file '$yhat_residual_tempfile_cv5' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5");
 
                 while (my $row = <$fh_yhat_res_cv5>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -9064,22 +9066,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv5);
 
             my $cmd_f90_cv1_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1_2;
+            $logger->error(Dumper($cmd_f90_cv1_2));
             my $status_cv1_2 = system($cmd_f90_cv1_2);
 
             open(my $fh_log_cv1_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1_2);
 
             my $yhat_residual_tempfile_cv1_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1_2, '<', $yhat_residual_tempfile_cv1_2) or die "Could not open file '$yhat_residual_tempfile_cv1_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1_2");
 
                 while (my $row = <$fh_yhat_res_cv1_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -9088,22 +9090,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1_2);
 
             my $cmd_f90_cv2_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2_2;
+            $logger->error(Dumper($cmd_f90_cv2_2));
             my $status_cv2_2 = system($cmd_f90_cv2_2);
 
             open(my $fh_log_cv2_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2_2);
 
             my $yhat_residual_tempfile_cv2_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2_2, '<', $yhat_residual_tempfile_cv2_2) or die "Could not open file '$yhat_residual_tempfile_cv2_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2_2");
 
                 while (my $row = <$fh_yhat_res_cv2_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -9112,22 +9114,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2_2);
 
             my $cmd_f90_cv3_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3_2;
+            $logger->error(Dumper($cmd_f90_cv3_2));
             my $status_cv3_2 = system($cmd_f90_cv3_2);
 
             open(my $fh_log_cv3_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3_2);
 
             my $yhat_residual_tempfile_cv3_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3_2, '<', $yhat_residual_tempfile_cv3_2) or die "Could not open file '$yhat_residual_tempfile_cv3_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3_2");
 
                 while (my $row = <$fh_yhat_res_cv3_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -9136,22 +9138,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3_2);
 
             my $cmd_f90_cv4_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4_2;
+            $logger->error(Dumper($cmd_f90_cv4_2));
             my $status_cv4_2 = system($cmd_f90_cv4_2);
 
             open(my $fh_log_cv4_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4_2);
 
             my $yhat_residual_tempfile_cv4_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4_2, '<', $yhat_residual_tempfile_cv4_2) or die "Could not open file '$yhat_residual_tempfile_cv4_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4_2");
 
                 while (my $row = <$fh_yhat_res_cv4_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -9160,22 +9162,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4_2);
 
             my $cmd_f90_cv5_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5_2;
+            $logger->error(Dumper($cmd_f90_cv5_2));
             my $status_cv5_2 = system($cmd_f90_cv5_2);
 
             open(my $fh_log_cv5_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5_2);
 
             my $yhat_residual_tempfile_cv5_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5_2, '<', $yhat_residual_tempfile_cv5_2) or die "Could not open file '$yhat_residual_tempfile_cv5_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5_2");
 
                 while (my $row = <$fh_yhat_res_cv5_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -9192,8 +9194,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -9205,8 +9207,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -9215,7 +9217,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -9244,12 +9246,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -9260,7 +9262,7 @@ sub perform_drone_imagery_analytics {
                         my $z_ratio = $columns[3];
                         if (defined $value && $value ne '') {
                             if ($solution_file_counter < $row_number_span) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             elsif ($solution_file_counter < $row_number_span + $number_accessions) {
                                 my $stock_name = $accession_id_factor_map_reverse{$solution_file_counter - $row_number_span + 1};
@@ -9279,7 +9281,7 @@ sub perform_drone_imagery_analytics {
                                 $current_gen_row_count++;
                             }
                             elsif ($solution_file_counter < $col_number_span + $row_number_span + $number_accessions) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             else {
                                 my $plot_name = $row_col_ordered_plots_names[$current_env_row_count];
@@ -9303,7 +9305,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -9327,7 +9329,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -9351,7 +9353,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -9375,7 +9377,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -9399,7 +9401,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -9423,7 +9425,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -9447,7 +9449,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -9471,7 +9473,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -9495,7 +9497,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -9519,7 +9521,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -9543,7 +9545,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -9564,7 +9566,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -9579,7 +9581,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -9604,7 +9606,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -9625,8 +9627,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -9638,8 +9640,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -9648,7 +9650,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -9677,12 +9679,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -9730,7 +9732,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -9754,7 +9756,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -9778,7 +9780,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -9802,7 +9804,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -9826,7 +9828,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -9850,7 +9852,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -9874,7 +9876,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -9898,7 +9900,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -9922,7 +9924,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -9946,7 +9948,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -9970,7 +9972,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -9991,15 +9993,15 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
         }
     }
     elsif ($statistics_select eq 'asreml_grm_multivariate_spatial_genetic_blups') {
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
@@ -10012,8 +10014,8 @@ sub perform_drone_imagery_analytics {
 
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -10022,7 +10024,7 @@ sub perform_drone_imagery_analytics {
             my @row_col_ordered_plots_names;
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -10061,7 +10063,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -10074,7 +10076,7 @@ sub perform_drone_imagery_analytics {
                 my $solution_file_counter_g_index = 0;
                 my $solution_file_counter_p_index = 0;
                 while (defined(my $row = <$fh>)) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @columns;
                     if ($csv->parse($row)) {
                         @columns = $csv->fields();
@@ -10136,7 +10138,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -10160,7 +10162,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -10184,7 +10186,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -10208,7 +10210,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -10232,7 +10234,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -10256,7 +10258,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -10280,7 +10282,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -10304,7 +10306,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -10328,7 +10330,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -10352,7 +10354,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -10376,7 +10378,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -10396,19 +10398,19 @@ sub perform_drone_imagery_analytics {
             }
 
             if ($run_stats_fault == 1) {
-                print STDERR "ERROR IN R CMD\n";
+                $logger->error("ERROR IN R CMD");
                 return {error=>'Error in R! Try a larger tolerance'};
             }
         }
     }
-    print STDERR "ALTERED w/SIM_ENV linear $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env\n";
-    print STDERR "ALTERED w/SIM_ENV linear $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env\n";
-    print STDERR Dumper [$genetic_effect_min_altered_env, $genetic_effect_max_altered_env, $env_effect_min_altered_env, $env_effect_max_altered_env];
+    $logger->debug("ALTERED w/SIM_ENV linear $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env");
+    $logger->debug("ALTERED w/SIM_ENV linear $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env");
+    $logger->error(Dumper([$genetic_effect_min_altered_env, $genetic_effect_max_altered_env, $env_effect_min_altered_env, $env_effect_max_altered_env]));
 
     my @model_sum_square_altered_env_cv_values = ($model_sum_square_cv1_altered_env, $model_sum_square_cv2_altered_env, $model_sum_square_cv3_altered_env, $model_sum_square_cv4_altered_env, $model_sum_square_cv5_altered_env);
     my @model_sum_square_altered_env_cv_2_values = ($model_sum_square_cv1_2_altered_env, $model_sum_square_cv2_2_altered_env, $model_sum_square_cv3_2_altered_env, $model_sum_square_cv4_2_altered_env, $model_sum_square_cv5_2_altered_env);
-    print STDERR Dumper \@model_sum_square_altered_env_cv_values;
-    print STDERR Dumper \@model_sum_square_altered_env_cv_2_values;
+    $logger->error(Dumper(\@model_sum_square_altered_env_cv_values));
+    $logger->error(Dumper(\@model_sum_square_altered_env_cv_2_values));
     my $model_sum_square_altered_env_cv_stat = Statistics::Descriptive::Full->new();
     $model_sum_square_altered_env_cv_stat->add_data(@model_sum_square_altered_env_cv_values);
     my $model_sum_square_altered_env_cv_result = {
@@ -10462,7 +10464,7 @@ sub perform_drone_imagery_analytics {
 
         if ($sim_env_change_over_time eq 'changing_gradual') {
             open(my $sim_change_f, ">", $sim_env_changing_mat_tempfile) || die "Can't open file ".$sim_env_changing_mat_tempfile;
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile");
                 foreach (@sim_data_env_first) {
                     print $sim_change_f $_."\n";
                 }
@@ -10486,11 +10488,11 @@ sub perform_drone_imagery_analytics {
             chol2 <- chol(newc);
             finalx <- newx %*% chol2 * sd(x1) + mean(x1);
             write.table(finalx, file=\''.$sim_env_changing_mat_full_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-            # print STDERR Dumper $sim_change_cmd;
+            # $logger->error(Dumper($sim_change_cmd));
             my $status_sim_change = system($sim_change_cmd);
 
             open(my $sim_change_res, '<', $sim_env_changing_mat_full_tempfile) or die "Could not open file '$sim_env_changing_mat_full_tempfile' $!";
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile");
                 my $sim_change_line_counter = 0;
                 while (my $row = <$sim_change_res>) {
                     my @columns;
@@ -10542,7 +10544,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_pheno_f, ">", $permanent_environment_structure_env_tempfile) || die "Can't open file ".$permanent_environment_structure_env_tempfile;
-            print STDERR "OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile\n";
+            $logger->debug("OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile");
             foreach (@sim_data_diff_2) {
                 my $line = join "\t", @$_;
                 print $pe_pheno_f $line."\n";
@@ -10559,12 +10561,12 @@ sub perform_drone_imagery_analytics {
         range01 <- function(x){(x-min(x))/(max(x)-min(x))};
         cor_mat <- range01(cor_mat);
         write.table(cor_mat, file=\''.$permanent_environment_structure_env_tempfile2.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-        # print STDERR Dumper $pe_rel_cmd;
+        # $logger->error(Dumper($pe_rel_cmd));
         my $status_pe_rel = system($pe_rel_cmd);
 
         my %rel_pe_result_hash;
         open(my $pe_rel_res, '<', $permanent_environment_structure_env_tempfile2) or die "Could not open file '$permanent_environment_structure_env_tempfile2' $!";
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2");
             my $header_row = <$pe_rel_res>;
             my @header;
             if ($csv->parse($header_row)) {
@@ -10607,13 +10609,13 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_rel_out, ">", $permanent_environment_structure_env_tempfile_mat) || die "Can't open file ".$permanent_environment_structure_env_tempfile_mat;
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat");
             print $pe_rel_out $data_rel_pe;
         close($pe_rel_out);
     }
 
-    print STDERR "ADD SIMULATED ENV TO ALTERED PHENO random_1d_normal_gradient\n";
-    print STDERR Dumper [$env_sim_min_2, $env_sim_max_2];
+    $logger->debug("ADD SIMULATED ENV TO ALTERED PHENO random_1d_normal_gradient");
+    $logger->error(Dumper([$env_sim_min_2, $env_sim_max_2]));
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups') {
 
         foreach my $p (@unique_plot_names) {
@@ -10644,7 +10646,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_2{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, 'NA';
                 }
             }
@@ -10743,7 +10745,7 @@ sub perform_drone_imagery_analytics {
                         push @data_matrix_phenotypes_row, $val;
                     }
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                     push @data_matrix_phenotypes_row, 'NA';
                 }
@@ -10807,7 +10809,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_2{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                 }
             }
@@ -10823,7 +10825,7 @@ sub perform_drone_imagery_analytics {
         close($F);
     }
 
-    print STDERR Dumper [$phenotype_min_altered_env_2, $phenotype_max_altered_env_2];
+    $logger->error(Dumper([$phenotype_min_altered_env_2, $phenotype_max_altered_env_2]));
 
     my ($result_blup_data_altered_env_2, $result_blup_data_delta_altered_env_2, $result_blup_spatial_data_altered_env_2, $result_blup_pe_data_altered_env_2, $result_blup_pe_data_delta_altered_env_2, $result_residual_data_altered_env_2, $result_fitted_data_altered_env_2, %fixed_effects_altered_env_2, %rr_genetic_coefficients_altered_env_2, %rr_temporal_coefficients_altered_env_2);
     my (@rr_coeff_genetic_covariance_altered_env_2, @rr_coeff_env_covariance_altered_env_2, @rr_coeff_genetic_correlation_altered_env_2, @rr_coeff_env_correlation_altered_env_2, $rr_residual_variance_altered_env_2);
@@ -10850,10 +10852,10 @@ sub perform_drone_imagery_analytics {
     my $residual_sum_square_altered_env_2 = 0;
     my $residual_sum_altered_env_2 = 0;
 
-    print STDERR "RUN ENV ESTIMATE ON Altered Pheno With Sim Env random_1d_normal_gradient\n";
+    $logger->debug("RUN ENV ESTIMATE ON Altered Pheno With Sim Env random_1d_normal_gradient");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
-        #print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        #$logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -10865,8 +10867,8 @@ sub perform_drone_imagery_analytics {
         };
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -10874,7 +10876,7 @@ sub perform_drone_imagery_analytics {
             my $current_env_row_count = 0;
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -10913,7 +10915,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
                 if ($csv->parse($header_2dspl)) {
@@ -10952,7 +10954,7 @@ sub perform_drone_imagery_analytics {
             close($fh_2dspl);
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -10984,7 +10986,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -11010,7 +11012,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -11036,7 +11038,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -11062,7 +11064,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -11088,7 +11090,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -11114,7 +11116,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -11140,7 +11142,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -11166,7 +11168,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -11192,7 +11194,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -11218,7 +11220,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -11244,7 +11246,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -11265,7 +11267,7 @@ sub perform_drone_imagery_analytics {
         }
 
         if ($run_stats_fault == 1) {
-            print STDERR "ERROR IN R CMD\n";
+            $logger->error("ERROR IN R CMD");
             return {error=>'Error in R! Try a larger tolerance'};
         }
     }
@@ -11278,8 +11280,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -11290,8 +11292,8 @@ sub perform_drone_imagery_analytics {
             };
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -11299,7 +11301,7 @@ sub perform_drone_imagery_analytics {
                 my $current_env_row_count = 0;
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -11340,7 +11342,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                    print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                    $logger->debug("Opened $stats_out_tempfile_2dspl");
                     my $header_2dspl = <$fh_2dspl>;
                     my @header_cols_2dspl;
                     if ($csv->parse($header_2dspl)) {
@@ -11381,7 +11383,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_2dspl);
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -11411,7 +11413,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -11435,7 +11437,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -11459,7 +11461,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -11483,7 +11485,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -11507,7 +11509,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -11531,7 +11533,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -11555,7 +11557,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -11579,7 +11581,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -11603,7 +11605,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -11627,7 +11629,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -11651,7 +11653,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -11671,7 +11673,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -11679,12 +11681,12 @@ sub perform_drone_imagery_analytics {
     }
     elsif ($statistics_select eq 'blupf90_grm_random_regression_gdd_blups' || $statistics_select eq 'blupf90_grm_random_regression_dap_blups' || $statistics_select eq 'airemlf90_grm_random_regression_gdd_blups' || $statistics_select eq 'airemlf90_grm_random_regression_dap_blups') {
 
-        print STDERR Dumper $statistics_cmd;
+        $logger->error(Dumper($statistics_cmd));
         my $status_r = system($statistics_cmd);
 
         my @pheno_var;
         open(my $fh_r, '<', $stats_out_param_tempfile) or die "Could not open file '$stats_out_param_tempfile' $!";
-            print STDERR "Opened $stats_out_param_tempfile\n";
+            $logger->debug("Opened $stats_out_param_tempfile");
 
             while (my $row = <$fh_r>) {
                 my @columns;
@@ -11694,7 +11696,7 @@ sub perform_drone_imagery_analytics {
                 push @pheno_var, \@columns;
             }
         close($fh_r);
-        # print STDERR Dumper \@pheno_var;
+        # $logger->error(Dumper(\@pheno_var));
 
         my $stats_tempfile_2_basename = basename($stats_tempfile_2);
         my $grm_file_basename = basename($grm_rename_tempfile);
@@ -11706,7 +11708,7 @@ sub perform_drone_imagery_analytics {
         my $effect_grm_levels = scalar(@unique_accession_names);
         my $effect_pe_levels = scalar(@ind_rep_factors);
 
-        print STDERR Dumper $stats_tempfile_2;
+        $logger->error(Dumper($stats_tempfile_2));
         my $data_cv_cmd = 'R -e "mat <- read.csv(\''.$stats_tempfile_2.'\', header=FALSE, sep=\' \');
         randomized_positions <- sample(length(mat[,1]));
         cv_step_size <- length(mat[,1]) %/% 5;
@@ -11820,14 +11822,14 @@ sub perform_drone_imagery_analytics {
         my $parameter_tempfile_cv4_2_basename = basename($parameter_tempfile_cv4_2);
         my $parameter_tempfile_cv5_2_basename = basename($parameter_tempfile_cv5_2);
 
-        print STDERR Dumper $cmd_f90;
+        $logger->error(Dumper($cmd_f90));
         my $status = system($cmd_f90);
 
         my @log_output_rows;
         open(my $fh_log, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-            print STDERR "Opened $stats_out_tempfile\n";
+            $logger->debug("Opened $stats_out_tempfile");
             while (my $row = <$fh_log>) {
-                print STDERR $row;
+                $logger->error($row);
                 push @log_output_rows, $row;
             }
         close($fh_log);
@@ -11835,20 +11837,20 @@ sub perform_drone_imagery_analytics {
         my $log_output = join '', @log_output_rows;
         my ($gen_var_string) = $log_output =~ /Genetic variance\(s\) for effect  2(.*?)correlations/gs;
         @rr_coeff_genetic_covariance_altered_env_2 = split ' ', $gen_var_string;
-        print STDERR Dumper \@rr_coeff_genetic_covariance_altered_env_2;
+        $logger->error(Dumper(\@rr_coeff_genetic_covariance_altered_env_2));
         my ($env_var_string) = $log_output =~ /Genetic variance\(s\) for effect  $legendre_order_number_env_var_pos(.*?)correlations/gs;
         @rr_coeff_env_covariance_altered_env_2 = split ' ', $env_var_string;
-        print STDERR Dumper \@rr_coeff_env_covariance_altered_env_2;
+        $logger->error(Dumper(\@rr_coeff_env_covariance_altered_env_2));
         my (@gen_cor_string) = $log_output =~ /correlations(.*?)eigenvectors/gs;
         @rr_coeff_genetic_correlation_altered_env_2 = split ' ', $gen_cor_string[0];
-        print STDERR Dumper \@rr_coeff_genetic_correlation_altered_env_2;
+        $logger->error(Dumper(\@rr_coeff_genetic_correlation_altered_env_2));
         @rr_coeff_env_correlation_altered_env_2 = split ' ', $gen_cor_string[1];
-        print STDERR Dumper \@rr_coeff_env_correlation_altered_env_2;
+        $logger->error(Dumper(\@rr_coeff_env_correlation_altered_env_2));
         my ($res_se_string) = $log_output =~ /SE for R(.*?)\* FINISHED \(AIREMLF90\)/gs;
-        print STDERR Dumper $res_se_string;
+        $logger->error(Dumper($res_se_string));
         # $rr_residual_variance_altered_env_2 = ($res_se_string**2)*$number_plots;
         $rr_residual_variance_altered_env_2 = $res_se_string;
-        print STDERR Dumper $rr_residual_variance_altered_env_2;
+        $logger->error(Dumper($rr_residual_variance_altered_env_2));
 
         @param_file_rows_6 = (
             '(CO)VARIANCES'
@@ -11913,12 +11915,12 @@ sub perform_drone_imagery_analytics {
 
         $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
         open(my $fh_yhat_res, '<', $yhat_residual_tempfile) or die "Could not open file '$yhat_residual_tempfile' $!";
-            print STDERR "Opened $yhat_residual_tempfile\n";
+            $logger->debug("Opened $yhat_residual_tempfile");
 
             my $pred_res_counter = 0;
             my $trait_counter = 0;
             while (my $row = <$fh_yhat_res>) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $pred = $vals[0];
                 my $residual = $vals[1];
@@ -11942,10 +11944,10 @@ sub perform_drone_imagery_analytics {
 
         $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
         open(my $fh_sol, '<', $blupf90_solutions_tempfile) or die "Could not open file '$blupf90_solutions_tempfile' $!";
-            print STDERR "Opened $blupf90_solutions_tempfile\n";
+            $logger->debug("Opened $blupf90_solutions_tempfile");
 
             my $head = <$fh_sol>;
-            print STDERR $head;
+            $logger->error($head);
 
             my $solution_file_counter = 0;
             my $grm_sol_counter = 0;
@@ -11953,7 +11955,7 @@ sub perform_drone_imagery_analytics {
             my $pe_sol_counter = 0;
             my $pe_sol_trait_counter = 0;
             while (defined(my $row = <$fh_sol>)) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $level = $vals[2];
                 my $value = $vals[3];
@@ -11990,8 +11992,8 @@ sub perform_drone_imagery_analytics {
             }
         close($fh_sol);
 
-        # print STDERR Dumper \%rr_genetic_coefficients_altered;
-        # print STDERR Dumper \%rr_temporal_coefficients_altered;
+        # $logger->error(Dumper(\%rr_genetic_coefficients_altered));
+        # $logger->error(Dumper(\%rr_temporal_coefficients_altered));
 
         open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
 
@@ -12008,7 +12010,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -12044,7 +12046,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -12078,7 +12080,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -12114,7 +12116,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -12135,22 +12137,22 @@ sub perform_drone_imagery_analytics {
 
         if ($perform_cv) {
             my $cmd_f90_cv1 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1;
+            $logger->error(Dumper($cmd_f90_cv1));
             my $status_cv1 = system($cmd_f90_cv1);
 
             open(my $fh_log_cv1, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1);
 
             my $yhat_residual_tempfile_cv1 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1, '<', $yhat_residual_tempfile_cv1) or die "Could not open file '$yhat_residual_tempfile_cv1' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1");
 
                 while (my $row = <$fh_yhat_res_cv1>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12159,22 +12161,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1);
 
             my $cmd_f90_cv2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2;
+            $logger->error(Dumper($cmd_f90_cv2));
             my $status_cv2 = system($cmd_f90_cv2);
 
             open(my $fh_log_cv2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2);
 
             my $yhat_residual_tempfile_cv2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2, '<', $yhat_residual_tempfile_cv2) or die "Could not open file '$yhat_residual_tempfile_cv2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2");
 
                 while (my $row = <$fh_yhat_res_cv2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12183,22 +12185,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2);
 
             my $cmd_f90_cv3 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3;
+            $logger->error(Dumper($cmd_f90_cv3));
             my $status_cv3 = system($cmd_f90_cv3);
 
             open(my $fh_log_cv3, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3);
 
             my $yhat_residual_tempfile_cv3 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3, '<', $yhat_residual_tempfile_cv3) or die "Could not open file '$yhat_residual_tempfile_cv3' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3");
 
                 while (my $row = <$fh_yhat_res_cv3>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12207,22 +12209,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3);
 
             my $cmd_f90_cv4 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4;
+            $logger->error(Dumper($cmd_f90_cv4));
             my $status_cv4 = system($cmd_f90_cv4);
 
             open(my $fh_log_cv4, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4);
 
             my $yhat_residual_tempfile_cv4 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4, '<', $yhat_residual_tempfile_cv4) or die "Could not open file '$yhat_residual_tempfile_cv4' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4");
 
                 while (my $row = <$fh_yhat_res_cv4>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12231,22 +12233,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4);
 
             my $cmd_f90_cv5 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5;
+            $logger->error(Dumper($cmd_f90_cv5));
             my $status_cv5 = system($cmd_f90_cv5);
 
             open(my $fh_log_cv5, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5);
 
             my $yhat_residual_tempfile_cv5 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5, '<', $yhat_residual_tempfile_cv5) or die "Could not open file '$yhat_residual_tempfile_cv5' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5");
 
                 while (my $row = <$fh_yhat_res_cv5>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12255,22 +12257,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv5);
 
             my $cmd_f90_cv1_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1_2;
+            $logger->error(Dumper($cmd_f90_cv1_2));
             my $status_cv1_2 = system($cmd_f90_cv1_2);
 
             open(my $fh_log_cv1_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1_2);
 
             my $yhat_residual_tempfile_cv1_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1_2, '<', $yhat_residual_tempfile_cv1_2) or die "Could not open file '$yhat_residual_tempfile_cv1_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1_2");
 
                 while (my $row = <$fh_yhat_res_cv1_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12279,22 +12281,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1_2);
 
             my $cmd_f90_cv2_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2_2;
+            $logger->error(Dumper($cmd_f90_cv2_2));
             my $status_cv2_2 = system($cmd_f90_cv2_2);
 
             open(my $fh_log_cv2_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2_2);
 
             my $yhat_residual_tempfile_cv2_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2_2, '<', $yhat_residual_tempfile_cv2_2) or die "Could not open file '$yhat_residual_tempfile_cv2_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2_2");
 
                 while (my $row = <$fh_yhat_res_cv2_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12303,22 +12305,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2_2);
 
             my $cmd_f90_cv3_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3_2;
+            $logger->error(Dumper($cmd_f90_cv3_2));
             my $status_cv3_2 = system($cmd_f90_cv3_2);
 
             open(my $fh_log_cv3_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3_2);
 
             my $yhat_residual_tempfile_cv3_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3_2, '<', $yhat_residual_tempfile_cv3_2) or die "Could not open file '$yhat_residual_tempfile_cv3_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3_2");
 
                 while (my $row = <$fh_yhat_res_cv3_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12327,22 +12329,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3_2);
 
             my $cmd_f90_cv4_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4_2;
+            $logger->error(Dumper($cmd_f90_cv4_2));
             my $status_cv4_2 = system($cmd_f90_cv4_2);
 
             open(my $fh_log_cv4_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4_2);
 
             my $yhat_residual_tempfile_cv4_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4_2, '<', $yhat_residual_tempfile_cv4_2) or die "Could not open file '$yhat_residual_tempfile_cv4_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4_2");
 
                 while (my $row = <$fh_yhat_res_cv4_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12351,22 +12353,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4_2);
 
             my $cmd_f90_cv5_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5_2;
+            $logger->error(Dumper($cmd_f90_cv5_2));
             my $status_cv5_2 = system($cmd_f90_cv5_2);
 
             open(my $fh_log_cv5_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5_2);
 
             my $yhat_residual_tempfile_cv5_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5_2, '<', $yhat_residual_tempfile_cv5_2) or die "Could not open file '$yhat_residual_tempfile_cv5_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5_2");
 
                 while (my $row = <$fh_yhat_res_cv5_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -12383,8 +12385,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -12396,8 +12398,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -12406,7 +12408,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -12435,12 +12437,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -12451,7 +12453,7 @@ sub perform_drone_imagery_analytics {
                         my $z_ratio = $columns[3];
                         if (defined $value && $value ne '') {
                             if ($solution_file_counter < $row_number_span) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             elsif ($solution_file_counter < $row_number_span + $number_accessions) {
                                 my $stock_name = $accession_id_factor_map_reverse{$solution_file_counter - $row_number_span + 1};
@@ -12470,7 +12472,7 @@ sub perform_drone_imagery_analytics {
                                 $current_gen_row_count++;
                             }
                             elsif ($solution_file_counter < $col_number_span + $row_number_span + $number_accessions) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             else {
                                 my $plot_name = $row_col_ordered_plots_names[$current_env_row_count];
@@ -12494,7 +12496,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -12518,7 +12520,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -12542,7 +12544,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -12566,7 +12568,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -12590,7 +12592,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -12614,7 +12616,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -12638,7 +12640,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -12662,7 +12664,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -12686,7 +12688,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -12710,7 +12712,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -12734,7 +12736,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -12755,7 +12757,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -12770,7 +12772,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -12795,7 +12797,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -12816,8 +12818,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -12829,8 +12831,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -12839,7 +12841,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -12868,12 +12870,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -12921,7 +12923,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -12945,7 +12947,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -12969,7 +12971,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -12993,7 +12995,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -13017,7 +13019,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -13041,7 +13043,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -13065,7 +13067,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -13089,7 +13091,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -13113,7 +13115,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -13137,7 +13139,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -13161,7 +13163,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -13182,15 +13184,15 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
         }
     }
     elsif ($statistics_select eq 'asreml_grm_multivariate_spatial_genetic_blups') {
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
@@ -13203,8 +13205,8 @@ sub perform_drone_imagery_analytics {
 
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -13213,7 +13215,7 @@ sub perform_drone_imagery_analytics {
             my @row_col_ordered_plots_names;
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -13252,7 +13254,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -13265,7 +13267,7 @@ sub perform_drone_imagery_analytics {
                 my $solution_file_counter_g_index = 0;
                 my $solution_file_counter_p_index = 0;
                 while (defined(my $row = <$fh>)) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @columns;
                     if ($csv->parse($row)) {
                         @columns = $csv->fields();
@@ -13327,7 +13329,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -13351,7 +13353,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -13375,7 +13377,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -13399,7 +13401,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -13423,7 +13425,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -13447,7 +13449,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -13471,7 +13473,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -13495,7 +13497,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -13519,7 +13521,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -13543,7 +13545,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -13567,7 +13569,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -13587,19 +13589,19 @@ sub perform_drone_imagery_analytics {
             }
 
             if ($run_stats_fault == 1) {
-                print STDERR "ERROR IN R CMD\n";
+                $logger->error("ERROR IN R CMD");
                 return {error=>'Error in R! Try a larger tolerance'};
             }
         }
     }
-    print STDERR "ALTERED w/SIM_ENV 1dn $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_2\n";
-    print STDERR "ALTERED w/SIM_ENV 1dn $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_2\n";
-    print STDERR Dumper [$genetic_effect_min_altered_env_2, $genetic_effect_max_altered_env_2, $env_effect_min_altered_env_2, $env_effect_max_altered_env_2];
+    $logger->debug("ALTERED w/SIM_ENV 1dn $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_2");
+    $logger->debug("ALTERED w/SIM_ENV 1dn $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_2");
+    $logger->error(Dumper([$genetic_effect_min_altered_env_2, $genetic_effect_max_altered_env_2, $env_effect_min_altered_env_2, $env_effect_max_altered_env_2]));
 
     my @model_sum_square_altered_env_2_cv_values = ($model_sum_square_cv1_altered_env_2, $model_sum_square_cv2_altered_env_2, $model_sum_square_cv3_altered_env_2, $model_sum_square_cv4_altered_env_2, $model_sum_square_cv5_altered_env_2);
     my @model_sum_square_altered_env_2_cv_2_values = ($model_sum_square_cv1_2_altered_env_2, $model_sum_square_cv2_2_altered_env_2, $model_sum_square_cv3_2_altered_env_2, $model_sum_square_cv4_2_altered_env_2, $model_sum_square_cv5_2_altered_env_2);
-    print STDERR Dumper \@model_sum_square_altered_env_2_cv_values;
-    print STDERR Dumper \@model_sum_square_altered_env_2_cv_2_values;
+    $logger->error(Dumper(\@model_sum_square_altered_env_2_cv_values));
+    $logger->error(Dumper(\@model_sum_square_altered_env_2_cv_2_values));
     my $model_sum_square_altered_env_2_cv_stat = Statistics::Descriptive::Full->new();
     $model_sum_square_altered_env_2_cv_stat->add_data(@model_sum_square_altered_env_2_cv_values);
     my $model_sum_square_altered_env_cv_result_2 = {
@@ -13654,7 +13656,7 @@ sub perform_drone_imagery_analytics {
 
         if ($sim_env_change_over_time eq 'changing_gradual') {
             open(my $sim_change_f, ">", $sim_env_changing_mat_tempfile) || die "Can't open file ".$sim_env_changing_mat_tempfile;
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile");
                 foreach (@sim_data_env_first) {
                     print $sim_change_f $_."\n";
                 }
@@ -13678,11 +13680,11 @@ sub perform_drone_imagery_analytics {
             chol2 <- chol(newc);
             finalx <- newx %*% chol2 * sd(x1) + mean(x1);
             write.table(finalx, file=\''.$sim_env_changing_mat_full_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-            # print STDERR Dumper $sim_change_cmd;
+            # $logger->error(Dumper($sim_change_cmd));
             my $status_sim_change = system($sim_change_cmd);
 
             open(my $sim_change_res, '<', $sim_env_changing_mat_full_tempfile) or die "Could not open file '$sim_env_changing_mat_full_tempfile' $!";
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile");
                 my $sim_change_line_counter = 0;
                 while (my $row = <$sim_change_res>) {
                     my @columns;
@@ -13734,7 +13736,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_pheno_f, ">", $permanent_environment_structure_env_tempfile) || die "Can't open file ".$permanent_environment_structure_env_tempfile;
-            print STDERR "OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile\n";
+            $logger->debug("OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile");
             foreach (@sim_data_diff_3) {
                 my $line = join "\t", @$_;
                 print $pe_pheno_f $line."\n";
@@ -13751,12 +13753,12 @@ sub perform_drone_imagery_analytics {
         range01 <- function(x){(x-min(x))/(max(x)-min(x))};
         cor_mat <- range01(cor_mat);
         write.table(cor_mat, file=\''.$permanent_environment_structure_env_tempfile2.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-        # print STDERR Dumper $pe_rel_cmd;
+        # $logger->error(Dumper($pe_rel_cmd));
         my $status_pe_rel = system($pe_rel_cmd);
 
         my %rel_pe_result_hash;
         open(my $pe_rel_res, '<', $permanent_environment_structure_env_tempfile2) or die "Could not open file '$permanent_environment_structure_env_tempfile2' $!";
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2");
             my $header_row = <$pe_rel_res>;
             my @header;
             if ($csv->parse($header_row)) {
@@ -13799,13 +13801,13 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_rel_out, ">", $permanent_environment_structure_env_tempfile_mat) || die "Can't open file ".$permanent_environment_structure_env_tempfile_mat;
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat");
             print $pe_rel_out $data_rel_pe;
         close($pe_rel_out);
     }
 
-    print STDERR "ADD SIMULATED ENV TO ALTERED PHENO random_2d_normal_gradient\n";
-    print STDERR Dumper [$env_sim_min_3, $env_sim_max_3];
+    $logger->debug("ADD SIMULATED ENV TO ALTERED PHENO random_2d_normal_gradient");
+    $logger->error(Dumper([$env_sim_min_3, $env_sim_max_3]));
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups') {
 
         foreach my $p (@unique_plot_names) {
@@ -13836,7 +13838,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_3{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, 'NA';
                 }
             }
@@ -13935,7 +13937,7 @@ sub perform_drone_imagery_analytics {
                         push @data_matrix_phenotypes_row, $val;
                     }
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                     push @data_matrix_phenotypes_row, 'NA';
                 }
@@ -13999,7 +14001,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_3{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                 }
             }
@@ -14015,7 +14017,7 @@ sub perform_drone_imagery_analytics {
         close($F);
     }
 
-    print STDERR Dumper [$phenotype_min_altered_env_3, $phenotype_max_altered_env_3];
+    $logger->error(Dumper([$phenotype_min_altered_env_3, $phenotype_max_altered_env_3]));
 
     my ($result_blup_data_altered_env_3, $result_blup_data_delta_altered_env_3, $result_blup_spatial_data_altered_env_3, $result_blup_pe_data_altered_env_3, $result_blup_pe_data_delta_altered_env_3, $result_residual_data_altered_env_3, $result_fitted_data_altered_env_3, %fixed_effects_altered_env_3, %rr_genetic_coefficients_altered_env_3, %rr_temporal_coefficients_altered_env_3);
     my (@rr_coeff_genetic_covariance_altered_env_3, @rr_coeff_env_covariance_altered_env_3, @rr_coeff_genetic_correlation_altered_env_3, @rr_coeff_env_correlation_altered_env_3, $rr_residual_variance_altered_env_3);
@@ -14042,10 +14044,10 @@ sub perform_drone_imagery_analytics {
     my $residual_sum_square_altered_env_3 = 0;
     my $residual_sum_altered_env_3 = 0;
 
-    print STDERR "RUN ENV ESTIMATE ON Altered Pheno With Sim Env random_2d_normal_gradient\n";
+    $logger->debug("RUN ENV ESTIMATE ON Altered Pheno With Sim Env random_2d_normal_gradient");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
-        #print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        #$logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -14057,8 +14059,8 @@ sub perform_drone_imagery_analytics {
         };
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -14066,7 +14068,7 @@ sub perform_drone_imagery_analytics {
             my $current_env_row_count = 0;
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -14105,7 +14107,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
                 if ($csv->parse($header_2dspl)) {
@@ -14144,7 +14146,7 @@ sub perform_drone_imagery_analytics {
             close($fh_2dspl);
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -14176,7 +14178,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -14202,7 +14204,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -14228,7 +14230,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -14254,7 +14256,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -14280,7 +14282,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -14306,7 +14308,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -14332,7 +14334,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -14358,7 +14360,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -14384,7 +14386,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -14410,7 +14412,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -14436,7 +14438,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -14457,7 +14459,7 @@ sub perform_drone_imagery_analytics {
         }
 
         if ($run_stats_fault == 1) {
-            print STDERR "ERROR IN R CMD\n";
+            $logger->error("ERROR IN R CMD");
             return {error=>'Error in R! Try a larger tolerance'};
         }
     }
@@ -14470,8 +14472,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -14483,8 +14485,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -14492,7 +14494,7 @@ sub perform_drone_imagery_analytics {
                 my $current_env_row_count = 0;
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -14533,7 +14535,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                    print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                    $logger->debug("Opened $stats_out_tempfile_2dspl");
                     my $header_2dspl = <$fh_2dspl>;
                     my @header_cols_2dspl;
                     if ($csv->parse($header_2dspl)) {
@@ -14574,7 +14576,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_2dspl);
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -14604,7 +14606,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -14628,7 +14630,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -14652,7 +14654,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -14676,7 +14678,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -14700,7 +14702,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -14724,7 +14726,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -14748,7 +14750,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -14772,7 +14774,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -14796,7 +14798,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -14820,7 +14822,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -14844,7 +14846,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -14864,7 +14866,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -14872,12 +14874,12 @@ sub perform_drone_imagery_analytics {
     }
     elsif ($statistics_select eq 'blupf90_grm_random_regression_gdd_blups' || $statistics_select eq 'blupf90_grm_random_regression_dap_blups' || $statistics_select eq 'airemlf90_grm_random_regression_gdd_blups' || $statistics_select eq 'airemlf90_grm_random_regression_dap_blups') {
 
-        print STDERR Dumper $statistics_cmd;
+        $logger->error(Dumper($statistics_cmd));
         my $status_r = system($statistics_cmd);
 
         my @pheno_var;
         open(my $fh_r, '<', $stats_out_param_tempfile) or die "Could not open file '$stats_out_param_tempfile' $!";
-            print STDERR "Opened $stats_out_param_tempfile\n";
+            $logger->debug("Opened $stats_out_param_tempfile");
 
             while (my $row = <$fh_r>) {
                 my @columns;
@@ -14887,7 +14889,7 @@ sub perform_drone_imagery_analytics {
                 push @pheno_var, \@columns;
             }
         close($fh_r);
-        # print STDERR Dumper \@pheno_var;
+        # $logger->error(Dumper(\@pheno_var));
 
         my $stats_tempfile_2_basename = basename($stats_tempfile_2);
         my $grm_file_basename = basename($grm_rename_tempfile);
@@ -14899,7 +14901,7 @@ sub perform_drone_imagery_analytics {
         my $effect_grm_levels = scalar(@unique_accession_names);
         my $effect_pe_levels = scalar(@ind_rep_factors);
 
-        print STDERR Dumper $stats_tempfile_2;
+        $logger->error(Dumper($stats_tempfile_2));
         my $data_cv_cmd = 'R -e "mat <- read.csv(\''.$stats_tempfile_2.'\', header=FALSE, sep=\' \');
         randomized_positions <- sample(length(mat[,1]));
         cv_step_size <- length(mat[,1]) %/% 5;
@@ -15013,14 +15015,14 @@ sub perform_drone_imagery_analytics {
         my $parameter_tempfile_cv4_2_basename = basename($parameter_tempfile_cv4_2);
         my $parameter_tempfile_cv5_2_basename = basename($parameter_tempfile_cv5_2);
 
-        print STDERR Dumper $cmd_f90;
+        $logger->error(Dumper($cmd_f90));
         my $status = system($cmd_f90);
 
         my @log_output_rows;
         open(my $fh_log, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-            print STDERR "Opened $stats_out_tempfile\n";
+            $logger->debug("Opened $stats_out_tempfile");
             while (my $row = <$fh_log>) {
-                print STDERR $row;
+                $logger->error($row);
                 push @log_output_rows, $row;
             }
         close($fh_log);
@@ -15028,20 +15030,20 @@ sub perform_drone_imagery_analytics {
         my $log_output = join '', @log_output_rows;
         my ($gen_var_string) = $log_output =~ /Genetic variance\(s\) for effect  2(.*?)correlations/gs;
         @rr_coeff_genetic_covariance_altered_env_3 = split ' ', $gen_var_string;
-        print STDERR Dumper \@rr_coeff_genetic_covariance_altered_env_3;
+        $logger->error(Dumper(\@rr_coeff_genetic_covariance_altered_env_3));
         my ($env_var_string) = $log_output =~ /Genetic variance\(s\) for effect  $legendre_order_number_env_var_pos(.*?)correlations/gs;
         @rr_coeff_env_covariance_altered_env_3 = split ' ', $env_var_string;
-        print STDERR Dumper \@rr_coeff_env_covariance_altered_env_3;
+        $logger->error(Dumper(\@rr_coeff_env_covariance_altered_env_3));
         my (@gen_cor_string) = $log_output =~ /correlations(.*?)eigenvectors/gs;
         @rr_coeff_genetic_correlation_altered_env_3 = split ' ', $gen_cor_string[0];
-        print STDERR Dumper \@rr_coeff_genetic_correlation_altered_env_3;
+        $logger->error(Dumper(\@rr_coeff_genetic_correlation_altered_env_3));
         @rr_coeff_env_correlation_altered_env_3 = split ' ', $gen_cor_string[1];
-        print STDERR Dumper \@rr_coeff_env_correlation_altered_env_3;
+        $logger->error(Dumper(\@rr_coeff_env_correlation_altered_env_3));
         my ($res_se_string) = $log_output =~ /SE for R(.*?)\* FINISHED \(AIREMLF90\)/gs;
-        print STDERR Dumper $res_se_string;
+        $logger->error(Dumper($res_se_string));
         # $rr_residual_variance_altered_env_3 = ($res_se_string**2)*$number_plots;
         $rr_residual_variance_altered_env_3 = $res_se_string;
-        print STDERR Dumper $rr_residual_variance_altered_env_3;
+        $logger->error(Dumper($rr_residual_variance_altered_env_3));
 
         @param_file_rows_6 = (
             '(CO)VARIANCES'
@@ -15106,12 +15108,12 @@ sub perform_drone_imagery_analytics {
 
         $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
         open(my $fh_yhat_res, '<', $yhat_residual_tempfile) or die "Could not open file '$yhat_residual_tempfile' $!";
-            print STDERR "Opened $yhat_residual_tempfile\n";
+            $logger->debug("Opened $yhat_residual_tempfile");
 
             my $pred_res_counter = 0;
             my $trait_counter = 0;
             while (my $row = <$fh_yhat_res>) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $pred = $vals[0];
                 my $residual = $vals[1];
@@ -15135,10 +15137,10 @@ sub perform_drone_imagery_analytics {
 
         $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
         open(my $fh_sol, '<', $blupf90_solutions_tempfile) or die "Could not open file '$blupf90_solutions_tempfile' $!";
-            print STDERR "Opened $blupf90_solutions_tempfile\n";
+            $logger->debug("Opened $blupf90_solutions_tempfile");
 
             my $head = <$fh_sol>;
-            print STDERR $head;
+            $logger->error($head);
 
             my $solution_file_counter = 0;
             my $grm_sol_counter = 0;
@@ -15146,7 +15148,7 @@ sub perform_drone_imagery_analytics {
             my $pe_sol_counter = 0;
             my $pe_sol_trait_counter = 0;
             while (defined(my $row = <$fh_sol>)) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $level = $vals[2];
                 my $value = $vals[3];
@@ -15183,8 +15185,8 @@ sub perform_drone_imagery_analytics {
             }
         close($fh_sol);
 
-        # print STDERR Dumper \%rr_genetic_coefficients_altered;
-        # print STDERR Dumper \%rr_temporal_coefficients_altered;
+        # $logger->error(Dumper(\%rr_genetic_coefficients_altered));
+        # $logger->error(Dumper(\%rr_temporal_coefficients_altered));
 
         open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
 
@@ -15201,7 +15203,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -15237,7 +15239,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -15271,7 +15273,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -15307,7 +15309,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -15328,22 +15330,22 @@ sub perform_drone_imagery_analytics {
 
         if ($perform_cv) {
             my $cmd_f90_cv1 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1;
+            $logger->error(Dumper($cmd_f90_cv1));
             my $status_cv1 = system($cmd_f90_cv1);
 
             open(my $fh_log_cv1, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1);
 
             my $yhat_residual_tempfile_cv1 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1, '<', $yhat_residual_tempfile_cv1) or die "Could not open file '$yhat_residual_tempfile_cv1' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1");
 
                 while (my $row = <$fh_yhat_res_cv1>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15352,22 +15354,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1);
 
             my $cmd_f90_cv2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2;
+            $logger->error(Dumper($cmd_f90_cv2));
             my $status_cv2 = system($cmd_f90_cv2);
 
             open(my $fh_log_cv2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2);
 
             my $yhat_residual_tempfile_cv2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2, '<', $yhat_residual_tempfile_cv2) or die "Could not open file '$yhat_residual_tempfile_cv2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2");
 
                 while (my $row = <$fh_yhat_res_cv2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15376,22 +15378,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2);
 
             my $cmd_f90_cv3 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3;
+            $logger->error(Dumper($cmd_f90_cv3));
             my $status_cv3 = system($cmd_f90_cv3);
 
             open(my $fh_log_cv3, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3);
 
             my $yhat_residual_tempfile_cv3 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3, '<', $yhat_residual_tempfile_cv3) or die "Could not open file '$yhat_residual_tempfile_cv3' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3");
 
                 while (my $row = <$fh_yhat_res_cv3>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15400,22 +15402,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3);
 
             my $cmd_f90_cv4 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4;
+            $logger->error(Dumper($cmd_f90_cv4));
             my $status_cv4 = system($cmd_f90_cv4);
 
             open(my $fh_log_cv4, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4);
 
             my $yhat_residual_tempfile_cv4 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4, '<', $yhat_residual_tempfile_cv4) or die "Could not open file '$yhat_residual_tempfile_cv4' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4");
 
                 while (my $row = <$fh_yhat_res_cv4>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15424,22 +15426,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4);
 
             my $cmd_f90_cv5 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5;
+            $logger->error(Dumper($cmd_f90_cv5));
             my $status_cv5 = system($cmd_f90_cv5);
 
             open(my $fh_log_cv5, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5);
 
             my $yhat_residual_tempfile_cv5 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5, '<', $yhat_residual_tempfile_cv5) or die "Could not open file '$yhat_residual_tempfile_cv5' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5");
 
                 while (my $row = <$fh_yhat_res_cv5>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15448,22 +15450,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv5);
 
             my $cmd_f90_cv1_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1_2;
+            $logger->error(Dumper($cmd_f90_cv1_2));
             my $status_cv1_2 = system($cmd_f90_cv1_2);
 
             open(my $fh_log_cv1_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1_2);
 
             my $yhat_residual_tempfile_cv1_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1_2, '<', $yhat_residual_tempfile_cv1_2) or die "Could not open file '$yhat_residual_tempfile_cv1_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1_2");
 
                 while (my $row = <$fh_yhat_res_cv1_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15472,22 +15474,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1_2);
 
             my $cmd_f90_cv2_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2_2;
+            $logger->error(Dumper($cmd_f90_cv2_2));
             my $status_cv2_2 = system($cmd_f90_cv2_2);
 
             open(my $fh_log_cv2_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2_2);
 
             my $yhat_residual_tempfile_cv2_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2_2, '<', $yhat_residual_tempfile_cv2_2) or die "Could not open file '$yhat_residual_tempfile_cv2_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2_2");
 
                 while (my $row = <$fh_yhat_res_cv2_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15496,22 +15498,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2_2);
 
             my $cmd_f90_cv3_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3_2;
+            $logger->error(Dumper($cmd_f90_cv3_2));
             my $status_cv3_2 = system($cmd_f90_cv3_2);
 
             open(my $fh_log_cv3_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3_2);
 
             my $yhat_residual_tempfile_cv3_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3_2, '<', $yhat_residual_tempfile_cv3_2) or die "Could not open file '$yhat_residual_tempfile_cv3_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3_2");
 
                 while (my $row = <$fh_yhat_res_cv3_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15520,22 +15522,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3_2);
 
             my $cmd_f90_cv4_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4_2;
+            $logger->error(Dumper($cmd_f90_cv4_2));
             my $status_cv4_2 = system($cmd_f90_cv4_2);
 
             open(my $fh_log_cv4_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4_2);
 
             my $yhat_residual_tempfile_cv4_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4_2, '<', $yhat_residual_tempfile_cv4_2) or die "Could not open file '$yhat_residual_tempfile_cv4_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4_2");
 
                 while (my $row = <$fh_yhat_res_cv4_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15544,22 +15546,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4_2);
 
             my $cmd_f90_cv5_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5_2;
+            $logger->error(Dumper($cmd_f90_cv5_2));
             my $status_cv5_2 = system($cmd_f90_cv5_2);
 
             open(my $fh_log_cv5_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5_2);
 
             my $yhat_residual_tempfile_cv5_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5_2, '<', $yhat_residual_tempfile_cv5_2) or die "Could not open file '$yhat_residual_tempfile_cv5_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5_2");
 
                 while (my $row = <$fh_yhat_res_cv5_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -15576,8 +15578,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -15589,8 +15591,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -15599,7 +15601,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -15628,12 +15630,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -15644,7 +15646,7 @@ sub perform_drone_imagery_analytics {
                         my $z_ratio = $columns[3];
                         if (defined $value && $value ne '') {
                             if ($solution_file_counter < $row_number_span) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             elsif ($solution_file_counter < $row_number_span + $number_accessions) {
                                 my $stock_name = $accession_id_factor_map_reverse{$solution_file_counter - $row_number_span + 1};
@@ -15663,7 +15665,7 @@ sub perform_drone_imagery_analytics {
                                 $current_gen_row_count++;
                             }
                             elsif ($solution_file_counter < $col_number_span + $row_number_span + $number_accessions) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             else {
                                 my $plot_name = $row_col_ordered_plots_names[$current_env_row_count];
@@ -15687,7 +15689,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -15711,7 +15713,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -15735,7 +15737,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -15759,7 +15761,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -15783,7 +15785,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -15807,7 +15809,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -15831,7 +15833,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -15855,7 +15857,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -15879,7 +15881,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -15903,7 +15905,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -15927,7 +15929,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -15948,7 +15950,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -15963,7 +15965,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -15988,7 +15990,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -16009,8 +16011,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -16022,8 +16024,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -16032,7 +16034,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -16061,12 +16063,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -16114,7 +16116,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -16138,7 +16140,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -16162,7 +16164,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -16186,7 +16188,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -16210,7 +16212,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -16234,7 +16236,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -16258,7 +16260,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -16282,7 +16284,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -16306,7 +16308,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -16330,7 +16332,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -16354,7 +16356,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -16375,15 +16377,15 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
         }
     }
     elsif ($statistics_select eq 'asreml_grm_multivariate_spatial_genetic_blups') {
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
@@ -16396,8 +16398,8 @@ sub perform_drone_imagery_analytics {
 
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -16406,7 +16408,7 @@ sub perform_drone_imagery_analytics {
             my @row_col_ordered_plots_names;
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -16445,7 +16447,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -16458,7 +16460,7 @@ sub perform_drone_imagery_analytics {
                 my $solution_file_counter_g_index = 0;
                 my $solution_file_counter_p_index = 0;
                 while (defined(my $row = <$fh>)) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @columns;
                     if ($csv->parse($row)) {
                         @columns = $csv->fields();
@@ -16520,7 +16522,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -16544,7 +16546,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -16568,7 +16570,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -16592,7 +16594,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -16616,7 +16618,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -16640,7 +16642,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -16664,7 +16666,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -16688,7 +16690,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -16712,7 +16714,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -16736,7 +16738,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -16760,7 +16762,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -16780,19 +16782,19 @@ sub perform_drone_imagery_analytics {
             }
 
             if ($run_stats_fault == 1) {
-                print STDERR "ERROR IN R CMD\n";
+                $logger->error("ERROR IN R CMD");
                 return {error=>'Error in R! Try a larger tolerance'};
             }
         }
     }
-    print STDERR "ALTERED w/SIM_ENV 2dn $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_3\n";
-    print STDERR "ALTERED w/SIM_ENV 2dn $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_3\n";
-    print STDERR Dumper [$genetic_effect_min_altered_env_3, $genetic_effect_max_altered_env_3, $env_effect_min_altered_env_3, $env_effect_max_altered_env_3];
+    $logger->debug("ALTERED w/SIM_ENV 2dn $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_3");
+    $logger->debug("ALTERED w/SIM_ENV 2dn $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_3");
+    $logger->error(Dumper([$genetic_effect_min_altered_env_3, $genetic_effect_max_altered_env_3, $env_effect_min_altered_env_3, $env_effect_max_altered_env_3]));
 
     my @model_sum_square_altered_env_3_cv_values = ($model_sum_square_cv1_altered_env_3, $model_sum_square_cv2_altered_env_3, $model_sum_square_cv3_altered_env_3, $model_sum_square_cv4_altered_env_3, $model_sum_square_cv5_altered_env_3);
     my @model_sum_square_altered_env_3_cv_2_values = ($model_sum_square_cv1_2_altered_env_3, $model_sum_square_cv2_2_altered_env_3, $model_sum_square_cv3_2_altered_env_3, $model_sum_square_cv4_2_altered_env_3, $model_sum_square_cv5_2_altered_env_3);
-    print STDERR Dumper \@model_sum_square_altered_env_3_cv_values;
-    print STDERR Dumper \@model_sum_square_altered_env_3_cv_2_values;
+    $logger->error(Dumper(\@model_sum_square_altered_env_3_cv_values));
+    $logger->error(Dumper(\@model_sum_square_altered_env_3_cv_2_values));
     my $model_sum_square_altered_env_3_cv_stat = Statistics::Descriptive::Full->new();
     $model_sum_square_altered_env_3_cv_stat->add_data(@model_sum_square_altered_env_3_cv_values);
     my $model_sum_square_altered_env_cv_result_3 = {
@@ -16839,7 +16841,7 @@ sub perform_drone_imagery_analytics {
 
         if ($sim_env_change_over_time eq 'changing_gradual') {
             open(my $sim_change_f, ">", $sim_env_changing_mat_tempfile) || die "Can't open file ".$sim_env_changing_mat_tempfile;
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile");
                 foreach (@sim_data_env_first) {
                     print $sim_change_f $_."\n";
                 }
@@ -16863,11 +16865,11 @@ sub perform_drone_imagery_analytics {
             chol2 <- chol(newc);
             finalx <- newx %*% chol2 * sd(x1) + mean(x1);
             write.table(finalx, file=\''.$sim_env_changing_mat_full_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-            # print STDERR Dumper $sim_change_cmd;
+            # $logger->error(Dumper($sim_change_cmd));
             my $status_sim_change = system($sim_change_cmd);
 
             open(my $sim_change_res, '<', $sim_env_changing_mat_full_tempfile) or die "Could not open file '$sim_env_changing_mat_full_tempfile' $!";
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile");
                 my $sim_change_line_counter = 0;
                 while (my $row = <$sim_change_res>) {
                     my @columns;
@@ -16924,7 +16926,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_pheno_f, ">", $permanent_environment_structure_env_tempfile) || die "Can't open file ".$permanent_environment_structure_env_tempfile;
-            print STDERR "OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile\n";
+            $logger->debug("OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile");
             foreach (@sim_data_diff_4) {
                 my $line = join "\t", @$_;
                 print $pe_pheno_f $line."\n";
@@ -16941,12 +16943,12 @@ sub perform_drone_imagery_analytics {
         range01 <- function(x){(x-min(x))/(max(x)-min(x))};
         cor_mat <- range01(cor_mat);
         write.table(cor_mat, file=\''.$permanent_environment_structure_env_tempfile2.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-        # print STDERR Dumper $pe_rel_cmd;
+        # $logger->error(Dumper($pe_rel_cmd));
         my $status_pe_rel = system($pe_rel_cmd);
 
         my %rel_pe_result_hash;
         open(my $pe_rel_res, '<', $permanent_environment_structure_env_tempfile2) or die "Could not open file '$permanent_environment_structure_env_tempfile2' $!";
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2");
             my $header_row = <$pe_rel_res>;
             my @header;
             if ($csv->parse($header_row)) {
@@ -16989,13 +16991,13 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_rel_out, ">", $permanent_environment_structure_env_tempfile_mat) || die "Can't open file ".$permanent_environment_structure_env_tempfile_mat;
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat");
             print $pe_rel_out $data_rel_pe;
         close($pe_rel_out);
     }
 
-    print STDERR "ADD SIMULATED ENV TO ALTERED PHENO random\n";
-    print STDERR Dumper [$env_sim_min_4, $env_sim_max_4];
+    $logger->debug("ADD SIMULATED ENV TO ALTERED PHENO random");
+    $logger->error(Dumper([$env_sim_min_4, $env_sim_max_4]));
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups') {
 
         foreach my $p (@unique_plot_names) {
@@ -17026,7 +17028,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_4{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, 'NA';
                 }
             }
@@ -17125,7 +17127,7 @@ sub perform_drone_imagery_analytics {
                         push @data_matrix_phenotypes_row, $val;
                     }
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                     push @data_matrix_phenotypes_row, 'NA';
                 }
@@ -17189,7 +17191,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_4{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                 }
             }
@@ -17205,7 +17207,7 @@ sub perform_drone_imagery_analytics {
         close($F);
     }
 
-    print STDERR Dumper [$phenotype_min_altered_env_4, $phenotype_max_altered_env_4];
+    $logger->error(Dumper([$phenotype_min_altered_env_4, $phenotype_max_altered_env_4]));
 
     my ($result_blup_data_altered_env_4, $result_blup_data_delta_altered_env_4, $result_blup_spatial_data_altered_env_4, $result_blup_pe_data_altered_env_4, $result_blup_pe_data_delta_altered_env_4, $result_residual_data_altered_env_4, $result_fitted_data_altered_env_4, %fixed_effects_altered_env_4, %rr_genetic_coefficients_altered_env_4, %rr_temporal_coefficients_altered_env_4);
     my (@rr_coeff_genetic_covariance_altered_env_4, @rr_coeff_env_covariance_altered_env_4, @rr_coeff_genetic_correlation_altered_env_4, @rr_coeff_env_correlation_altered_env_4, $rr_residual_variance_altered_env_4);
@@ -17232,10 +17234,10 @@ sub perform_drone_imagery_analytics {
     my $residual_sum_square_altered_env_4 = 0;
     my $residual_sum_altered_env_4 = 0;
 
-    print STDERR "RUN ENV ESTIMATE ON Altered Pheno With Sim Env random\n";
+    $logger->debug("RUN ENV ESTIMATE ON Altered Pheno With Sim Env random");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
-        #print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        #$logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -17247,8 +17249,8 @@ sub perform_drone_imagery_analytics {
         };
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -17256,7 +17258,7 @@ sub perform_drone_imagery_analytics {
             my $current_env_row_count = 0;
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -17295,7 +17297,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
                 if ($csv->parse($header_2dspl)) {
@@ -17334,7 +17336,7 @@ sub perform_drone_imagery_analytics {
             close($fh_2dspl);
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -17366,7 +17368,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -17392,7 +17394,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -17418,7 +17420,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -17444,7 +17446,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -17470,7 +17472,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -17496,7 +17498,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -17522,7 +17524,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -17548,7 +17550,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -17574,7 +17576,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -17600,7 +17602,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -17626,7 +17628,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -17647,7 +17649,7 @@ sub perform_drone_imagery_analytics {
         }
 
         if ($run_stats_fault == 1) {
-            print STDERR "ERROR IN R CMD\n";
+            $logger->error("ERROR IN R CMD");
             return {error=>'Error in R! Try a larger tolerance'};
         }
     }
@@ -17660,8 +17662,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -17673,8 +17675,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -17682,7 +17684,7 @@ sub perform_drone_imagery_analytics {
                 my $current_env_row_count = 0;
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -17723,7 +17725,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                    print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                    $logger->debug("Opened $stats_out_tempfile_2dspl");
                     my $header_2dspl = <$fh_2dspl>;
                     my @header_cols_2dspl;
                     if ($csv->parse($header_2dspl)) {
@@ -17764,7 +17766,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_2dspl);
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -17794,7 +17796,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -17818,7 +17820,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -17842,7 +17844,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -17866,7 +17868,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -17890,7 +17892,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -17914,7 +17916,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -17938,7 +17940,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -17962,7 +17964,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -17986,7 +17988,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -18010,7 +18012,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -18034,7 +18036,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -18054,7 +18056,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -18062,12 +18064,12 @@ sub perform_drone_imagery_analytics {
     }
     elsif ($statistics_select eq 'blupf90_grm_random_regression_gdd_blups' || $statistics_select eq 'blupf90_grm_random_regression_dap_blups' || $statistics_select eq 'airemlf90_grm_random_regression_gdd_blups' || $statistics_select eq 'airemlf90_grm_random_regression_dap_blups') {
 
-        print STDERR Dumper $statistics_cmd;
+        $logger->error(Dumper($statistics_cmd));
         my $status_r = system($statistics_cmd);
 
         my @pheno_var;
         open(my $fh_r, '<', $stats_out_param_tempfile) or die "Could not open file '$stats_out_param_tempfile' $!";
-            print STDERR "Opened $stats_out_param_tempfile\n";
+            $logger->debug("Opened $stats_out_param_tempfile");
 
             while (defined(my $row = <$fh_r>)) {
                 my @columns;
@@ -18077,7 +18079,7 @@ sub perform_drone_imagery_analytics {
                 push @pheno_var, \@columns;
             }
         close($fh_r);
-        # print STDERR Dumper \@pheno_var;
+        # $logger->error(Dumper(\@pheno_var));
 
         my $stats_tempfile_2_basename = basename($stats_tempfile_2);
         my $grm_file_basename = basename($grm_rename_tempfile);
@@ -18089,7 +18091,7 @@ sub perform_drone_imagery_analytics {
         my $effect_grm_levels = scalar(@unique_accession_names);
         my $effect_pe_levels = scalar(@ind_rep_factors);
 
-        print STDERR Dumper $stats_tempfile_2;
+        $logger->error(Dumper($stats_tempfile_2));
         my $data_cv_cmd = 'R -e "mat <- read.csv(\''.$stats_tempfile_2.'\', header=FALSE, sep=\' \');
         randomized_positions <- sample(length(mat[,1]));
         cv_step_size <- length(mat[,1]) %/% 5;
@@ -18203,14 +18205,14 @@ sub perform_drone_imagery_analytics {
         my $parameter_tempfile_cv4_2_basename = basename($parameter_tempfile_cv4_2);
         my $parameter_tempfile_cv5_2_basename = basename($parameter_tempfile_cv5_2);
 
-        print STDERR Dumper $cmd_f90;
+        $logger->error(Dumper($cmd_f90));
         my $status = system($cmd_f90);
 
         my @log_output_rows;
         open(my $fh_log, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-            print STDERR "Opened $stats_out_tempfile\n";
+            $logger->debug("Opened $stats_out_tempfile");
             while (my $row = <$fh_log>) {
-                print STDERR $row;
+                $logger->error($row);
                 push @log_output_rows, $row;
             }
         close($fh_log);
@@ -18218,20 +18220,20 @@ sub perform_drone_imagery_analytics {
         my $log_output = join '', @log_output_rows;
         my ($gen_var_string) = $log_output =~ /Genetic variance\(s\) for effect  2(.*?)correlations/gs;
         @rr_coeff_genetic_covariance_altered_env_4 = split ' ', $gen_var_string;
-        print STDERR Dumper \@rr_coeff_genetic_covariance_altered_env_4;
+        $logger->error(Dumper(\@rr_coeff_genetic_covariance_altered_env_4));
         my ($env_var_string) = $log_output =~ /Genetic variance\(s\) for effect  $legendre_order_number_env_var_pos(.*?)correlations/gs;
         @rr_coeff_env_covariance_altered_env_4 = split ' ', $env_var_string;
-        print STDERR Dumper \@rr_coeff_env_covariance_altered_env_4;
+        $logger->error(Dumper(\@rr_coeff_env_covariance_altered_env_4));
         my (@gen_cor_string) = $log_output =~ /correlations(.*?)eigenvectors/gs;
         @rr_coeff_genetic_correlation_altered_env_4 = split ' ', $gen_cor_string[0];
-        print STDERR Dumper \@rr_coeff_genetic_correlation_altered_env_4;
+        $logger->error(Dumper(\@rr_coeff_genetic_correlation_altered_env_4));
         @rr_coeff_env_correlation_altered_env_4 = split ' ', $gen_cor_string[1];
-        print STDERR Dumper \@rr_coeff_env_correlation_altered_env_4;
+        $logger->error(Dumper(\@rr_coeff_env_correlation_altered_env_4));
         my ($res_se_string) = $log_output =~ /SE for R(.*?)\* FINISHED \(AIREMLF90\)/gs;
-        print STDERR Dumper $res_se_string;
+        $logger->error(Dumper($res_se_string));
         # $rr_residual_variance_altered_env_4 = ($res_se_string**2)*$number_plots;
         $rr_residual_variance_altered_env_4 = $res_se_string;
-        print STDERR Dumper $rr_residual_variance_altered_env_4;
+        $logger->error(Dumper($rr_residual_variance_altered_env_4));
 
         @param_file_rows_6 = (
             '(CO)VARIANCES'
@@ -18296,12 +18298,12 @@ sub perform_drone_imagery_analytics {
 
         $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
         open(my $fh_yhat_res, '<', $yhat_residual_tempfile) or die "Could not open file '$yhat_residual_tempfile' $!";
-            print STDERR "Opened $yhat_residual_tempfile\n";
+            $logger->debug("Opened $yhat_residual_tempfile");
 
             my $pred_res_counter = 0;
             my $trait_counter = 0;
             while (my $row = <$fh_yhat_res>) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $pred = $vals[0];
                 my $residual = $vals[1];
@@ -18325,10 +18327,10 @@ sub perform_drone_imagery_analytics {
 
         $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
         open(my $fh_sol, '<', $blupf90_solutions_tempfile) or die "Could not open file '$blupf90_solutions_tempfile' $!";
-            print STDERR "Opened $blupf90_solutions_tempfile\n";
+            $logger->debug("Opened $blupf90_solutions_tempfile");
 
             my $head = <$fh_sol>;
-            print STDERR $head;
+            $logger->error($head);
 
             my $solution_file_counter = 0;
             my $grm_sol_counter = 0;
@@ -18336,7 +18338,7 @@ sub perform_drone_imagery_analytics {
             my $pe_sol_counter = 0;
             my $pe_sol_trait_counter = 0;
             while (defined(my $row = <$fh_sol>)) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $level = $vals[2];
                 my $value = $vals[3];
@@ -18373,8 +18375,8 @@ sub perform_drone_imagery_analytics {
             }
         close($fh_sol);
 
-        # print STDERR Dumper \%rr_genetic_coefficients_altered;
-        # print STDERR Dumper \%rr_temporal_coefficients_altered;
+        # $logger->error(Dumper(\%rr_genetic_coefficients_altered));
+        # $logger->error(Dumper(\%rr_temporal_coefficients_altered));
 
         open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
 
@@ -18391,7 +18393,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -18427,7 +18429,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -18461,7 +18463,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -18497,7 +18499,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -18518,22 +18520,22 @@ sub perform_drone_imagery_analytics {
 
         if ($perform_cv) {
             my $cmd_f90_cv1 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1;
+            $logger->error(Dumper($cmd_f90_cv1));
             my $status_cv1 = system($cmd_f90_cv1);
 
             open(my $fh_log_cv1, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1);
 
             my $yhat_residual_tempfile_cv1 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1, '<', $yhat_residual_tempfile_cv1) or die "Could not open file '$yhat_residual_tempfile_cv1' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1");
 
                 while (my $row = <$fh_yhat_res_cv1>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18542,22 +18544,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1);
 
             my $cmd_f90_cv2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2;
+            $logger->error(Dumper($cmd_f90_cv2));
             my $status_cv2 = system($cmd_f90_cv2);
 
             open(my $fh_log_cv2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2);
 
             my $yhat_residual_tempfile_cv2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2, '<', $yhat_residual_tempfile_cv2) or die "Could not open file '$yhat_residual_tempfile_cv2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2");
 
                 while (my $row = <$fh_yhat_res_cv2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18566,22 +18568,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2);
 
             my $cmd_f90_cv3 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3;
+            $logger->error(Dumper($cmd_f90_cv3));
             my $status_cv3 = system($cmd_f90_cv3);
 
             open(my $fh_log_cv3, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3);
 
             my $yhat_residual_tempfile_cv3 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3, '<', $yhat_residual_tempfile_cv3) or die "Could not open file '$yhat_residual_tempfile_cv3' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3");
 
                 while (my $row = <$fh_yhat_res_cv3>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18590,22 +18592,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3);
 
             my $cmd_f90_cv4 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4;
+            $logger->error(Dumper($cmd_f90_cv4));
             my $status_cv4 = system($cmd_f90_cv4);
 
             open(my $fh_log_cv4, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4);
 
             my $yhat_residual_tempfile_cv4 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4, '<', $yhat_residual_tempfile_cv4) or die "Could not open file '$yhat_residual_tempfile_cv4' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4");
 
                 while (my $row = <$fh_yhat_res_cv4>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18614,22 +18616,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4);
 
             my $cmd_f90_cv5 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5;
+            $logger->error(Dumper($cmd_f90_cv5));
             my $status_cv5 = system($cmd_f90_cv5);
 
             open(my $fh_log_cv5, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5);
 
             my $yhat_residual_tempfile_cv5 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5, '<', $yhat_residual_tempfile_cv5) or die "Could not open file '$yhat_residual_tempfile_cv5' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5");
 
                 while (my $row = <$fh_yhat_res_cv5>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18638,22 +18640,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv5);
 
             my $cmd_f90_cv1_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1_2;
+            $logger->error(Dumper($cmd_f90_cv1_2));
             my $status_cv1_2 = system($cmd_f90_cv1_2);
 
             open(my $fh_log_cv1_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1_2);
 
             my $yhat_residual_tempfile_cv1_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1_2, '<', $yhat_residual_tempfile_cv1_2) or die "Could not open file '$yhat_residual_tempfile_cv1_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1_2");
 
                 while (my $row = <$fh_yhat_res_cv1_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18662,22 +18664,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1_2);
 
             my $cmd_f90_cv2_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2_2;
+            $logger->error(Dumper($cmd_f90_cv2_2));
             my $status_cv2_2 = system($cmd_f90_cv2_2);
 
             open(my $fh_log_cv2_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2_2);
 
             my $yhat_residual_tempfile_cv2_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2_2, '<', $yhat_residual_tempfile_cv2_2) or die "Could not open file '$yhat_residual_tempfile_cv2_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2_2");
 
                 while (my $row = <$fh_yhat_res_cv2_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18686,22 +18688,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2_2);
 
             my $cmd_f90_cv3_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3_2;
+            $logger->error(Dumper($cmd_f90_cv3_2));
             my $status_cv3_2 = system($cmd_f90_cv3_2);
 
             open(my $fh_log_cv3_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3_2);
 
             my $yhat_residual_tempfile_cv3_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3_2, '<', $yhat_residual_tempfile_cv3_2) or die "Could not open file '$yhat_residual_tempfile_cv3_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3_2");
 
                 while (my $row = <$fh_yhat_res_cv3_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18710,22 +18712,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3_2);
 
             my $cmd_f90_cv4_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4_2;
+            $logger->error(Dumper($cmd_f90_cv4_2));
             my $status_cv4_2 = system($cmd_f90_cv4_2);
 
             open(my $fh_log_cv4_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4_2);
 
             my $yhat_residual_tempfile_cv4_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4_2, '<', $yhat_residual_tempfile_cv4_2) or die "Could not open file '$yhat_residual_tempfile_cv4_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4_2");
 
                 while (my $row = <$fh_yhat_res_cv4_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18734,22 +18736,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4_2);
 
             my $cmd_f90_cv5_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5_2;
+            $logger->error(Dumper($cmd_f90_cv5_2));
             my $status_cv5_2 = system($cmd_f90_cv5_2);
 
             open(my $fh_log_cv5_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5_2);
 
             my $yhat_residual_tempfile_cv5_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5_2, '<', $yhat_residual_tempfile_cv5_2) or die "Could not open file '$yhat_residual_tempfile_cv5_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5_2");
 
                 while (my $row = <$fh_yhat_res_cv5_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -18766,8 +18768,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -18779,8 +18781,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -18789,7 +18791,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -18818,12 +18820,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -18834,7 +18836,7 @@ sub perform_drone_imagery_analytics {
                         my $z_ratio = $columns[3];
                         if (defined $value && $value ne '') {
                             if ($solution_file_counter < $row_number_span) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             elsif ($solution_file_counter < $row_number_span + $number_accessions) {
                                 my $stock_name = $accession_id_factor_map_reverse{$solution_file_counter - $row_number_span + 1};
@@ -18853,7 +18855,7 @@ sub perform_drone_imagery_analytics {
                                 $current_gen_row_count++;
                             }
                             elsif ($solution_file_counter < $col_number_span + $row_number_span + $number_accessions) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             else {
                                 my $plot_name = $row_col_ordered_plots_names[$current_env_row_count];
@@ -18877,7 +18879,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -18901,7 +18903,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -18925,7 +18927,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -18949,7 +18951,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -18973,7 +18975,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -18997,7 +18999,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -19021,7 +19023,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -19045,7 +19047,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -19069,7 +19071,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -19093,7 +19095,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -19117,7 +19119,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -19138,7 +19140,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -19153,7 +19155,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -19178,7 +19180,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -19199,8 +19201,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -19212,8 +19214,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -19222,7 +19224,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -19251,12 +19253,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -19304,7 +19306,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -19328,7 +19330,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -19352,7 +19354,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -19376,7 +19378,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -19400,7 +19402,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -19424,7 +19426,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -19448,7 +19450,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -19472,7 +19474,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -19496,7 +19498,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -19520,7 +19522,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -19544,7 +19546,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -19565,15 +19567,15 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
         }
     }
     elsif ($statistics_select eq 'asreml_grm_multivariate_spatial_genetic_blups') {
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
@@ -19586,8 +19588,8 @@ sub perform_drone_imagery_analytics {
 
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -19596,7 +19598,7 @@ sub perform_drone_imagery_analytics {
             my @row_col_ordered_plots_names;
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -19635,7 +19637,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -19648,7 +19650,7 @@ sub perform_drone_imagery_analytics {
                 my $solution_file_counter_g_index = 0;
                 my $solution_file_counter_p_index = 0;
                 while (defined(my $row = <$fh>)) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @columns;
                     if ($csv->parse($row)) {
                         @columns = $csv->fields();
@@ -19710,7 +19712,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -19734,7 +19736,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -19758,7 +19760,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -19782,7 +19784,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -19806,7 +19808,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -19830,7 +19832,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -19854,7 +19856,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -19878,7 +19880,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -19902,7 +19904,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -19926,7 +19928,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -19950,7 +19952,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -19970,19 +19972,19 @@ sub perform_drone_imagery_analytics {
             }
 
             if ($run_stats_fault == 1) {
-                print STDERR "ERROR IN R CMD\n";
+                $logger->error("ERROR IN R CMD");
                 return {error=>'Error in R! Try a larger tolerance'};
             }
         }
     }
-    print STDERR "ALTERED w/SIM_ENV random $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_4\n";
-    print STDERR "ALTERED w/SIM_ENV random $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_4\n";
-    print STDERR Dumper [$genetic_effect_min_altered_env_4, $genetic_effect_max_altered_env_4, $env_effect_min_altered_env_4, $env_effect_max_altered_env_4];
+    $logger->debug("ALTERED w/SIM_ENV random $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_4");
+    $logger->debug("ALTERED w/SIM_ENV random $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_4");
+    $logger->error(Dumper([$genetic_effect_min_altered_env_4, $genetic_effect_max_altered_env_4, $env_effect_min_altered_env_4, $env_effect_max_altered_env_4]));
 
     my @model_sum_square_altered_env_4_cv_values = ($model_sum_square_cv1_altered_env_4, $model_sum_square_cv2_altered_env_4, $model_sum_square_cv3_altered_env_4, $model_sum_square_cv4_altered_env_4, $model_sum_square_cv5_altered_env_4);
     my @model_sum_square_altered_env_4_cv_2_values = ($model_sum_square_cv1_2_altered_env_4, $model_sum_square_cv2_2_altered_env_4, $model_sum_square_cv3_2_altered_env_4, $model_sum_square_cv4_2_altered_env_4, $model_sum_square_cv5_2_altered_env_4);
-    print STDERR Dumper \@model_sum_square_altered_env_4_cv_values;
-    print STDERR Dumper \@model_sum_square_altered_env_4_cv_2_values;
+    $logger->error(Dumper(\@model_sum_square_altered_env_4_cv_values));
+    $logger->error(Dumper(\@model_sum_square_altered_env_4_cv_2_values));
     my $model_sum_square_altered_env_4_cv_stat = Statistics::Descriptive::Full->new();
     $model_sum_square_altered_env_4_cv_stat->add_data(@model_sum_square_altered_env_4_cv_values);
     my $model_sum_square_altered_env_cv_result_4 = {
@@ -20057,12 +20059,12 @@ sub perform_drone_imagery_analytics {
         Resscr <- mvrnorm(1,rep(0,length(Rscr[1,])),Rscr);
         write.table(Rscr, file=\''.$permanent_environment_structure_env_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');
         write.table(Resscr, file=\''.$permanent_environment_structure_env_tempfile2.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-        print STDERR Dumper $pe_rel_cmd;
+        $logger->error(Dumper($pe_rel_cmd));
         my $status_pe_rel = system($pe_rel_cmd);
 
         my %rel_pe_result_hash;
         open(my $pe_rel_res, '<', $permanent_environment_structure_env_tempfile2) or die "Could not open file '$permanent_environment_structure_env_tempfile2' $!";
-            print STDERR "Opened PERMANENT ENV $env_simulation VAL FILE $permanent_environment_structure_env_tempfile2\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation VAL FILE $permanent_environment_structure_env_tempfile2");
 
             my $current_row_num = $min_row;
             my $current_col_num = $min_col;
@@ -20106,7 +20108,7 @@ sub perform_drone_imagery_analytics {
     if ($permanent_environment_structure eq 'env_corr_structure') {
         my %rel_pe_result_hash;
         open(my $pe_rel_res, '<', $permanent_environment_structure_env_tempfile) or die "Could not open file '$permanent_environment_structure_env_tempfile' $!";
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile");
 
             my $counter1 = 0;
             while (my $row = <$pe_rel_res>) {
@@ -20148,13 +20150,13 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_rel_out, ">", $permanent_environment_structure_env_tempfile_mat) || die "Can't open file ".$permanent_environment_structure_env_tempfile_mat;
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat");
             print $pe_rel_out $data_rel_pe;
         close($pe_rel_out);
     }
 
-    print STDERR "ADD SIMULATED ENV TO ALTERED PHENO ar1xar1\n";
-    print STDERR Dumper [$env_sim_min_5, $env_sim_max_5];
+    $logger->debug("ADD SIMULATED ENV TO ALTERED PHENO ar1xar1");
+    $logger->error(Dumper([$env_sim_min_5, $env_sim_max_5]));
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups') {
 
         foreach my $p (@unique_plot_names) {
@@ -20185,7 +20187,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_5{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, 'NA';
                 }
             }
@@ -20283,7 +20285,7 @@ sub perform_drone_imagery_analytics {
                         push @data_matrix_phenotypes_row, $val;
                     }
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                     push @data_matrix_phenotypes_row, 'NA';
                 }
@@ -20347,7 +20349,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_5{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                 }
             }
@@ -20362,7 +20364,7 @@ sub perform_drone_imagery_analytics {
             }
         close($F);
     }
-    print STDERR Dumper [$phenotype_min_altered_env_5, $phenotype_max_altered_env_5];
+    $logger->error(Dumper([$phenotype_min_altered_env_5, $phenotype_max_altered_env_5]));
 
     my ($result_blup_data_altered_env_5, $result_blup_data_delta_altered_env_5, $result_blup_spatial_data_altered_env_5, $result_blup_pe_data_altered_env_5, $result_blup_pe_data_delta_altered_env_5, $result_residual_data_altered_env_5, $result_fitted_data_altered_env_5, %fixed_effects_altered_env_5, %rr_genetic_coefficients_altered_env_5, %rr_temporal_coefficients_altered_env_5);
     my (@rr_coeff_genetic_covariance_altered_env_5, @rr_coeff_env_covariance_altered_env_5, @rr_coeff_genetic_correlation_altered_env_5, @rr_coeff_env_correlation_altered_env_5, $rr_residual_variance_altered_env_5);
@@ -20389,10 +20391,10 @@ sub perform_drone_imagery_analytics {
     my $residual_sum_square_altered_env_5 = 0;
     my $residual_sum_altered_env_5 = 0;
 
-    print STDERR "RUN ENV ESTIMATE ON Altered Pheno With Sim Env ar1xar1\n";
+    $logger->debug("RUN ENV ESTIMATE ON Altered Pheno With Sim Env ar1xar1");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
-        #print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        #$logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -20404,8 +20406,8 @@ sub perform_drone_imagery_analytics {
         };
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -20413,7 +20415,7 @@ sub perform_drone_imagery_analytics {
             my $current_env_row_count = 0;
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -20452,7 +20454,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
 
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
@@ -20492,7 +20494,7 @@ sub perform_drone_imagery_analytics {
             close($fh_2dspl);
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
 
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
@@ -20525,7 +20527,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -20551,7 +20553,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -20577,7 +20579,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -20603,7 +20605,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -20629,7 +20631,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -20655,7 +20657,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -20681,7 +20683,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -20707,7 +20709,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -20733,7 +20735,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -20759,7 +20761,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -20785,7 +20787,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -20806,7 +20808,7 @@ sub perform_drone_imagery_analytics {
         }
 
         if ($run_stats_fault == 1) {
-            print STDERR "ERROR IN R CMD\n";
+            $logger->error("ERROR IN R CMD");
             return {error=>'Error in R! Try a larger tolerance'};
         }
     }
@@ -20819,8 +20821,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -20832,8 +20834,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -20841,7 +20843,7 @@ sub perform_drone_imagery_analytics {
                 my $current_env_row_count = 0;
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -20882,7 +20884,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                    print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                    $logger->debug("Opened $stats_out_tempfile_2dspl");
 
                     my $header_2dspl = <$fh_2dspl>;
                     my @header_cols_2dspl;
@@ -20924,7 +20926,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_2dspl);
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
 
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
@@ -20955,7 +20957,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -20979,7 +20981,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -21003,7 +21005,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -21027,7 +21029,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -21051,7 +21053,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -21075,7 +21077,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -21099,7 +21101,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -21123,7 +21125,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -21147,7 +21149,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -21171,7 +21173,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -21195,7 +21197,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -21215,7 +21217,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -21223,12 +21225,12 @@ sub perform_drone_imagery_analytics {
     }
     elsif ($statistics_select eq 'blupf90_grm_random_regression_gdd_blups' || $statistics_select eq 'blupf90_grm_random_regression_dap_blups' || $statistics_select eq 'airemlf90_grm_random_regression_gdd_blups' || $statistics_select eq 'airemlf90_grm_random_regression_dap_blups') {
 
-        print STDERR Dumper $statistics_cmd;
+        $logger->error(Dumper($statistics_cmd));
         my $status_r = system($statistics_cmd);
 
         my @pheno_var;
         open(my $fh_r, '<', $stats_out_param_tempfile) or die "Could not open file '$stats_out_param_tempfile' $!";
-            print STDERR "Opened $stats_out_param_tempfile\n";
+            $logger->debug("Opened $stats_out_param_tempfile");
 
             while (defined(my $row = <$fh_r>)) {
                 my @columns;
@@ -21238,7 +21240,7 @@ sub perform_drone_imagery_analytics {
                 push @pheno_var, \@columns;
             }
         close($fh_r);
-        # print STDERR Dumper \@pheno_var;
+        # $logger->error(Dumper(\@pheno_var));
 
         my $stats_tempfile_2_basename = basename($stats_tempfile_2);
         my $grm_file_basename = basename($grm_rename_tempfile);
@@ -21250,7 +21252,7 @@ sub perform_drone_imagery_analytics {
         my $effect_grm_levels = scalar(@unique_accession_names);
         my $effect_pe_levels = scalar(@ind_rep_factors);
 
-        print STDERR Dumper $stats_tempfile_2;
+        $logger->error(Dumper($stats_tempfile_2));
         my $data_cv_cmd = 'R -e "mat <- read.csv(\''.$stats_tempfile_2.'\', header=FALSE, sep=\' \');
         randomized_positions <- sample(length(mat[,1]));
         cv_step_size <- length(mat[,1]) %/% 5;
@@ -21364,14 +21366,14 @@ sub perform_drone_imagery_analytics {
         my $parameter_tempfile_cv4_2_basename = basename($parameter_tempfile_cv4_2);
         my $parameter_tempfile_cv5_2_basename = basename($parameter_tempfile_cv5_2);
 
-        print STDERR Dumper $cmd_f90;
+        $logger->error(Dumper($cmd_f90));
         my $status = system($cmd_f90);
 
         my @log_output_rows;
         open(my $fh_log, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-            print STDERR "Opened $stats_out_tempfile\n";
+            $logger->debug("Opened $stats_out_tempfile");
             while (my $row = <$fh_log>) {
-                print STDERR $row;
+                $logger->error($row);
                 push @log_output_rows, $row;
             }
         close($fh_log);
@@ -21379,20 +21381,20 @@ sub perform_drone_imagery_analytics {
         my $log_output = join '', @log_output_rows;
         my ($gen_var_string) = $log_output =~ /Genetic variance\(s\) for effect  2(.*?)correlations/gs;
         @rr_coeff_genetic_covariance_altered_env_5 = split ' ', $gen_var_string;
-        print STDERR Dumper \@rr_coeff_genetic_covariance_altered_env_5;
+        $logger->error(Dumper(\@rr_coeff_genetic_covariance_altered_env_5));
         my ($env_var_string) = $log_output =~ /Genetic variance\(s\) for effect  $legendre_order_number_env_var_pos(.*?)correlations/gs;
         @rr_coeff_env_covariance_altered_env_5 = split ' ', $env_var_string;
-        print STDERR Dumper \@rr_coeff_env_covariance_altered_env_5;
+        $logger->error(Dumper(\@rr_coeff_env_covariance_altered_env_5));
         my (@gen_cor_string) = $log_output =~ /correlations(.*?)eigenvectors/gs;
         @rr_coeff_genetic_correlation_altered_env_5 = split ' ', $gen_cor_string[0];
-        print STDERR Dumper \@rr_coeff_genetic_correlation_altered_env_5;
+        $logger->error(Dumper(\@rr_coeff_genetic_correlation_altered_env_5));
         @rr_coeff_env_correlation_altered_env_5 = split ' ', $gen_cor_string[1];
-        print STDERR Dumper \@rr_coeff_env_correlation_altered_env_5;
+        $logger->error(Dumper(\@rr_coeff_env_correlation_altered_env_5));
         my ($res_se_string) = $log_output =~ /SE for R(.*?)\* FINISHED \(AIREMLF90\)/gs;
-        print STDERR Dumper $res_se_string;
+        $logger->error(Dumper($res_se_string));
         # $rr_residual_variance_altered_env_5 = ($res_se_string**2)*$number_plots;
         $rr_residual_variance_altered_env_5 = $res_se_string;
-        print STDERR Dumper $rr_residual_variance_altered_env_5;
+        $logger->error(Dumper($rr_residual_variance_altered_env_5));
 
         @param_file_rows_6 = (
             '(CO)VARIANCES'
@@ -21457,12 +21459,12 @@ sub perform_drone_imagery_analytics {
 
         $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
         open(my $fh_yhat_res, '<', $yhat_residual_tempfile) or die "Could not open file '$yhat_residual_tempfile' $!";
-            print STDERR "Opened $yhat_residual_tempfile\n";
+            $logger->debug("Opened $yhat_residual_tempfile");
 
             my $pred_res_counter = 0;
             my $trait_counter = 0;
             while (my $row = <$fh_yhat_res>) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $pred = $vals[0];
                 my $residual = $vals[1];
@@ -21486,10 +21488,10 @@ sub perform_drone_imagery_analytics {
 
         $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
         open(my $fh_sol, '<', $blupf90_solutions_tempfile) or die "Could not open file '$blupf90_solutions_tempfile' $!";
-            print STDERR "Opened $blupf90_solutions_tempfile\n";
+            $logger->debug("Opened $blupf90_solutions_tempfile");
 
             my $head = <$fh_sol>;
-            print STDERR $head;
+            $logger->error($head);
 
             my $solution_file_counter = 0;
             my $grm_sol_counter = 0;
@@ -21497,7 +21499,7 @@ sub perform_drone_imagery_analytics {
             my $pe_sol_counter = 0;
             my $pe_sol_trait_counter = 0;
             while (defined(my $row = <$fh_sol>)) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $level = $vals[2];
                 my $value = $vals[3];
@@ -21534,8 +21536,8 @@ sub perform_drone_imagery_analytics {
             }
         close($fh_sol);
 
-        # print STDERR Dumper \%rr_genetic_coefficients_altered;
-        # print STDERR Dumper \%rr_temporal_coefficients_altered;
+        # $logger->error(Dumper(\%rr_genetic_coefficients_altered));
+        # $logger->error(Dumper(\%rr_temporal_coefficients_altered));
 
         open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
 
@@ -21552,7 +21554,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -21588,7 +21590,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -21622,7 +21624,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -21658,7 +21660,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -21679,22 +21681,22 @@ sub perform_drone_imagery_analytics {
 
         if ($perform_cv) {
             my $cmd_f90_cv1 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1;
+            $logger->error(Dumper($cmd_f90_cv1));
             my $status_cv1 = system($cmd_f90_cv1);
 
             open(my $fh_log_cv1, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1);
 
             my $yhat_residual_tempfile_cv1 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1, '<', $yhat_residual_tempfile_cv1) or die "Could not open file '$yhat_residual_tempfile_cv1' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1");
 
                 while (my $row = <$fh_yhat_res_cv1>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21703,22 +21705,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1);
 
             my $cmd_f90_cv2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2;
+            $logger->error(Dumper($cmd_f90_cv2));
             my $status_cv2 = system($cmd_f90_cv2);
 
             open(my $fh_log_cv2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2);
 
             my $yhat_residual_tempfile_cv2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2, '<', $yhat_residual_tempfile_cv2) or die "Could not open file '$yhat_residual_tempfile_cv2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2");
 
                 while (my $row = <$fh_yhat_res_cv2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21727,22 +21729,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2);
 
             my $cmd_f90_cv3 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3;
+            $logger->error(Dumper($cmd_f90_cv3));
             my $status_cv3 = system($cmd_f90_cv3);
 
             open(my $fh_log_cv3, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3);
 
             my $yhat_residual_tempfile_cv3 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3, '<', $yhat_residual_tempfile_cv3) or die "Could not open file '$yhat_residual_tempfile_cv3' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3");
 
                 while (my $row = <$fh_yhat_res_cv3>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21751,22 +21753,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3);
 
             my $cmd_f90_cv4 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4;
+            $logger->error(Dumper($cmd_f90_cv4));
             my $status_cv4 = system($cmd_f90_cv4);
 
             open(my $fh_log_cv4, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4);
 
             my $yhat_residual_tempfile_cv4 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4, '<', $yhat_residual_tempfile_cv4) or die "Could not open file '$yhat_residual_tempfile_cv4' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4");
 
                 while (my $row = <$fh_yhat_res_cv4>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21775,22 +21777,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4);
 
             my $cmd_f90_cv5 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5;
+            $logger->error(Dumper($cmd_f90_cv5));
             my $status_cv5 = system($cmd_f90_cv5);
 
             open(my $fh_log_cv5, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5);
 
             my $yhat_residual_tempfile_cv5 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5, '<', $yhat_residual_tempfile_cv5) or die "Could not open file '$yhat_residual_tempfile_cv5' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5");
 
                 while (my $row = <$fh_yhat_res_cv5>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21799,22 +21801,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv5);
 
             my $cmd_f90_cv1_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1_2;
+            $logger->error(Dumper($cmd_f90_cv1_2));
             my $status_cv1_2 = system($cmd_f90_cv1_2);
 
             open(my $fh_log_cv1_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1_2);
 
             my $yhat_residual_tempfile_cv1_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1_2, '<', $yhat_residual_tempfile_cv1_2) or die "Could not open file '$yhat_residual_tempfile_cv1_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1_2");
 
                 while (my $row = <$fh_yhat_res_cv1_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21823,22 +21825,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1_2);
 
             my $cmd_f90_cv2_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2_2;
+            $logger->error(Dumper($cmd_f90_cv2_2));
             my $status_cv2_2 = system($cmd_f90_cv2_2);
 
             open(my $fh_log_cv2_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2_2);
 
             my $yhat_residual_tempfile_cv2_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2_2, '<', $yhat_residual_tempfile_cv2_2) or die "Could not open file '$yhat_residual_tempfile_cv2_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2_2");
 
                 while (my $row = <$fh_yhat_res_cv2_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21847,22 +21849,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2_2);
 
             my $cmd_f90_cv3_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3_2;
+            $logger->error(Dumper($cmd_f90_cv3_2));
             my $status_cv3_2 = system($cmd_f90_cv3_2);
 
             open(my $fh_log_cv3_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3_2);
 
             my $yhat_residual_tempfile_cv3_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3_2, '<', $yhat_residual_tempfile_cv3_2) or die "Could not open file '$yhat_residual_tempfile_cv3_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3_2");
 
                 while (my $row = <$fh_yhat_res_cv3_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21871,22 +21873,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3_2);
 
             my $cmd_f90_cv4_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4_2;
+            $logger->error(Dumper($cmd_f90_cv4_2));
             my $status_cv4_2 = system($cmd_f90_cv4_2);
 
             open(my $fh_log_cv4_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4_2);
 
             my $yhat_residual_tempfile_cv4_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4_2, '<', $yhat_residual_tempfile_cv4_2) or die "Could not open file '$yhat_residual_tempfile_cv4_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4_2");
 
                 while (my $row = <$fh_yhat_res_cv4_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21895,22 +21897,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4_2);
 
             my $cmd_f90_cv5_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5_2;
+            $logger->error(Dumper($cmd_f90_cv5_2));
             my $status_cv5_2 = system($cmd_f90_cv5_2);
 
             open(my $fh_log_cv5_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5_2);
 
             my $yhat_residual_tempfile_cv5_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5_2, '<', $yhat_residual_tempfile_cv5_2) or die "Could not open file '$yhat_residual_tempfile_cv5_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5_2");
 
                 while (my $row = <$fh_yhat_res_cv5_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -21927,8 +21929,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -21940,8 +21942,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -21950,7 +21952,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -21979,12 +21981,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -21995,7 +21997,7 @@ sub perform_drone_imagery_analytics {
                         my $z_ratio = $columns[3];
                         if (defined $value && $value ne '') {
                             if ($solution_file_counter < $row_number_span) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             elsif ($solution_file_counter < $row_number_span + $number_accessions) {
                                 my $stock_name = $accession_id_factor_map_reverse{$solution_file_counter - $row_number_span + 1};
@@ -22014,7 +22016,7 @@ sub perform_drone_imagery_analytics {
                                 $current_gen_row_count++;
                             }
                             elsif ($solution_file_counter < $col_number_span + $row_number_span + $number_accessions) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             else {
                                 my $plot_name = $row_col_ordered_plots_names[$current_env_row_count];
@@ -22038,7 +22040,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -22062,7 +22064,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -22086,7 +22088,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -22110,7 +22112,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -22134,7 +22136,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -22158,7 +22160,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -22182,7 +22184,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -22206,7 +22208,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -22230,7 +22232,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -22254,7 +22256,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -22278,7 +22280,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -22299,7 +22301,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -22314,7 +22316,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -22339,7 +22341,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -22360,8 +22362,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -22373,8 +22375,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -22383,7 +22385,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -22412,12 +22414,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -22465,7 +22467,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -22489,7 +22491,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -22513,7 +22515,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -22537,7 +22539,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -22561,7 +22563,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -22585,7 +22587,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -22609,7 +22611,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -22633,7 +22635,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -22657,7 +22659,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -22681,7 +22683,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -22705,7 +22707,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -22726,15 +22728,15 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
         }
     }
     elsif ($statistics_select eq 'asreml_grm_multivariate_spatial_genetic_blups') {
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
@@ -22747,8 +22749,8 @@ sub perform_drone_imagery_analytics {
 
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -22757,7 +22759,7 @@ sub perform_drone_imagery_analytics {
             my @row_col_ordered_plots_names;
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -22796,7 +22798,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -22809,7 +22811,7 @@ sub perform_drone_imagery_analytics {
                 my $solution_file_counter_g_index = 0;
                 my $solution_file_counter_p_index = 0;
                 while (defined(my $row = <$fh>)) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @columns;
                     if ($csv->parse($row)) {
                         @columns = $csv->fields();
@@ -22871,7 +22873,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -22895,7 +22897,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -22919,7 +22921,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -22943,7 +22945,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -22967,7 +22969,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -22991,7 +22993,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -23015,7 +23017,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -23039,7 +23041,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -23063,7 +23065,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -23087,7 +23089,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -23111,7 +23113,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -23131,19 +23133,19 @@ sub perform_drone_imagery_analytics {
             }
 
             if ($run_stats_fault == 1) {
-                print STDERR "ERROR IN R CMD\n";
+                $logger->error("ERROR IN R CMD");
                 return {error=>'Error in R! Try a larger tolerance'};
             }
         }
     }
-    print STDERR "ALTERED w/SIM_ENV ar1xar1 $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_5\n";
-    print STDERR "ALTERED w/SIM_ENV ar1xar1 $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_5\n";
-    print STDERR Dumper [$genetic_effect_min_altered_env_5, $genetic_effect_max_altered_env_5, $env_effect_min_altered_env_5, $env_effect_max_altered_env_5];
+    $logger->debug("ALTERED w/SIM_ENV ar1xar1 $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_5");
+    $logger->debug("ALTERED w/SIM_ENV ar1xar1 $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_5");
+    $logger->error(Dumper([$genetic_effect_min_altered_env_5, $genetic_effect_max_altered_env_5, $env_effect_min_altered_env_5, $env_effect_max_altered_env_5]));
 
     my @model_sum_square_altered_env_5_cv_values = ($model_sum_square_cv1_altered_env_5, $model_sum_square_cv2_altered_env_5, $model_sum_square_cv3_altered_env_5, $model_sum_square_cv4_altered_env_5, $model_sum_square_cv5_altered_env_5);
     my @model_sum_square_altered_env_5_cv_2_values = ($model_sum_square_cv1_2_altered_env_5, $model_sum_square_cv2_2_altered_env_5, $model_sum_square_cv3_2_altered_env_5, $model_sum_square_cv4_2_altered_env_5, $model_sum_square_cv5_2_altered_env_5);
-    print STDERR Dumper \@model_sum_square_altered_env_5_cv_values;
-    print STDERR Dumper \@model_sum_square_altered_env_5_cv_2_values;
+    $logger->error(Dumper(\@model_sum_square_altered_env_5_cv_values));
+    $logger->error(Dumper(\@model_sum_square_altered_env_5_cv_2_values));
     my $model_sum_square_altered_env_5_cv_stat = Statistics::Descriptive::Full->new();
     $model_sum_square_altered_env_5_cv_stat->add_data(@model_sum_square_altered_env_5_cv_values);
     my $model_sum_square_altered_env_cv_result_5 = {
@@ -23217,7 +23219,7 @@ sub perform_drone_imagery_analytics {
 
         if ($sim_env_change_over_time eq 'changing_gradual') {
             open(my $sim_change_f, ">", $sim_env_changing_mat_tempfile) || die "Can't open file ".$sim_env_changing_mat_tempfile;
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL $env_simulation CORR $sim_env_changing_mat_tempfile");
                 foreach (@sim_data_env_first) {
                     print $sim_change_f $_."\n";
                 }
@@ -23241,11 +23243,11 @@ sub perform_drone_imagery_analytics {
             chol2 <- chol(newc);
             finalx <- newx %*% chol2 * sd(x1) + mean(x1);
             write.table(finalx, file=\''.$sim_env_changing_mat_full_tempfile.'\', row.names=FALSE, col.names=FALSE, sep=\'\t\');"';
-            # print STDERR Dumper $sim_change_cmd;
+            # $logger->error(Dumper($sim_change_cmd));
             my $status_sim_change = system($sim_change_cmd);
 
             open(my $sim_change_res, '<', $sim_env_changing_mat_full_tempfile) or die "Could not open file '$sim_env_changing_mat_full_tempfile' $!";
-                print STDERR "OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile\n";
+                $logger->debug("OPENING ENV SIM CHANGING GRADUAL VALUES $env_simulation CORR $sim_env_changing_mat_full_tempfile");
                 my $sim_change_line_counter = 0;
                 while (my $row = <$sim_change_res>) {
                     my @columns;
@@ -23297,7 +23299,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_pheno_f, ">", $permanent_environment_structure_env_tempfile) || die "Can't open file ".$permanent_environment_structure_env_tempfile;
-            print STDERR "OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile\n";
+            $logger->debug("OPENING PERMANENT ENVIRONMENT ENV $env_simulation CORR $permanent_environment_structure_env_tempfile");
             foreach (@sim_data_diff_6) {
                 my $line = join "\t", @$_;
                 print $pe_pheno_f $line."\n";
@@ -23314,12 +23316,12 @@ sub perform_drone_imagery_analytics {
         range01 <- function(x){(x-min(x))/(max(x)-min(x))};
         cor_mat <- range01(cor_mat);
         write.table(cor_mat, file=\''.$permanent_environment_structure_env_tempfile2.'\', row.names=TRUE, col.names=TRUE, sep=\'\t\');"';
-        # print STDERR Dumper $pe_rel_cmd;
+        # $logger->error(Dumper($pe_rel_cmd));
         my $status_pe_rel = system($pe_rel_cmd);
 
         my %rel_pe_result_hash;
         open(my $pe_rel_res, '<', $permanent_environment_structure_env_tempfile2) or die "Could not open file '$permanent_environment_structure_env_tempfile2' $!";
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE $permanent_environment_structure_env_tempfile2");
             my $header_row = <$pe_rel_res>;
             my @header;
             if ($csv->parse($header_row)) {
@@ -23362,13 +23364,13 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $pe_rel_out, ">", $permanent_environment_structure_env_tempfile_mat) || die "Can't open file ".$permanent_environment_structure_env_tempfile_mat;
-            print STDERR "Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat\n";
+            $logger->debug("Opened PERMANENT ENV $env_simulation CORR FILE 3col $permanent_environment_structure_env_tempfile_mat");
             print $pe_rel_out $data_rel_pe;
         close($pe_rel_out);
     }
 
-    print STDERR "ADD SIMULATED ENV TO ALTERED PHENO selected_field_trial_htp_env\n";
-    print STDERR Dumper [$env_sim_min_6, $env_sim_max_6];
+    $logger->debug("ADD SIMULATED ENV TO ALTERED PHENO selected_field_trial_htp_env");
+    $logger->error(Dumper([$env_sim_min_6, $env_sim_max_6]));
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups' || $statistics_select eq 'sommer_grm_univariate_spatial_pure_2dspl_genetic_blups') {
 
         foreach my $p (@unique_plot_names) {
@@ -23399,7 +23401,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_6{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, 'NA';
                 }
             }
@@ -23497,7 +23499,7 @@ sub perform_drone_imagery_analytics {
                         push @data_matrix_phenotypes_row, $val;
                     }
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                     push @data_matrix_phenotypes_row, 'NA';
                 }
@@ -23561,7 +23563,7 @@ sub perform_drone_imagery_analytics {
                     $phenotype_data_altered_env_6{$p}->{$t} = $new_val;
                     push @row, $new_val;
                 } else {
-                    print STDERR $p." : $t : $germplasm_name : NA \n";
+                    $logger->debug($p." : $t : $germplasm_name : NA ");
                     push @row, '';
                 }
             }
@@ -23576,7 +23578,7 @@ sub perform_drone_imagery_analytics {
             }
         close($F);
     }
-    print STDERR Dumper [$phenotype_min_altered_env_6, $phenotype_max_altered_env_6];
+    $logger->error(Dumper([$phenotype_min_altered_env_6, $phenotype_max_altered_env_6]));
 
     my ($result_blup_data_altered_env_6, $result_blup_data_delta_altered_env_6, $result_blup_spatial_data_altered_env_6, $result_blup_pe_data_altered_env_6, $result_blup_pe_data_delta_altered_env_6, $result_residual_data_altered_env_6, $result_fitted_data_altered_env_6, %fixed_effects_altered_env_6, %rr_genetic_coefficients_altered_env_6, %rr_temporal_coefficients_altered_env_6);
     my (@rr_coeff_genetic_covariance_altered_env_6, @rr_coeff_env_covariance_altered_env_6, @rr_coeff_genetic_correlation_altered_env_6, @rr_coeff_env_correlation_altered_env_6, $rr_residual_variance_altered_env_6);
@@ -23603,10 +23605,10 @@ sub perform_drone_imagery_analytics {
     my $residual_sum_square_altered_env_6 = 0;
     my $residual_sum_altered_env_6 = 0;
 
-    print STDERR "RUN ENV ESTIMATE ON Altered Pheno With Sim Env selected_field_trial_htp_env\n";
+    $logger->debug("RUN ENV ESTIMATE ON Altered Pheno With Sim Env selected_field_trial_htp_env");
     if ($statistics_select eq 'sommer_grm_spatial_genetic_blups' || $statistics_select eq 'sommer_grm_spatial_pure_2dspl_genetic_blups') {
-        #print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        #$logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
@@ -23618,8 +23620,8 @@ sub perform_drone_imagery_analytics {
         };
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -23627,7 +23629,7 @@ sub perform_drone_imagery_analytics {
             my $current_env_row_count = 0;
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -23666,7 +23668,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                $logger->debug("Opened $stats_out_tempfile_2dspl");
 
                 my $header_2dspl = <$fh_2dspl>;
                 my @header_cols_2dspl;
@@ -23706,7 +23708,7 @@ sub perform_drone_imagery_analytics {
             close($fh_2dspl);
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
 
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
@@ -23739,7 +23741,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -23765,7 +23767,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -23791,7 +23793,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -23817,7 +23819,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -23843,7 +23845,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -23869,7 +23871,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -23895,7 +23897,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -23921,7 +23923,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -23947,7 +23949,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -23973,7 +23975,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -23999,7 +24001,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -24020,7 +24022,7 @@ sub perform_drone_imagery_analytics {
         }
 
         if ($run_stats_fault == 1) {
-            print STDERR "ERROR IN R CMD\n";
+            $logger->error("ERROR IN R CMD");
             return {error=>'Error in R! Try a larger tolerance'};
         }
     }
@@ -24033,8 +24035,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -24046,8 +24048,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -24055,7 +24057,7 @@ sub perform_drone_imagery_analytics {
                 my $current_env_row_count = 0;
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
                     my @header_cols;
                     if ($csv->parse($header)) {
@@ -24096,7 +24098,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_2dspl, '<', $stats_out_tempfile_2dspl) or die "Could not open file '$stats_out_tempfile_2dspl' $!";
-                    print STDERR "Opened $stats_out_tempfile_2dspl\n";
+                    $logger->debug("Opened $stats_out_tempfile_2dspl");
 
                     my $header_2dspl = <$fh_2dspl>;
                     my @header_cols_2dspl;
@@ -24138,7 +24140,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_2dspl);
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
 
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
@@ -24169,7 +24171,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -24193,7 +24195,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -24217,7 +24219,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -24241,7 +24243,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -24265,7 +24267,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -24289,7 +24291,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -24313,7 +24315,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -24337,7 +24339,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -24361,7 +24363,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -24385,7 +24387,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -24409,7 +24411,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -24429,7 +24431,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -24437,12 +24439,12 @@ sub perform_drone_imagery_analytics {
     }
     elsif ($statistics_select eq 'blupf90_grm_random_regression_gdd_blups' || $statistics_select eq 'blupf90_grm_random_regression_dap_blups' || $statistics_select eq 'airemlf90_grm_random_regression_gdd_blups' || $statistics_select eq 'airemlf90_grm_random_regression_dap_blups') {
 
-        print STDERR Dumper $statistics_cmd;
+        $logger->error(Dumper($statistics_cmd));
         my $status_r = system($statistics_cmd);
 
         my @pheno_var;
         open(my $fh_r, '<', $stats_out_param_tempfile) or die "Could not open file '$stats_out_param_tempfile' $!";
-            print STDERR "Opened $stats_out_param_tempfile\n";
+            $logger->debug("Opened $stats_out_param_tempfile");
 
             while (defined(my $row = <$fh_r>)) {
                 my @columns;
@@ -24452,7 +24454,7 @@ sub perform_drone_imagery_analytics {
                 push @pheno_var, \@columns;
             }
         close($fh_r);
-        # print STDERR Dumper \@pheno_var;
+        # $logger->error(Dumper(\@pheno_var));
 
         my $stats_tempfile_2_basename = basename($stats_tempfile_2);
         my $grm_file_basename = basename($grm_rename_tempfile);
@@ -24464,7 +24466,7 @@ sub perform_drone_imagery_analytics {
         my $effect_grm_levels = scalar(@unique_accession_names);
         my $effect_pe_levels = scalar(@ind_rep_factors);
 
-        print STDERR Dumper $stats_tempfile_2;
+        $logger->error(Dumper($stats_tempfile_2));
         my $data_cv_cmd = 'R -e "mat <- read.csv(\''.$stats_tempfile_2.'\', header=FALSE, sep=\' \');
         randomized_positions <- sample(length(mat[,1]));
         cv_step_size <- length(mat[,1]) %/% 5;
@@ -24578,14 +24580,14 @@ sub perform_drone_imagery_analytics {
         my $parameter_tempfile_cv4_2_basename = basename($parameter_tempfile_cv4_2);
         my $parameter_tempfile_cv5_2_basename = basename($parameter_tempfile_cv5_2);
 
-        print STDERR Dumper $cmd_f90;
+        $logger->error(Dumper($cmd_f90));
         my $status = system($cmd_f90);
 
         my @log_output_rows;
         open(my $fh_log, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-            print STDERR "Opened $stats_out_tempfile\n";
+            $logger->debug("Opened $stats_out_tempfile");
             while (my $row = <$fh_log>) {
-                print STDERR $row;
+                $logger->error($row);
                 push @log_output_rows, $row;
             }
         close($fh_log);
@@ -24593,20 +24595,20 @@ sub perform_drone_imagery_analytics {
         my $log_output = join '', @log_output_rows;
         my ($gen_var_string) = $log_output =~ /Genetic variance\(s\) for effect  2(.*?)correlations/gs;
         @rr_coeff_genetic_covariance_altered_env_6 = split ' ', $gen_var_string;
-        print STDERR Dumper \@rr_coeff_genetic_covariance_altered_env_6;
+        $logger->error(Dumper(\@rr_coeff_genetic_covariance_altered_env_6));
         my ($env_var_string) = $log_output =~ /Genetic variance\(s\) for effect  $legendre_order_number_env_var_pos(.*?)correlations/gs;
         @rr_coeff_env_covariance_altered_env_6 = split ' ', $env_var_string;
-        print STDERR Dumper \@rr_coeff_env_covariance_altered_env_6;
+        $logger->error(Dumper(\@rr_coeff_env_covariance_altered_env_6));
         my (@gen_cor_string) = $log_output =~ /correlations(.*?)eigenvectors/gs;
         @rr_coeff_genetic_correlation_altered_env_6 = split ' ', $gen_cor_string[0];
-        print STDERR Dumper \@rr_coeff_genetic_correlation_altered_env_6;
+        $logger->error(Dumper(\@rr_coeff_genetic_correlation_altered_env_6));
         @rr_coeff_env_correlation_altered_env_6 = split ' ', $gen_cor_string[1];
-        print STDERR Dumper \@rr_coeff_env_correlation_altered_env_6;
+        $logger->error(Dumper(\@rr_coeff_env_correlation_altered_env_6));
         my ($res_se_string) = $log_output =~ /SE for R(.*?)\* FINISHED \(AIREMLF90\)/gs;
-        print STDERR Dumper $res_se_string;
+        $logger->error(Dumper($res_se_string));
         # $rr_residual_variance_altered_env_6 = ($res_se_string**2)*$number_plots;
         $rr_residual_variance_altered_env_6 = $res_se_string;
-        print STDERR Dumper $rr_residual_variance_altered_env_6;
+        $logger->error(Dumper($rr_residual_variance_altered_env_6));
 
         @param_file_rows_6 = (
             '(CO)VARIANCES'
@@ -24671,12 +24673,12 @@ sub perform_drone_imagery_analytics {
 
         $yhat_residual_tempfile = $tmp_stats_dir."/yhat_residual";
         open(my $fh_yhat_res, '<', $yhat_residual_tempfile) or die "Could not open file '$yhat_residual_tempfile' $!";
-            print STDERR "Opened $yhat_residual_tempfile\n";
+            $logger->debug("Opened $yhat_residual_tempfile");
 
             my $pred_res_counter = 0;
             my $trait_counter = 0;
             while (my $row = <$fh_yhat_res>) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $pred = $vals[0];
                 my $residual = $vals[1];
@@ -24700,10 +24702,10 @@ sub perform_drone_imagery_analytics {
 
         $blupf90_solutions_tempfile = $tmp_stats_dir."/solutions";
         open(my $fh_sol, '<', $blupf90_solutions_tempfile) or die "Could not open file '$blupf90_solutions_tempfile' $!";
-            print STDERR "Opened $blupf90_solutions_tempfile\n";
+            $logger->debug("Opened $blupf90_solutions_tempfile");
 
             my $head = <$fh_sol>;
-            print STDERR $head;
+            $logger->error($head);
 
             my $solution_file_counter = 0;
             my $grm_sol_counter = 0;
@@ -24711,7 +24713,7 @@ sub perform_drone_imagery_analytics {
             my $pe_sol_counter = 0;
             my $pe_sol_trait_counter = 0;
             while (defined(my $row = <$fh_sol>)) {
-                # print STDERR $row;
+                # $logger->error($row);
                 my @vals = split ' ', $row;
                 my $level = $vals[2];
                 my $value = $vals[3];
@@ -24748,8 +24750,8 @@ sub perform_drone_imagery_analytics {
             }
         close($fh_sol);
 
-        # print STDERR Dumper \%rr_genetic_coefficients_altered_env_6;
-        # print STDERR Dumper \%rr_temporal_coefficients_altered_env_6;
+        # $logger->error(Dumper(\%rr_genetic_coefficients_altered_env_6));
+        # $logger->error(Dumper(\%rr_temporal_coefficients_altered_env_6));
 
         open(my $Fgc, ">", $coeff_genetic_tempfile) || die "Can't open file ".$coeff_genetic_tempfile;
 
@@ -24766,7 +24768,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -24802,7 +24804,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -24836,7 +24838,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -24872,7 +24874,7 @@ sub perform_drone_imagery_analytics {
                 my $coeff_counter = 0;
                 foreach my $b (@$coeffs) {
                     my $eval_string = $legendre_coeff_exec[$coeff_counter];
-                    # print STDERR Dumper [$eval_string, $b, $time];
+                    # $logger->error(Dumper([$eval_string, $b, $time]));
                     $value += eval $eval_string;
                     $coeff_counter++;
                 }
@@ -24893,22 +24895,22 @@ sub perform_drone_imagery_analytics {
 
         if ($perform_cv) {
             my $cmd_f90_cv1 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1;
+            $logger->error(Dumper($cmd_f90_cv1));
             my $status_cv1 = system($cmd_f90_cv1);
 
             open(my $fh_log_cv1, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1);
 
             my $yhat_residual_tempfile_cv1 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1, '<', $yhat_residual_tempfile_cv1) or die "Could not open file '$yhat_residual_tempfile_cv1' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1");
 
                 while (my $row = <$fh_yhat_res_cv1>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -24917,22 +24919,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1);
 
             my $cmd_f90_cv2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2;
+            $logger->error(Dumper($cmd_f90_cv2));
             my $status_cv2 = system($cmd_f90_cv2);
 
             open(my $fh_log_cv2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2);
 
             my $yhat_residual_tempfile_cv2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2, '<', $yhat_residual_tempfile_cv2) or die "Could not open file '$yhat_residual_tempfile_cv2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2");
 
                 while (my $row = <$fh_yhat_res_cv2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -24941,22 +24943,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2);
 
             my $cmd_f90_cv3 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3;
+            $logger->error(Dumper($cmd_f90_cv3));
             my $status_cv3 = system($cmd_f90_cv3);
 
             open(my $fh_log_cv3, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3);
 
             my $yhat_residual_tempfile_cv3 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3, '<', $yhat_residual_tempfile_cv3) or die "Could not open file '$yhat_residual_tempfile_cv3' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3");
 
                 while (my $row = <$fh_yhat_res_cv3>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -24965,22 +24967,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3);
 
             my $cmd_f90_cv4 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4;
+            $logger->error(Dumper($cmd_f90_cv4));
             my $status_cv4 = system($cmd_f90_cv4);
 
             open(my $fh_log_cv4, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4);
 
             my $yhat_residual_tempfile_cv4 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4, '<', $yhat_residual_tempfile_cv4) or die "Could not open file '$yhat_residual_tempfile_cv4' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4");
 
                 while (my $row = <$fh_yhat_res_cv4>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -24989,22 +24991,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4);
 
             my $cmd_f90_cv5 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_basename.' | '.$command_name.' > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5;
+            $logger->error(Dumper($cmd_f90_cv5));
             my $status_cv5 = system($cmd_f90_cv5);
 
             open(my $fh_log_cv5, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5);
 
             my $yhat_residual_tempfile_cv5 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5, '<', $yhat_residual_tempfile_cv5) or die "Could not open file '$yhat_residual_tempfile_cv5' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5");
 
                 while (my $row = <$fh_yhat_res_cv5>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -25013,22 +25015,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv5);
 
             my $cmd_f90_cv1_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv1_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv1_2;
+            $logger->error(Dumper($cmd_f90_cv1_2));
             my $status_cv1_2 = system($cmd_f90_cv1_2);
 
             open(my $fh_log_cv1_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv1_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv1_2);
 
             my $yhat_residual_tempfile_cv1_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv1_2, '<', $yhat_residual_tempfile_cv1_2) or die "Could not open file '$yhat_residual_tempfile_cv1_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv1_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv1_2");
 
                 while (my $row = <$fh_yhat_res_cv1_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -25037,22 +25039,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv1_2);
 
             my $cmd_f90_cv2_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv2_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv2_2;
+            $logger->error(Dumper($cmd_f90_cv2_2));
             my $status_cv2_2 = system($cmd_f90_cv2_2);
 
             open(my $fh_log_cv2_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv2_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv2_2);
 
             my $yhat_residual_tempfile_cv2_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv2_2, '<', $yhat_residual_tempfile_cv2_2) or die "Could not open file '$yhat_residual_tempfile_cv2_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv2_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv2_2");
 
                 while (my $row = <$fh_yhat_res_cv2_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -25061,22 +25063,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv2_2);
 
             my $cmd_f90_cv3_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv3_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv3_2;
+            $logger->error(Dumper($cmd_f90_cv3_2));
             my $status_cv3_2 = system($cmd_f90_cv3_2);
 
             open(my $fh_log_cv3_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv3_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv3_2);
 
             my $yhat_residual_tempfile_cv3_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv3_2, '<', $yhat_residual_tempfile_cv3_2) or die "Could not open file '$yhat_residual_tempfile_cv3_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv3_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv3_2");
 
                 while (my $row = <$fh_yhat_res_cv3_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -25085,22 +25087,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv3_2);
 
             my $cmd_f90_cv4_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv4_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv4_2;
+            $logger->error(Dumper($cmd_f90_cv4_2));
             my $status_cv4_2 = system($cmd_f90_cv4_2);
 
             open(my $fh_log_cv4_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv4_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv4_2);
 
             my $yhat_residual_tempfile_cv4_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv4_2, '<', $yhat_residual_tempfile_cv4_2) or die "Could not open file '$yhat_residual_tempfile_cv4_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv4_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv4_2");
 
                 while (my $row = <$fh_yhat_res_cv4_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -25109,22 +25111,22 @@ sub perform_drone_imagery_analytics {
             close($fh_yhat_res_cv4_2);
 
             my $cmd_f90_cv5_2 = 'cd '.$tmp_stats_dir.'; echo '.$parameter_tempfile_cv5_2_basename.' | blupf90 > '.$stats_out_tempfile;
-            print STDERR Dumper $cmd_f90_cv5_2;
+            $logger->error(Dumper($cmd_f90_cv5_2));
             my $status_cv5_2 = system($cmd_f90_cv5_2);
 
             open(my $fh_log_cv5_2, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 while (my $row = <$fh_log_cv5_2>) {
-                    print STDERR $row;
+                    $logger->error($row);
                 }
             close($fh_log_cv5_2);
 
             my $yhat_residual_tempfile_cv5_2 = $tmp_stats_dir."/yhat_residual";
             open(my $fh_yhat_res_cv5_2, '<', $yhat_residual_tempfile_cv5_2) or die "Could not open file '$yhat_residual_tempfile_cv5_2' $!";
-                print STDERR "Opened $yhat_residual_tempfile_cv5_2\n";
+                $logger->debug("Opened $yhat_residual_tempfile_cv5_2");
 
                 while (my $row = <$fh_yhat_res_cv5_2>) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @vals = split ' ', $row;
                     my $pred = $vals[0];
                     my $residual = $vals[1];
@@ -25141,8 +25143,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -25154,8 +25156,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -25164,7 +25166,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -25193,12 +25195,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -25209,7 +25211,7 @@ sub perform_drone_imagery_analytics {
                         my $z_ratio = $columns[3];
                         if (defined $value && $value ne '') {
                             if ($solution_file_counter < $row_number_span) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             elsif ($solution_file_counter < $row_number_span + $number_accessions) {
                                 my $stock_name = $accession_id_factor_map_reverse{$solution_file_counter - $row_number_span + 1};
@@ -25228,7 +25230,7 @@ sub perform_drone_imagery_analytics {
                                 $current_gen_row_count++;
                             }
                             elsif ($solution_file_counter < $col_number_span + $row_number_span + $number_accessions) {
-                                # print STDERR "$level $value \n";
+                                # $logger->debug("$level $value ");
                             }
                             else {
                                 my $plot_name = $row_col_ordered_plots_names[$current_env_row_count];
@@ -25252,7 +25254,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -25276,7 +25278,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -25300,7 +25302,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -25324,7 +25326,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -25348,7 +25350,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -25372,7 +25374,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -25396,7 +25398,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -25420,7 +25422,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -25444,7 +25446,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -25468,7 +25470,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -25492,7 +25494,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -25513,7 +25515,7 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
@@ -25528,7 +25530,7 @@ sub perform_drone_imagery_analytics {
 
         my @grm_old;
         open(my $fh_grm_old, '<', $grm_file) or die "Could not open file '$grm_file' $!";
-            print STDERR "Opened $grm_file\n";
+            $logger->debug("Opened $grm_file");
 
             while (my $row = <$fh_grm_old>) {
                 my @columns;
@@ -25553,7 +25555,7 @@ sub perform_drone_imagery_analytics {
         }
 
         open(my $fh_grm_new, '>', $grm_rename_tempfile) or die "Could not open file '$grm_rename_tempfile' $!";
-            print STDERR "Opened $grm_rename_tempfile\n";
+            $logger->debug("Opened $grm_rename_tempfile");
 
             foreach my $i (sort {$a <=> $b} keys %grm_hash_ordered) {
                 my $v = $grm_hash_ordered{$i};
@@ -25574,8 +25576,8 @@ sub perform_drone_imagery_analytics {
             $statistics_cmd_cv_1 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_1};
             $statistics_cmd_cv_2 = $cmd_statistics_uni{$t}->{statistics_cmd_cv_2};
 
-            # print STDERR Dumper $prepare_file_cv_cmd;
-            # print STDERR Dumper $statistics_cmd;
+            # $logger->error(Dumper($prepare_file_cv_cmd));
+            # $logger->error(Dumper($statistics_cmd));
             eval {
                 my $status_prepare_file_cv = system($prepare_file_cv_cmd);
                 my $status = system($statistics_cmd);
@@ -25587,8 +25589,8 @@ sub perform_drone_imagery_analytics {
 
             my $run_stats_fault = 0;
             if ($@) {
-                print STDERR "R ERROR\n";
-                print STDERR Dumper $@;
+                $logger->error("R ERROR");
+                $logger->error(Dumper($@));
                 $run_stats_fault = 1;
             }
             else {
@@ -25597,7 +25599,7 @@ sub perform_drone_imagery_analytics {
                 my @row_col_ordered_plots_names;
 
                 open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                    print STDERR "Opened $stats_out_tempfile_residual\n";
+                    $logger->debug("Opened $stats_out_tempfile_residual");
                     my $header_residual = <$fh_residual>;
                     my @header_cols_residual;
                     if ($csv->parse($header_residual)) {
@@ -25626,12 +25628,12 @@ sub perform_drone_imagery_analytics {
                 close($fh_residual);
 
                 open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                    print STDERR "Opened $stats_out_tempfile\n";
+                    $logger->debug("Opened $stats_out_tempfile");
                     my $header = <$fh>;
 
                     my $solution_file_counter = 0;
                     while (defined(my $row = <$fh>)) {
-                        # print STDERR $row;
+                        # $logger->error($row);
                         my @columns;
                         if ($csv->parse($row)) {
                             @columns = $csv->fields();
@@ -25679,7 +25681,7 @@ sub perform_drone_imagery_analytics {
                 close($fh);
 
                 open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                     my $header_cv1 = <$fh_cv1>;
                     my @header_cols_cv1;
                     if ($csv->parse($header_cv1)) {
@@ -25703,7 +25705,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1);
 
                 open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                     my $header_cv2 = <$fh_cv2>;
                     my @header_cols_cv2;
                     if ($csv->parse($header_cv2)) {
@@ -25727,7 +25729,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2);
 
                 open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                     my $header_cv3 = <$fh_cv3>;
                     my @header_cols_cv3;
                     if ($csv->parse($header_cv3)) {
@@ -25751,7 +25753,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3);
 
                 open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                     my $header_cv4 = <$fh_cv4>;
                     my @header_cols_cv4;
                     if ($csv->parse($header_cv4)) {
@@ -25775,7 +25777,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4);
 
                 open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                     my $header_cv5 = <$fh_cv5>;
                     my @header_cols_cv5;
                     if ($csv->parse($header_cv5)) {
@@ -25799,7 +25801,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5);
 
                 open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                     my $header_cv1_2 = <$fh_cv1_2>;
                     my @header_cols_cv1_2;
                     if ($csv->parse($header_cv1_2)) {
@@ -25823,7 +25825,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv1_2);
 
                 open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                     my $header_cv2_2 = <$fh_cv2_2>;
                     my @header_cols_cv2_2;
                     if ($csv->parse($header_cv2_2)) {
@@ -25847,7 +25849,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv2_2);
 
                 open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                     my $header_cv3_2 = <$fh_cv3_2>;
                     my @header_cols_cv3_2;
                     if ($csv->parse($header_cv3_2)) {
@@ -25871,7 +25873,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv3_2);
 
                 open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                     my $header_cv4_2 = <$fh_cv4_2>;
                     my @header_cols_cv4_2;
                     if ($csv->parse($header_cv4_2)) {
@@ -25895,7 +25897,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv4_2);
 
                 open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                    print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                    $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                     my $header_cv5_2 = <$fh_cv5_2>;
                     my @header_cols_cv5_2;
                     if ($csv->parse($header_cv5_2)) {
@@ -25919,7 +25921,7 @@ sub perform_drone_imagery_analytics {
                 close($fh_cv5_2);
 
                 open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                    print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                    $logger->debug("Opened $stats_out_tempfile_varcomp");
                     my $header_varcomp = <$fh_varcomp>;
                     my @header_cols_varcomp;
                     if ($csv->parse($header_varcomp)) {
@@ -25940,15 +25942,15 @@ sub perform_drone_imagery_analytics {
                 }
 
                 if ($run_stats_fault == 1) {
-                    print STDERR "ERROR IN R CMD\n";
+                    $logger->error("ERROR IN R CMD");
                     return {error=>'Error in R! Try a larger tolerance'};
                 }
             }
         }
     }
     elsif ($statistics_select eq 'asreml_grm_multivariate_spatial_genetic_blups') {
-        # print STDERR Dumper $prepare_file_cv_cmd;
-        # print STDERR Dumper $statistics_cmd;
+        # $logger->error(Dumper($prepare_file_cv_cmd));
+        # $logger->error(Dumper($statistics_cmd));
         eval {
             my $status_prepare_file_cv2 = system($prepare_file_cv2_cmd);
             my $status_prepare_file_cv = system($prepare_file_cv_cmd);
@@ -25961,8 +25963,8 @@ sub perform_drone_imagery_analytics {
 
         my $run_stats_fault = 0;
         if ($@) {
-            print STDERR "R ERROR\n";
-            print STDERR Dumper $@;
+            $logger->error("R ERROR");
+            $logger->error(Dumper($@));
             $run_stats_fault = 1;
         }
         else {
@@ -25971,7 +25973,7 @@ sub perform_drone_imagery_analytics {
             my @row_col_ordered_plots_names;
 
             open(my $fh_residual, '<', $stats_out_tempfile_residual) or die "Could not open file '$stats_out_tempfile_residual' $!";
-                print STDERR "Opened $stats_out_tempfile_residual\n";
+                $logger->debug("Opened $stats_out_tempfile_residual");
                 my $header_residual = <$fh_residual>;
                 my @header_cols_residual;
                 if ($csv->parse($header_residual)) {
@@ -26010,7 +26012,7 @@ sub perform_drone_imagery_analytics {
             close($fh_residual);
 
             open(my $fh, '<', $stats_out_tempfile) or die "Could not open file '$stats_out_tempfile' $!";
-                print STDERR "Opened $stats_out_tempfile\n";
+                $logger->debug("Opened $stats_out_tempfile");
                 my $header = <$fh>;
                 my @header_cols;
                 if ($csv->parse($header)) {
@@ -26023,7 +26025,7 @@ sub perform_drone_imagery_analytics {
                 my $solution_file_counter_g_index = 0;
                 my $solution_file_counter_p_index = 0;
                 while (defined(my $row = <$fh>)) {
-                    # print STDERR $row;
+                    # $logger->error($row);
                     my @columns;
                     if ($csv->parse($row)) {
                         @columns = $csv->fields();
@@ -26085,7 +26087,7 @@ sub perform_drone_imagery_analytics {
             close($fh);
 
             open(my $fh_cv1, '<', $stats_out_cv1_predict_tempfile) or die "Could not open file '$stats_out_cv1_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_predict_tempfile");
                 my $header_cv1 = <$fh_cv1>;
                 my @header_cols_cv1;
                 if ($csv->parse($header_cv1)) {
@@ -26109,7 +26111,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1);
 
             open(my $fh_cv2, '<', $stats_out_cv2_predict_tempfile) or die "Could not open file '$stats_out_cv2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_predict_tempfile");
                 my $header_cv2 = <$fh_cv2>;
                 my @header_cols_cv2;
                 if ($csv->parse($header_cv2)) {
@@ -26133,7 +26135,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2);
 
             open(my $fh_cv3, '<', $stats_out_cv3_predict_tempfile) or die "Could not open file '$stats_out_cv3_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_predict_tempfile");
                 my $header_cv3 = <$fh_cv3>;
                 my @header_cols_cv3;
                 if ($csv->parse($header_cv3)) {
@@ -26157,7 +26159,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3);
 
             open(my $fh_cv4, '<', $stats_out_cv4_predict_tempfile) or die "Could not open file '$stats_out_cv4_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_predict_tempfile");
                 my $header_cv4 = <$fh_cv4>;
                 my @header_cols_cv4;
                 if ($csv->parse($header_cv4)) {
@@ -26181,7 +26183,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4);
 
             open(my $fh_cv5, '<', $stats_out_cv5_predict_tempfile) or die "Could not open file '$stats_out_cv5_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_predict_tempfile");
                 my $header_cv5 = <$fh_cv5>;
                 my @header_cols_cv5;
                 if ($csv->parse($header_cv5)) {
@@ -26205,7 +26207,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5);
 
             open(my $fh_cv1_2, '<', $stats_out_cv1_2_predict_tempfile) or die "Could not open file '$stats_out_cv1_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv1_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv1_2_predict_tempfile");
                 my $header_cv1_2 = <$fh_cv1_2>;
                 my @header_cols_cv1_2;
                 if ($csv->parse($header_cv1_2)) {
@@ -26229,7 +26231,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv1_2);
 
             open(my $fh_cv2_2, '<', $stats_out_cv2_2_predict_tempfile) or die "Could not open file '$stats_out_cv2_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv2_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv2_2_predict_tempfile");
                 my $header_cv2_2 = <$fh_cv2_2>;
                 my @header_cols_cv2_2;
                 if ($csv->parse($header_cv2_2)) {
@@ -26253,7 +26255,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv2_2);
 
             open(my $fh_cv3_2, '<', $stats_out_cv3_2_predict_tempfile) or die "Could not open file '$stats_out_cv3_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv3_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv3_2_predict_tempfile");
                 my $header_cv3_2 = <$fh_cv3_2>;
                 my @header_cols_cv3_2;
                 if ($csv->parse($header_cv3_2)) {
@@ -26277,7 +26279,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv3_2);
 
             open(my $fh_cv4_2, '<', $stats_out_cv4_2_predict_tempfile) or die "Could not open file '$stats_out_cv4_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv4_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv4_2_predict_tempfile");
                 my $header_cv4_2 = <$fh_cv4_2>;
                 my @header_cols_cv4_2;
                 if ($csv->parse($header_cv4_2)) {
@@ -26301,7 +26303,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv4_2);
 
             open(my $fh_cv5_2, '<', $stats_out_cv5_2_predict_tempfile) or die "Could not open file '$stats_out_cv5_2_predict_tempfile' $!";
-                print STDERR "Opened $stats_out_cv5_2_predict_tempfile\n";
+                $logger->debug("Opened $stats_out_cv5_2_predict_tempfile");
                 my $header_cv5_2 = <$fh_cv5_2>;
                 my @header_cols_cv5_2;
                 if ($csv->parse($header_cv5_2)) {
@@ -26325,7 +26327,7 @@ sub perform_drone_imagery_analytics {
             close($fh_cv5_2);
 
             open(my $fh_varcomp, '<', $stats_out_tempfile_varcomp) or die "Could not open file '$stats_out_tempfile_varcomp' $!";
-                print STDERR "Opened $stats_out_tempfile_varcomp\n";
+                $logger->debug("Opened $stats_out_tempfile_varcomp");
                 my $header_varcomp = <$fh_varcomp>;
                 my @header_cols_varcomp;
                 if ($csv->parse($header_varcomp)) {
@@ -26345,19 +26347,19 @@ sub perform_drone_imagery_analytics {
             }
 
             if ($run_stats_fault == 1) {
-                print STDERR "ERROR IN R CMD\n";
+                $logger->error("ERROR IN R CMD");
                 return {error=>'Error in R! Try a larger tolerance'};
             }
         }
     }
-    print STDERR "ALTERED w/SIM_ENV selected_field_trial_htp_env $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_6\n";
-    print STDERR "ALTERED w/SIM_ENV selected_field_trial_htp_env $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_6\n";
-    print STDERR Dumper [$genetic_effect_min_altered_env_6, $genetic_effect_max_altered_env_6, $env_effect_min_altered_env_6, $env_effect_max_altered_env_6];
+    $logger->debug("ALTERED w/SIM_ENV selected_field_trial_htp_env $statistics_select GENETIC EFFECT SUM $genetic_effect_sum_altered_env_6");
+    $logger->debug("ALTERED w/SIM_ENV selected_field_trial_htp_env $statistics_select ENV EFFECT SUM $env_effect_sum_altered_env_6");
+    $logger->error(Dumper([$genetic_effect_min_altered_env_6, $genetic_effect_max_altered_env_6, $env_effect_min_altered_env_6, $env_effect_max_altered_env_6]));
 
     my @model_sum_square_altered_env_6_cv_values = ($model_sum_square_cv1_altered_env_6, $model_sum_square_cv2_altered_env_6, $model_sum_square_cv3_altered_env_6, $model_sum_square_cv4_altered_env_6, $model_sum_square_cv5_altered_env_6);
     my @model_sum_square_altered_env_6_cv_2_values = ($model_sum_square_cv1_2_altered_env_6, $model_sum_square_cv2_2_altered_env_6, $model_sum_square_cv3_2_altered_env_6, $model_sum_square_cv4_2_altered_env_6, $model_sum_square_cv5_2_altered_env_6);
-    print STDERR Dumper \@model_sum_square_altered_env_6_cv_values;
-    print STDERR Dumper \@model_sum_square_altered_env_6_cv_2_values;
+    $logger->error(Dumper(\@model_sum_square_altered_env_6_cv_values));
+    $logger->error(Dumper(\@model_sum_square_altered_env_6_cv_2_values));
     my $model_sum_square_altered_env_6_cv_stat = Statistics::Descriptive::Full->new();
     $model_sum_square_altered_env_6_cv_stat->add_data(@model_sum_square_altered_env_6_cv_values);
     my $model_sum_square_altered_env_cv_result_6 = {
