@@ -272,6 +272,10 @@ sub germplasm_pedigree {
         ## Get parents relationships
         my $cvterm_female_parent = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, 'female_parent', 'stock_relationship')->cvterm_id();
         my $cvterm_male_parent = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, 'male_parent', 'stock_relationship')->cvterm_id();
+
+	my $cvterm_rootstock_of = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, 'rootstock_of', 'stock_relationship')->cvterm_id();
+        my $cvterm_scion_of = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, 'scion_of', 'stock_relationship')->cvterm_id();
+	
         my $accession_cvterm = SGN::Model::Cvterm->get_cvterm_row($self->bcs_schema, 'accession', 'stock_type')->cvterm_id();
 
         #get the stock relationships for the stock
@@ -280,12 +284,12 @@ sub germplasm_pedigree {
 
         my $stock_relationships = $stock->search_related("stock_relationship_objects",undef,{ prefetch => ['type','subject'] });
 
-        my $female_parent_relationship = $stock_relationships->find({type_id => $cvterm_female_parent, subject_id => {'not_in' => $direct_descendant_ids}});
+        my $female_parent_relationship = $stock_relationships->find({type_id => { in => [ $cvterm_female_parent, $cvterm_scion_of ]}, subject_id => {'not_in' => $direct_descendant_ids}});
         if ($female_parent_relationship) {
             $female_parent_stock_id = $female_parent_relationship->subject_id();
             $mother = $self->bcs_schema->resultset("Stock::Stock")->find({stock_id => $female_parent_stock_id})->uniquename();
         }
-        my $male_parent_relationship = $stock_relationships->find({type_id => $cvterm_male_parent, subject_id => {'not_in' => $direct_descendant_ids}});
+        my $male_parent_relationship = $stock_relationships->find({type_id => { in => [ $cvterm_male_parent, $cvterm_rootstock_of ]}, subject_id => {'not_in' => $direct_descendant_ids}});
         if ($male_parent_relationship) {
             $male_parent_stock_id = $male_parent_relationship->subject_id();
             $father = $self->bcs_schema->resultset("Stock::Stock")->find({stock_id => $male_parent_stock_id})->uniquename();
@@ -795,7 +799,8 @@ sub store {
     }
 
     my $bs = CXGN::BreederSearch->new( { dbh=>$dbh, dbname=>$c->config->{dbname}, } );
-    my $refresh = $bs->refresh_matviews($c->config->{dbhost}, $c->config->{dbname}, $c->config->{dbuser}, $c->config->{dbpass}, 'stockprop', 'concurrent', $c->config->{basepath});
+
+    my $refresh = $bs->refresh_matviews($c->config->{dbhost}, $c->config->{dbname}, $c->config->{dbuser}, $c->config->{dbpass}, 'stockprop', 'concurrent', $c->config->{basepath}, 0);
 
     #retrieve saved items
     my @data = _simple_search($self,undef,$accession_list);
@@ -1011,7 +1016,7 @@ sub update {
 
     #update matviews
     my $bs = CXGN::BreederSearch->new( { dbh=>$dbh, dbname=>$c->config->{dbname}, } );
-    my $refresh = $bs->refresh_matviews($c->config->{dbhost}, $c->config->{dbname}, $c->config->{dbuser}, $c->config->{dbpass}, 'stockprop', 'concurrent', $c->config->{basepath});
+    my $refresh = $bs->refresh_matviews($c->config->{dbhost}, $c->config->{dbname}, $c->config->{dbuser}, $c->config->{dbpass}, 'stockprop', 'concurrent', $c->config->{basepath}, 0);
 
      #retrieve updated item
     my @result = _simple_search($self,[$germplasm_id]);
@@ -1118,7 +1123,7 @@ sub _simple_search {
         push @data, {
             accessionNumber=>$_->{'accession number'},
             acquisitionDate=>$_->{'acquisition date'} eq '' ? undef : $_->{'accession number'},
-            additionalInfo=>defined $_->{'stock_additional_info'} ? decode_json $_->{'stock_additional_info'} : undef,
+            additionalInfo=>defined $_->{'stock_additional_info'} && $_->{'stock_additional_info'} ne '' ? decode_json $_->{'stock_additional_info'} : undef,
             biologicalStatusOfAccessionCode=>$_->{'biological status of accession code'} || 0,
             biologicalStatusOfAccessionDescription=>undef,
             breedingMethodDbId=>$cross_type,

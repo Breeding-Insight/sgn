@@ -192,6 +192,18 @@ has 'unique_trait_stock_timestamp' => (
     is => 'rw',
 );
 
+has 'composable_validation_check_name' => (
+    isa => "Bool",
+    is => 'rw',
+    default => 0
+);
+
+has 'allow_repeat_measures' => (
+    isa => "Bool",
+    is => 'rw',
+    default => 0
+);
+
 #build is used for creating hash lookups in this case
 sub create_hash_lookups {
     my $self = shift;
@@ -268,9 +280,13 @@ sub verify {
     # print STDERR Dumper \@plot_list;
     # print STDERR Dumper \%plot_trait_value;
     my $plot_validator = CXGN::List::Validate->new();
-    my $trait_validator = CXGN::List::Validate->new();
+    my $trait_validator = CXGN::List::Validate->new(
+        composable_validation_check_name => $self->{composable_validation_check_name}
+    );
     my @plots_missing = @{$plot_validator->validate($schema,'plots_or_subplots_or_plants_or_tissue_samples_or_analysis_instances',\@plot_list)->{'missing'}};
-    my @traits_missing = @{$trait_validator->validate($schema,'traits',\@trait_list)->{'missing'}};
+    my $traits_validation = $trait_validator->validate($schema,'traits',\@trait_list);
+    my @traits_missing = @{$traits_validation->{'missing'}};
+    my @traits_wrong_ids = @{$traits_validation->{'wrong_ids'}};
     my $error_message = '';
     my $warning_message = '';
 
@@ -280,6 +296,15 @@ sub verify {
         print STDERR "Invalid traits: ".join(", ", map { "'$_'" } @traits_missing)."\n" if (@traits_missing);
         $error_message = "Invalid plots: <br/>".join(", <br/>", map { "'$_'" } @plots_missing) if (@plots_missing);
         $error_message = "Invalid traits: <br/>".join(", <br/>", map { "'$_'" } @traits_missing) if (@traits_missing);
+
+        # Display matches of traits with the wrong id
+        if ( scalar(@traits_wrong_ids) > 0 ) {
+            $error_message .= "<br /><br /><strong>Possible Trait Matches:</strong>";
+            foreach my $m (@traits_wrong_ids) {
+                $error_message .= "<br /><br />" . $m->{'original_term'} . "<br />should be<br />" . $m->{'matching_term'};
+            }
+        }
+
         return ($warning_message, $error_message);
     }
 
@@ -345,10 +370,6 @@ sub verify {
                 my $trait_cvterm = $trait_objs{$trait_name};
                 my $trait_cvterm_id = $trait_cvterm->cvterm_id();
                 my $stock_id = $schema->resultset('Stock::Stock')->find({'uniquename' => $plot_name})->stock_id();
-
-                if ($trait_value eq '.' || ($trait_value =~ m/[^a-zA-Z0-9,.\-\/\_]/ && $trait_value ne '.')){
-                    $error_message = $error_message."<small>Trait values must be alphanumeric with no spaces: <br/>Plot Name: ".$plot_name."<br/>Trait Name: ".$trait_name."<br/>Value: ".$trait_value."</small><hr>";
-                }
 
                 #check that trait value is valid for trait name
                 if (exists($check_trait_format{$trait_cvterm_id})) {
@@ -453,6 +474,7 @@ sub store {
     my $phenome_schema = $self->phenome_schema;
     my $overwrite_values = $self->overwrite_values;
     my $ignore_new_values = $self->ignore_new_values;
+    my $allow_repeat_measures = $self->allow_repeat_measures;
     my $error_message;
     my $transaction_error;
     my $user_id = $self->user_id;
@@ -471,6 +493,7 @@ sub store {
     my $tissue_sample_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'tissue_sample', 'stock_type')->cvterm_id();
     my $analysis_instance_cvterm_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'analysis_instance', 'stock_type')->cvterm_id();
     my $phenotype_addtional_info_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'phenotype_additional_info', 'phenotype_property')->cvterm_id();
+    my $external_references_type_id = SGN::Model::Cvterm->get_cvterm_row($schema, 'phenotype_external_references', 'phenotype_property')->cvterm_id();
     my %experiment_ids;
     my @stored_details;
     my %nd_experiment_md_images;
@@ -567,7 +590,8 @@ sub store {
                     $operator = $value->[2] ? $value->[2] : $operator;
                     my $observation = $value->[3];
                     my $image_id = $value->[4];
-                    my $additional_info = $value_array->[5] || undef;
+                    my $additional_info = $value->[5] || undef;
+	                my $external_references = $value->[6] || undef;
                     my $unique_time = $timestamp && defined($timestamp) ? $timestamp : 'NA' . $upload_date;
 
                     if (defined($trait_value) && length($trait_value)) {
@@ -599,7 +623,12 @@ sub store {
                             $check_unique_trait_stock{$trait_cvterm->cvterm_id(), $stock_id} = 1;
                         }
                         else {
-                            $new_count++;
+                            if (!$allow_repeat_measures && exists($check_unique_trait_stock{$trait_cvterm->cvterm_id(), $stock_id})) {
+	                            $skip_count++;
+	                            next;
+	                        } else {
+	                            $new_count++;
+	                        }
                         }
 
                         my $phenotype;
@@ -672,6 +701,14 @@ sub store {
                                 value => encode_json $additional_info,
                             });
                         }
+
+	                    if($external_references){
+	                        my $phenotype_external_references = $schema->resultset("Phenotype::Phenotypeprop")->create({
+	                            phenotype_id => $phenotype->phenotype_id,
+	                            type_id      => $external_references_type_id,
+	                            value => encode_json $external_references,
+	                        });
+	                    }
 
                         my $observationVariableDbId = $trait_cvterm->cvterm_id;
                         my %details = (

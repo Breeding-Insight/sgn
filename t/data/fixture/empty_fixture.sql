@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.4 (Debian 12.4-1.pgdg100+1)
--- Dumped by pg_dump version 12.4 (Debian 12.4-1.pgdg100+1)
+-- Dumped from database version 12.7 (Debian 12.7-1.pgdg100+1)
+-- Dumped by pg_dump version 12.14 (Debian 12.14-1.pgdg110+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -157,6 +157,20 @@ CREATE SCHEMA utils;
 ALTER SCHEMA utils OWNER TO postgres;
 
 --
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
 -- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -221,6 +235,83 @@ CREATE FUNCTION public.boxrange(integer, integer) RETURNS box
 
 
 ALTER FUNCTION public.boxrange(integer, integer) OWNER TO postgres;
+
+--
+-- Name: create_materialized_markerview(boolean); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.create_materialized_markerview(refresh boolean) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $_$
+	DECLARE
+		maprow RECORD;
+		querystr TEXT;
+		queries TEXT[];
+		emptyquery TEXT;
+		matviewquery TEXT;
+	BEGIN
+	
+		-- Remove exsiting materialized view, if it exists
+		DROP MATERIALIZED VIEW IF EXISTS public.materialized_markerview;
+
+		-- Get the unique species / reference genome combinations from the nd_protocolprop table
+		FOR maprow IN (
+			SELECT value->>'species_name' AS species,
+				concat(
+					substring(split_part(value->>'species_name', ' ', 1), 1, 1),
+					substring(split_part(value->>'species_name', ' ', 2), 1, 1)
+				) AS species_abbreviation,
+				value->>'reference_genome_name' AS reference_genome,
+				replace(replace(value->>'reference_genome_name', '_', ''), ' ', '') AS reference_genome_cleaned
+			FROM nd_protocolprop 
+			WHERE type_id = (SELECT cvterm_id FROM public.cvterm WHERE name = 'vcf_map_details')
+			GROUP BY species, reference_genome
+		)
+		
+		-- Loop through each unique combination of species / reference genome and build the marker query
+		LOOP
+			querystr := 'SELECT nd_protocolprop.nd_protocol_id, ''' || maprow.species || ''' AS species_name, ''' || maprow.reference_genome || ''' AS reference_genome_name, s.value->>''name'' AS marker_name, s.value->>''chrom'' AS chrom, cast(coalesce(nullif(s.value->>''pos'',''''),NULL) as numeric) AS pos, s.value->>''ref'' AS ref, s.value->>''alt'' AS alt, CASE WHEN s.value->>''alt'' < s.value->>''ref'' THEN concat(''' || maprow.species_abbreviation || ''', ''' || maprow.reference_genome_cleaned || ''', ''_'', REGEXP_REPLACE(s.value->>''chrom'', ''^chr?'', ''''), ''_'', s.value->>''pos'', ''_'', s.value->>''alt'', ''_'', s.value->>''ref'') ELSE concat(''' || maprow.species_abbreviation || ''', ''' || maprow.reference_genome_cleaned || ''', ''_'', REGEXP_REPLACE(s.value->>''chrom'', ''^chr?'', ''''), ''_'', s.value->>''pos'', ''_'', s.value->>''ref'', ''_'', s.value->>''alt'') END AS variant_name FROM nd_protocolprop, LATERAL jsonb_each(nd_protocolprop.value) s(key, value) WHERE type_id = (SELECT cvterm_id FROM public.cvterm WHERE name = ''vcf_map_details_markers'') AND nd_protocol_id IN (SELECT nd_protocol_id FROM nd_protocolprop WHERE value->>''species_name'' = ''' || maprow.species || ''' and value->>''reference_genome_name'' = ''' || maprow.reference_genome || ''' AND type_id = (SELECT cvterm_id FROM public.cvterm WHERE name = ''vcf_map_details''))';
+			queries := array_append(queries, querystr);
+
+		END LOOP;
+
+		-- Add an empty query in case there is no existing marker data
+		emptyquery := 'SELECT column1::int AS nd_protocol_id, column2::text AS species_name, column3::text AS reference_genome_name, column4::text AS marker_name, column5::text AS chrom, column6::numeric AS pos, column7::text AS ref, column8::text AS alt, column9::text AS variant_name FROM (values (null,null,null,null,null,null,null,null,null)) AS x WHERE false';
+		queries := array_append(queries, emptyquery);
+		
+		-- Combine queries with a UNION
+		matviewquery := array_to_string(queries, ' UNION ');
+
+		-- Build the materialized view
+		EXECUTE 'CREATE MATERIALIZED VIEW public.materialized_markerview AS (' || matviewquery || ') WITH NO DATA';
+		ALTER MATERIALIZED VIEW public.materialized_markerview OWNER TO web_usr;
+
+		-- Add indexes
+		CREATE INDEX materialized_markerview_idx1 ON public.materialized_markerview(nd_protocol_id);
+		CREATE INDEX materialized_markerview_idx2 ON public.materialized_markerview(species_name);
+		CREATE INDEX materialized_markerview_idx3 ON public.materialized_markerview(reference_genome_name);
+		CREATE INDEX materialized_markerview_idx4 ON public.materialized_markerview(marker_name);
+		CREATE INDEX materialized_markerview_idx5 ON public.materialized_markerview(UPPER(marker_name));
+		CREATE INDEX materialized_markerview_idx6 ON public.materialized_markerview(chrom);
+		CREATE INDEX materialized_markerview_idx7 ON public.materialized_markerview(pos);
+		CREATE INDEX materialized_markerview_idx8 ON public.materialized_markerview(variant_name);
+		CREATE INDEX materialized_markerview_idx9 ON public.materialized_markerview(UPPER(variant_name));
+		CREATE INDEX materialized_markerview_idx10 ON public.materialized_markerview USING GIN(marker_name gin_trgm_ops);
+		CREATE INDEX materialized_markerview_idx11 ON public.materialized_markerview USING GIN(variant_name gin_trgm_ops);
+
+		-- Refresh materialzied view, if requested with function argument
+		IF $1 THEN
+			EXECUTE 'REFRESH MATERIALIZED VIEW public.materialized_markerview';
+		END IF;
+
+		-- Return true if the materialized view is refreshed
+		RETURN $1;
+
+	END
+$_$;
+
+
+ALTER FUNCTION public.create_materialized_markerview(refresh boolean) OWNER TO postgres;
 
 --
 -- Name: create_point(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1336,242 +1427,6 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY public.materialized_stockprop;$$;
 
 
 ALTER FUNCTION public.refresh_materialized_stockprop_concurrently() OWNER TO web_usr;
-
---
--- Name: refresh_materialized_views(); Type: FUNCTION; Schema: public; Owner: web_usr
---
-
-CREATE FUNCTION public.refresh_materialized_views() RETURNS void
-    LANGUAGE sql
-    AS $$
-REFRESH MATERIALIZED VIEW public.materialized_phenoview;
-REFRESH MATERIALIZED VIEW public.materialized_genoview;
-REFRESH MATERIALIZED VIEW public.accessions;
-REFRESH MATERIALIZED VIEW public.breeding_programs;
-REFRESH MATERIALIZED VIEW public.genotyping_protocols;
-REFRESH MATERIALIZED VIEW public.locations;
-REFRESH MATERIALIZED VIEW public.plants;
-REFRESH MATERIALIZED VIEW public.plots;
-REFRESH MATERIALIZED VIEW public.seedlots;
-REFRESH MATERIALIZED VIEW public.trait_components;
-REFRESH MATERIALIZED VIEW public.traits;
-REFRESH MATERIALIZED VIEW public.trial_designs;
-REFRESH MATERIALIZED VIEW public.trial_types;
-REFRESH MATERIALIZED VIEW public.trials;
-REFRESH MATERIALIZED VIEW public.genotyping_projects;
-REFRESH MATERIALIZED VIEW public.years;
-REFRESH MATERIALIZED VIEW public.accessionsXbreeding_programs;
-REFRESH MATERIALIZED VIEW public.accessionsXlocations;
-REFRESH MATERIALIZED VIEW public.accessionsXgenotyping_protocols;
-REFRESH MATERIALIZED VIEW public.accessionsXplants;
-REFRESH MATERIALIZED VIEW public.accessionsXplots;
-REFRESH MATERIALIZED VIEW public.accessionsXseedlots;
-REFRESH MATERIALIZED VIEW public.accessionsXtrait_components;
-REFRESH MATERIALIZED VIEW public.accessionsXtraits;
-REFRESH MATERIALIZED VIEW public.accessionsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.accessionsXtrial_types;
-REFRESH MATERIALIZED VIEW public.accessionsXtrials;
-REFRESH MATERIALIZED VIEW public.accessionsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW public.accessionsXyears;
-REFRESH MATERIALIZED VIEW public.breeding_programsXlocations;
-REFRESH MATERIALIZED VIEW public.breeding_programsXgenotyping_protocols;
-REFRESH MATERIALIZED VIEW public.breeding_programsXplants;
-REFRESH MATERIALIZED VIEW public.breeding_programsXplots;
-REFRESH MATERIALIZED VIEW public.breeding_programsXseedlots;
-REFRESH MATERIALIZED VIEW public.breeding_programsXtrait_components;
-REFRESH MATERIALIZED VIEW public.breeding_programsXtraits;
-REFRESH MATERIALIZED VIEW public.breeding_programsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.breeding_programsXtrial_types;
-REFRESH MATERIALIZED VIEW public.breeding_programsXtrials;
-REFRESH MATERIALIZED VIEW public.breeding_programsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW public.breeding_programsXyears;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXlocations;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXplants;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXplots;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXseedlots;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXtrait_components;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXtraits;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXtrial_types;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXtrials;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsXyears;
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxaccessions;
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxbreeding_programs;
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxgenotyping_protocols;
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxlocations;
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxtraits;
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxtrials;
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxyears;
-REFRESH MATERIALIZED VIEW public.locationsXplants;
-REFRESH MATERIALIZED VIEW public.locationsXplots;
-REFRESH MATERIALIZED VIEW public.locationsXseedlots;
-REFRESH MATERIALIZED VIEW public.locationsXtrait_components;
-REFRESH MATERIALIZED VIEW public.locationsXtraits;
-REFRESH MATERIALIZED VIEW public.locationsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.locationsXtrial_types;
-REFRESH MATERIALIZED VIEW public.locationsXtrials;
-REFRESH MATERIALIZED VIEW public.locationsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW public.locationsXyears;
-REFRESH MATERIALIZED VIEW public.plantsXplots;
-REFRESH MATERIALIZED VIEW public.plantsXseedlots;
-REFRESH MATERIALIZED VIEW public.plantsXtrait_components;
-REFRESH MATERIALIZED VIEW public.plantsXtraits;
-REFRESH MATERIALIZED VIEW public.plantsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.plantsXtrial_types;
-REFRESH MATERIALIZED VIEW public.plantsXtrials;
-REFRESH MATERIALIZED VIEW public.plantsXyears;
-REFRESH MATERIALIZED VIEW public.plotsXseedlots;
-REFRESH MATERIALIZED VIEW public.plotsXtrait_components;
-REFRESH MATERIALIZED VIEW public.plotsXtraits;
-REFRESH MATERIALIZED VIEW public.plotsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.plotsXtrial_types;
-REFRESH MATERIALIZED VIEW public.plotsXtrials;
-REFRESH MATERIALIZED VIEW public.plotsXyears;
-REFRESH MATERIALIZED VIEW public.seedlotsXtrait_components;
-REFRESH MATERIALIZED VIEW public.seedlotsXtraits;
-REFRESH MATERIALIZED VIEW public.seedlotsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.seedlotsXtrial_types;
-REFRESH MATERIALIZED VIEW public.seedlotsXtrials;
-REFRESH MATERIALIZED VIEW public.seedlotsXyears;
-REFRESH MATERIALIZED VIEW public.trait_componentsXtraits;
-REFRESH MATERIALIZED VIEW public.trait_componentsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.trait_componentsXtrial_types;
-REFRESH MATERIALIZED VIEW public.trait_componentsXtrials;
-REFRESH MATERIALIZED VIEW public.trait_componentsXyears;
-REFRESH MATERIALIZED VIEW public.traitsXtrial_designs;
-REFRESH MATERIALIZED VIEW public.traitsXtrial_types;
-REFRESH MATERIALIZED VIEW public.traitsXtrials;
-REFRESH MATERIALIZED VIEW public.traitsXyears;
-REFRESH MATERIALIZED VIEW public.trialsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW public.trial_designsXtrial_types;
-REFRESH MATERIALIZED VIEW public.trial_designsXtrials;
-REFRESH MATERIALIZED VIEW public.trial_designsXyears;
-REFRESH MATERIALIZED VIEW public.trial_typesXtrials;
-REFRESH MATERIALIZED VIEW public.trial_typesXyears;
-REFRESH MATERIALIZED VIEW public.trialsXyears;
-UPDATE public.matviews SET currently_refreshing=FALSE, last_refresh=CURRENT_TIMESTAMP;$$;
-
-
-ALTER FUNCTION public.refresh_materialized_views() OWNER TO web_usr;
-
---
--- Name: refresh_materialized_views_concurrently(); Type: FUNCTION; Schema: public; Owner: web_usr
---
-
-CREATE FUNCTION public.refresh_materialized_views_concurrently() RETURNS void
-    LANGUAGE sql
-    AS $$
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.materialized_phenoview;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.materialized_genoview;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessions;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocols;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locations;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plants;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.seedlots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trait_components;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.traits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_projects;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.years;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXbreeding_programs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXlocations;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXgenotyping_protocols;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXplants;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXplots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXseedlots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXtrait_components;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.accessionsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXlocations;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXgenotyping_protocols;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXplants;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXplots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXseedlots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXtrait_components;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.breeding_programsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXlocations;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXplants;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXplots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXseedlots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXtrait_components;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_protocolsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_projectsxaccessions;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_projectsxbreeding_programs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_projectsxgenotyping_protocols;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_projectsxlocations;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_projectsxtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_projectsxtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.genotyping_projectsxyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXplants;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXplots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXseedlots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXtrait_components;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.locationsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plantsXplots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plantsXseedlots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plantsXtrait_components;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plantsXtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plantsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plantsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plantsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plantsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plotsXseedlots;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plotsXtrait_components;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plotsXtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plotsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plotsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plotsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.plotsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.seedlotsXtrait_components;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.seedlotsXtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.seedlotsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.seedlotsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.seedlotsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.seedlotsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trait_componentsXtraits;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trait_componentsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trait_componentsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trait_componentsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trait_componentsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.traitsXtrial_designs;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.traitsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.traitsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.traitsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trialsxgenotyping_projects;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trial_designsXtrial_types;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trial_designsXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trial_designsXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trial_typesXtrials;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trial_typesXyears;
-REFRESH MATERIALIZED VIEW CONCURRENTLY public.trialsXyears;
-UPDATE public.matviews SET currently_refreshing=FALSE, last_refresh=CURRENT_TIMESTAMP;$$;
-
-
-ALTER FUNCTION public.refresh_materialized_views_concurrently() OWNER TO web_usr;
 
 --
 -- Name: store_feature(character varying); Type: FUNCTION; Schema: public; Owner: postgres
@@ -6749,9 +6604,9 @@ ALTER SEQUENCE metadata.md_groups_group_id_seq OWNED BY metadata.md_groups.group
 
 CREATE TABLE metadata.md_image (
     image_id integer NOT NULL,
-    name character varying(100),
+    name character varying(250),
     description text,
-    original_filename character varying(100),
+    original_filename character varying(250),
     file_ext character varying(20),
     sp_person_id bigint,
     modified_date timestamp with time zone DEFAULT now(),
@@ -9202,6 +9057,42 @@ ALTER SEQUENCE phenome.project_md_image_project_md_image_id_seq OWNED BY phenome
 
 
 --
+-- Name: project_owner; Type: TABLE; Schema: phenome; Owner: postgres
+--
+
+CREATE TABLE phenome.project_owner (
+    project_owner_id integer NOT NULL,
+    project_id integer NOT NULL,
+    sp_person_id integer NOT NULL,
+    create_date timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE phenome.project_owner OWNER TO postgres;
+
+--
+-- Name: project_owner_project_owner_id_seq; Type: SEQUENCE; Schema: phenome; Owner: postgres
+--
+
+CREATE SEQUENCE phenome.project_owner_project_owner_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE phenome.project_owner_project_owner_id_seq OWNER TO postgres;
+
+--
+-- Name: project_owner_project_owner_id_seq; Type: SEQUENCE OWNED BY; Schema: phenome; Owner: postgres
+--
+
+ALTER SEQUENCE phenome.project_owner_project_owner_id_seq OWNED BY phenome.project_owner.project_owner_id;
+
+
+--
 -- Name: pub_curator; Type: TABLE; Schema: phenome; Owner: postgres
 --
 
@@ -10555,35 +10446,20 @@ COMMENT ON COLUMN public.stock.type_id IS 'The type_id foreign key links to a co
 
 
 --
--- Name: accessions; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessions; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessions AS
+CREATE VIEW public.accessions AS
  SELECT stock.stock_id AS accession_id,
     stock.uniquename AS accession_name
    FROM public.stock
   WHERE ((stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'accession'::text))) AND (stock.is_obsolete = false))
-  GROUP BY stock.stock_id, stock.uniquename
-  WITH NO DATA;
+  GROUP BY stock.stock_id, stock.uniquename;
 
 
 ALTER TABLE public.accessions OWNER TO web_usr;
-
---
--- Name: nd_experiment; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.nd_experiment (
-    nd_experiment_id integer NOT NULL,
-    nd_geolocation_id integer NOT NULL,
-    type_id integer NOT NULL,
-    create_date timestamp without time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.nd_experiment OWNER TO postgres;
 
 --
 -- Name: nd_experiment_phenotype; Type: TABLE; Schema: public; Owner: postgres
@@ -10647,64 +10523,6 @@ COMMENT ON COLUMN public.nd_experiment_stock.stock_id IS 'stock used in the extr
 
 
 --
--- Name: nd_geolocation; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.nd_geolocation (
-    nd_geolocation_id integer NOT NULL,
-    description character varying(255),
-    latitude real,
-    longitude real,
-    geodetic_datum character varying(32),
-    altitude real
-);
-
-
-ALTER TABLE public.nd_geolocation OWNER TO postgres;
-
---
--- Name: TABLE nd_geolocation; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON TABLE public.nd_geolocation IS 'The geo-referencable location of the stock. NOTE: This entity is subject to change as a more general and possibly more OpenGIS-compliant geolocation module may be introduced into Chado.';
-
-
---
--- Name: COLUMN nd_geolocation.description; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.nd_geolocation.description IS 'A textual representation of the location, if this is the original georeference. Optional if the original georeference is available in lat/long coordinates.';
-
-
---
--- Name: COLUMN nd_geolocation.latitude; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.nd_geolocation.latitude IS 'The decimal latitude coordinate of the georeference, using positive and negative sign to indicate N and S, respectively.';
-
-
---
--- Name: COLUMN nd_geolocation.longitude; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.nd_geolocation.longitude IS 'The decimal longitude coordinate of the georeference, using positive and negative sign to indicate E and W, respectively.';
-
-
---
--- Name: COLUMN nd_geolocation.geodetic_datum; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.nd_geolocation.geodetic_datum IS 'The geodetic system on which the geo-reference coordinates are based. For geo-references measured between 1984 and 2010, this will typically be WGS84.';
-
-
---
--- Name: COLUMN nd_geolocation.altitude; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.nd_geolocation.altitude IS 'The altitude (elevation) of the location in meters. If the altitude is only known as a range, this is the average, and altitude_dev will hold half of the width of the range.';
-
-
---
 -- Name: phenotype; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -10734,12 +10552,20 @@ ALTER TABLE public.phenotype OWNER TO postgres;
 CREATE TABLE public.project (
     project_id integer NOT NULL,
     name character varying(255) NOT NULL,
-    description character varying(255) NOT NULL,
-    create_date timestamp without time zone DEFAULT now()
+    description text NOT NULL,
+    create_date timestamp without time zone DEFAULT now(),
+    type_id bigint
 );
 
 
 ALTER TABLE public.project OWNER TO postgres;
+
+--
+-- Name: COLUMN project.type_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.project.type_id IS 'An optional cvterm_id that specifies what type of project this record is.  Prior to 1.4, project type was set with an projectprop.';
+
 
 --
 -- Name: project_relationship; Type: TABLE; Schema: public; Owner: postgres
@@ -10843,15 +10669,15 @@ COMMENT ON COLUMN public.stock_relationship.rank IS 'stock_relationship.rank is 
 
 CREATE MATERIALIZED VIEW public.materialized_phenoview AS
  SELECT breeding_program.project_id AS breeding_program_id,
-    nd_experiment.nd_geolocation_id AS location_id,
-    projectprop.value AS year_id,
+    (location.value)::integer AS location_id,
+    year.value AS year_id,
     trial.project_id AS trial_id,
     accession.stock_id AS accession_id,
     seedlot.stock_id AS seedlot_id,
     stock.stock_id,
     phenotype.phenotype_id,
     phenotype.cvalue_id AS trait_id
-   FROM ((((((((((((((public.stock accession
+   FROM (((((((((((((public.stock accession
      LEFT JOIN public.stock_relationship ON (((accession.stock_id = stock_relationship.object_id) AND (stock_relationship.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE (((cvterm.name)::text = 'plot_of'::text) OR ((cvterm.name)::text = 'plant_of'::text) OR ((cvterm.name)::text = 'analysis_of'::text)))))))
@@ -10866,18 +10692,17 @@ CREATE MATERIALIZED VIEW public.materialized_phenoview AS
           WHERE ((cvterm.name)::text = 'seedlot'::text))))))
      LEFT JOIN public.nd_experiment_stock ON (((stock.stock_id = nd_experiment_stock.stock_id) AND (nd_experiment_stock.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = ANY (ARRAY[('phenotyping_experiment'::character varying)::text, ('field_layout'::character varying)::text, ('analysis_experiment'::character varying)::text])))))))
-     LEFT JOIN public.nd_experiment ON (((nd_experiment_stock.nd_experiment_id = nd_experiment.nd_experiment_id) AND (nd_experiment.type_id IN ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = ANY (ARRAY[('phenotyping_experiment'::character varying)::text, ('field_layout'::character varying)::text, ('analysis_experiment'::character varying)::text])))))))
-     FULL JOIN public.nd_geolocation ON ((nd_experiment.nd_geolocation_id = nd_geolocation.nd_geolocation_id)))
+          WHERE ((cvterm.name)::text = ANY ((ARRAY['phenotyping_experiment'::character varying, 'field_layout'::character varying, 'analysis_experiment'::character varying])::text[])))))))
      LEFT JOIN public.nd_experiment_project ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
      FULL JOIN public.project trial ON ((nd_experiment_project.project_id = trial.project_id)))
      LEFT JOIN public.project_relationship ON (((trial.project_id = project_relationship.subject_project_id) AND (project_relationship.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'breeding_program_trial_relationship'::text))))))
      FULL JOIN public.project breeding_program ON ((project_relationship.object_project_id = breeding_program.project_id)))
-     LEFT JOIN public.projectprop ON (((trial.project_id = projectprop.project_id) AND (projectprop.type_id = ( SELECT cvterm.cvterm_id
+     LEFT JOIN public.projectprop location ON (((trial.project_id = location.project_id) AND (location.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'project location'::text))))))
+     LEFT JOIN public.projectprop year ON (((trial.project_id = year.project_id) AND (year.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'project year'::text))))))
      LEFT JOIN public.nd_experiment_phenotype ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_phenotype.nd_experiment_id)))
@@ -10885,25 +10710,63 @@ CREATE MATERIALIZED VIEW public.materialized_phenoview AS
   WHERE (accession.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'accession'::text)))
-  ORDER BY breeding_program.project_id, nd_experiment.nd_geolocation_id, trial.project_id, accession.stock_id, seedlot.stock_id, stock.stock_id, phenotype.phenotype_id, phenotype.cvalue_id
+  ORDER BY breeding_program.project_id, (location.value)::integer, trial.project_id, accession.stock_id, seedlot.stock_id, stock.stock_id, phenotype.phenotype_id, phenotype.cvalue_id
   WITH NO DATA;
 
 
 ALTER TABLE public.materialized_phenoview OWNER TO web_usr;
 
 --
--- Name: accessionsxbreeding_programs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxbreeding_programs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxbreeding_programs AS
+CREATE VIEW public.accessionsxbreeding_programs AS
  SELECT materialized_phenoview.accession_id,
     materialized_phenoview.breeding_program_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.breeding_program_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.breeding_program_id;
 
 
 ALTER TABLE public.accessionsxbreeding_programs OWNER TO web_usr;
+
+--
+-- Name: genotype; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.genotype (
+    genotype_id integer NOT NULL,
+    name text,
+    uniquename text NOT NULL,
+    description character varying(255),
+    type_id integer NOT NULL,
+    create_date timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.genotype OWNER TO postgres;
+
+--
+-- Name: TABLE genotype; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.genotype IS 'Genetic context. A genotype is defined by a collection of features, mutations, balancers, deficiencies, haplotype blocks, or engineered constructs.';
+
+
+--
+-- Name: COLUMN genotype.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.genotype.name IS 'Optional alternative name for a genotype, 
+for display purposes.';
+
+
+--
+-- Name: COLUMN genotype.uniquename; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.genotype.uniquename IS 'The unique name for a genotype; 
+typically derived from the features making up the genotype.';
+
 
 --
 -- Name: nd_experiment_genotype; Type: TABLE; Schema: public; Owner: postgres
@@ -10979,124 +10842,122 @@ COMMENT ON COLUMN public.nd_protocol.name IS 'The protocol name.';
 --
 
 CREATE MATERIALIZED VIEW public.materialized_genoview AS
- SELECT COALESCE(stock_relationship.object_id, accession.stock_id) AS accession_id,
-    COALESCE(stock_type.name, 'accession'::character varying) AS stock_type,
-    COALESCE(nd_experiment_protocol.nd_protocol_id, nd_experiment_protocol_accession.nd_protocol_id) AS genotyping_protocol_id,
-    COALESCE(nd_experiment_genotype.genotype_id, nd_experiment_genotype_accession.genotype_id) AS genotype_id
-   FROM (((((((((((public.stock accession
-     LEFT JOIN public.stock_relationship ON (((accession.stock_id = stock_relationship.object_id) AND (stock_relationship.type_id IN ( SELECT cvterm.cvterm_id
+ SELECT stock.stock_id AS accession_id,
+    nd_experiment_protocol.nd_protocol_id AS genotyping_protocol_id,
+    nd_experiment_project.project_id AS genotyping_project_id,
+    genotype.genotype_id,
+    stock_type.name AS stock_type
+   FROM (((((((public.stock
+     JOIN public.cvterm stock_type ON (((stock_type.cvterm_id = stock.type_id) AND ((stock_type.name)::text = 'accession'::text))))
+     JOIN public.nd_experiment_stock ON ((stock.stock_id = nd_experiment_stock.stock_id)))
+     JOIN public.nd_experiment_protocol ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_protocol.nd_experiment_id)))
+     LEFT JOIN public.nd_experiment_project ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
+     JOIN public.nd_protocol ON ((nd_experiment_protocol.nd_protocol_id = nd_protocol.nd_protocol_id)))
+     JOIN public.nd_experiment_genotype ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_genotype.nd_experiment_id)))
+     JOIN public.genotype ON ((genotype.genotype_id = nd_experiment_genotype.genotype_id)))
+  GROUP BY stock.stock_id, nd_experiment_protocol.nd_protocol_id, nd_experiment_project.project_id, genotype.genotype_id, stock_type.name
+UNION
+ SELECT accession.stock_id AS accession_id,
+    nd_experiment_protocol.nd_protocol_id AS genotyping_protocol_id,
+    nd_experiment_project.project_id AS genotyping_project_id,
+    nd_experiment_genotype.genotype_id,
+    stock_type.name AS stock_type
+   FROM ((((((((public.stock accession
+     JOIN public.stock_relationship ON (((accession.stock_id = stock_relationship.object_id) AND (stock_relationship.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'tissue_sample_of'::text))))))
-     LEFT JOIN public.stock ON (((stock_relationship.subject_id = stock.stock_id) AND (stock.type_id IN ( SELECT cvterm.cvterm_id
+          WHERE ((cvterm.name)::text = ANY ((ARRAY['tissue_sample_of'::character varying, 'plant_of'::character varying, 'plot_of'::character varying])::text[])))))))
+     JOIN public.stock ON (((stock_relationship.subject_id = stock.stock_id) AND (stock.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'tissue_sample'::text))))))
-     LEFT JOIN public.cvterm stock_type ON ((stock_type.cvterm_id = stock.type_id)))
-     LEFT JOIN public.nd_experiment_stock ON ((stock.stock_id = nd_experiment_stock.stock_id)))
-     LEFT JOIN public.nd_experiment_protocol ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_protocol.nd_experiment_id)))
-     LEFT JOIN public.nd_protocol ON ((nd_experiment_protocol.nd_protocol_id = nd_protocol.nd_protocol_id)))
-     LEFT JOIN public.nd_experiment_genotype ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_genotype.nd_experiment_id)))
-     LEFT JOIN public.nd_experiment_stock nd_experiment_stock_accession ON ((accession.stock_id = nd_experiment_stock_accession.stock_id)))
-     LEFT JOIN public.nd_experiment_protocol nd_experiment_protocol_accession ON ((nd_experiment_stock_accession.nd_experiment_id = nd_experiment_protocol_accession.nd_experiment_id)))
-     LEFT JOIN public.nd_protocol nd_protocol_accession ON ((nd_experiment_protocol_accession.nd_protocol_id = nd_protocol_accession.nd_protocol_id)))
-     LEFT JOIN public.nd_experiment_genotype nd_experiment_genotype_accession ON ((nd_experiment_stock_accession.nd_experiment_id = nd_experiment_genotype_accession.nd_experiment_id)))
-  WHERE ((accession.type_id IN ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'accession'::text))) AND ((nd_experiment_genotype.genotype_id IS NOT NULL) OR (nd_experiment_genotype_accession.genotype_id IS NOT NULL)))
-  GROUP BY COALESCE(stock_relationship.object_id, accession.stock_id), COALESCE(stock_type.name, 'accession'::character varying), COALESCE(nd_experiment_protocol.nd_protocol_id, nd_experiment_protocol_accession.nd_protocol_id), COALESCE(nd_experiment_genotype.genotype_id, nd_experiment_genotype_accession.genotype_id)
+          WHERE ((cvterm.name)::text = ANY ((ARRAY['tissue_sample'::character varying, 'plant'::character varying, 'plot'::character varying])::text[])))))))
+     JOIN public.cvterm stock_type ON ((stock_type.cvterm_id = stock.type_id)))
+     JOIN public.nd_experiment_stock ON ((stock.stock_id = nd_experiment_stock.stock_id)))
+     JOIN public.nd_experiment_protocol ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_protocol.nd_experiment_id)))
+     LEFT JOIN public.nd_experiment_project ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
+     JOIN public.nd_protocol ON ((nd_experiment_protocol.nd_protocol_id = nd_protocol.nd_protocol_id)))
+     JOIN public.nd_experiment_genotype ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_genotype.nd_experiment_id)))
+  GROUP BY accession.stock_id, nd_experiment_protocol.nd_protocol_id, nd_experiment_project.project_id, nd_experiment_genotype.genotype_id, stock_type.name
+  ORDER BY 1, 2, 3, 4
   WITH NO DATA;
 
 
 ALTER TABLE public.materialized_genoview OWNER TO web_usr;
 
 --
--- Name: accessionsxgenotyping_projects; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxgenotyping_projects; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxgenotyping_projects AS
- SELECT accessions.accession_id,
-    nd_experiment_project.project_id AS genotyping_project_id
-   FROM (((public.accessions
-     JOIN public.materialized_genoview ON ((accessions.accession_id = materialized_genoview.accession_id)))
-     JOIN public.nd_experiment_genotype ON ((materialized_genoview.genotype_id = nd_experiment_genotype.genotype_id)))
-     JOIN public.nd_experiment_project ON ((nd_experiment_genotype.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
-  WHERE (nd_experiment_project.project_id IN ( SELECT projectprop.project_id
-           FROM public.projectprop
-          WHERE ((projectprop.type_id = ( SELECT cvterm.cvterm_id
-                   FROM public.cvterm
-                  WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop.value = 'genotype_data_project'::text))))
-  GROUP BY accessions.accession_id, nd_experiment_project.project_id
-  WITH NO DATA;
+CREATE VIEW public.accessionsxgenotyping_projects AS
+ SELECT materialized_genoview.accession_id,
+    materialized_genoview.genotyping_project_id
+   FROM public.materialized_genoview
+  GROUP BY materialized_genoview.accession_id, materialized_genoview.genotyping_project_id;
 
 
 ALTER TABLE public.accessionsxgenotyping_projects OWNER TO web_usr;
 
 --
--- Name: accessionsxgenotyping_protocols; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxgenotyping_protocols; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxgenotyping_protocols AS
+CREATE VIEW public.accessionsxgenotyping_protocols AS
  SELECT materialized_genoview.accession_id,
     materialized_genoview.genotyping_protocol_id
    FROM public.materialized_genoview
-  GROUP BY materialized_genoview.accession_id, materialized_genoview.genotyping_protocol_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.accession_id, materialized_genoview.genotyping_protocol_id;
 
 
 ALTER TABLE public.accessionsxgenotyping_protocols OWNER TO web_usr;
 
 --
--- Name: accessionsxlocations; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxlocations; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxlocations AS
+CREATE VIEW public.accessionsxlocations AS
  SELECT materialized_phenoview.accession_id,
     materialized_phenoview.location_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.location_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.location_id;
 
 
 ALTER TABLE public.accessionsxlocations OWNER TO web_usr;
 
 --
--- Name: accessionsxplants; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxplants; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxplants AS
+CREATE VIEW public.accessionsxplants AS
  SELECT materialized_phenoview.accession_id,
     stock.stock_id AS plant_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY materialized_phenoview.accession_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, stock.stock_id;
 
 
 ALTER TABLE public.accessionsxplants OWNER TO web_usr;
 
 --
--- Name: accessionsxplots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxplots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxplots AS
+CREATE VIEW public.accessionsxplots AS
  SELECT materialized_phenoview.accession_id,
     stock.stock_id AS plot_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))))))
-  GROUP BY materialized_phenoview.accession_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, stock.stock_id;
 
 
 ALTER TABLE public.accessionsxplots OWNER TO web_usr;
 
 --
--- Name: accessionsxseedlots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxseedlots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxseedlots AS
+CREATE VIEW public.accessionsxseedlots AS
  SELECT materialized_phenoview.accession_id,
     stock.stock_id AS seedlot_id
    FROM ((public.materialized_phenoview
@@ -11106,8 +10967,7 @@ CREATE MATERIALIZED VIEW public.accessionsxseedlots AS
      LEFT JOIN public.stock ON (((seedlot_relationship.object_id = stock.stock_id) AND (stock.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'seedlot'::text))))))
-  GROUP BY materialized_phenoview.accession_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, stock.stock_id;
 
 
 ALTER TABLE public.accessionsxseedlots OWNER TO web_usr;
@@ -11169,10 +11029,10 @@ object. In a graph, this typically corresponds to the parent node';
 
 
 --
--- Name: accessionsxtrait_components; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxtrait_components; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxtrait_components AS
+CREATE VIEW public.accessionsxtrait_components AS
  SELECT materialized_phenoview.accession_id,
     trait_component.cvterm_id AS trait_component_id
    FROM (((public.materialized_phenoview
@@ -11181,39 +11041,36 @@ CREATE MATERIALIZED VIEW public.accessionsxtrait_components AS
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'contains'::text))))))
      JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY materialized_phenoview.accession_id, trait_component.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, trait_component.cvterm_id;
 
 
 ALTER TABLE public.accessionsxtrait_components OWNER TO web_usr;
 
 --
--- Name: accessionsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxtraits; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxtraits AS
+CREATE VIEW public.accessionsxtraits AS
  SELECT materialized_phenoview.accession_id,
     materialized_phenoview.trait_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.trait_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.trait_id;
 
 
 ALTER TABLE public.accessionsxtraits OWNER TO web_usr;
 
 --
--- Name: accessionsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxtrial_designs AS
+CREATE VIEW public.accessionsxtrial_designs AS
  SELECT materialized_phenoview.accession_id,
     trialdesign.value AS trial_design_id
    FROM (public.materialized_phenoview
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY materialized_phenoview.accession_id, trialdesign.value
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, trialdesign.value;
 
 
 ALTER TABLE public.accessionsxtrial_designs OWNER TO web_usr;
@@ -11259,10 +11116,10 @@ membership of this ontology';
 
 
 --
--- Name: accessionsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxtrial_types AS
+CREATE VIEW public.accessionsxtrial_types AS
  SELECT materialized_phenoview.accession_id,
     trialterm.cvterm_id AS trial_type_id
    FROM ((public.materialized_phenoview
@@ -11271,36 +11128,33 @@ CREATE MATERIALIZED VIEW public.accessionsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY materialized_phenoview.accession_id, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, trialterm.cvterm_id;
 
 
 ALTER TABLE public.accessionsxtrial_types OWNER TO web_usr;
 
 --
--- Name: accessionsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxtrials AS
+CREATE VIEW public.accessionsxtrials AS
  SELECT materialized_phenoview.accession_id,
     materialized_phenoview.trial_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.accessionsxtrials OWNER TO web_usr;
 
 --
--- Name: accessionsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: accessionsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.accessionsxyears AS
+CREATE VIEW public.accessionsxyears AS
  SELECT materialized_phenoview.accession_id,
     materialized_phenoview.year_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.accession_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.accessionsxyears OWNER TO web_usr;
@@ -11873,10 +11727,10 @@ ALTER SEQUENCE public.blastwatch_results_blastwatch_results_id_seq OWNED BY publ
 
 
 --
--- Name: breeding_programs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programs AS
+CREATE VIEW public.breeding_programs AS
  SELECT project.project_id AS breeding_program_id,
     project.name AS breeding_program_name
    FROM (public.project
@@ -11884,116 +11738,106 @@ CREATE MATERIALIZED VIEW public.breeding_programs AS
   WHERE (projectprop.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'breeding_program'::text)))
-  GROUP BY project.project_id, project.name
-  WITH NO DATA;
+  GROUP BY project.project_id, project.name;
 
 
 ALTER TABLE public.breeding_programs OWNER TO web_usr;
 
 --
--- Name: genotyping_projects; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxgenotyping_projects; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_projects AS
- SELECT project.project_id AS genotyping_project_id,
-    project.name AS genotyping_project_name
-   FROM (public.project
-     JOIN public.projectprop USING (project_id))
+CREATE VIEW public.breeding_programsxgenotyping_projects AS
+ SELECT project_relationship.object_project_id AS breeding_program_id,
+    project.project_id AS genotyping_project_id
+   FROM ((public.project
+     LEFT JOIN public.projectprop ON ((project.project_id = projectprop.project_id)))
+     LEFT JOIN public.project_relationship ON ((project.project_id = project_relationship.subject_project_id)))
   WHERE ((projectprop.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop.value = 'genotype_data_project'::text))
-  GROUP BY project.project_id, project.name
-  WITH NO DATA;
-
-
-ALTER TABLE public.genotyping_projects OWNER TO web_usr;
-
---
--- Name: breeding_programsxgenotyping_projects; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.breeding_programsxgenotyping_projects AS
- SELECT breeding_programs.breeding_program_id,
-    project_relationship.subject_project_id AS genotyping_project_id
-   FROM (public.breeding_programs
-     JOIN public.project_relationship ON ((breeding_programs.breeding_program_id = project_relationship.object_project_id)))
-  WHERE ((project_relationship.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'breeding_program_trial_relationship'::text))) AND (project_relationship.subject_project_id IN ( SELECT genotyping_projects.genotyping_project_id
-           FROM public.genotyping_projects)))
-  WITH NO DATA;
+          WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop.value = 'genotype_data_project'::text));
 
 
 ALTER TABLE public.breeding_programsxgenotyping_projects OWNER TO web_usr;
 
 --
--- Name: breeding_programsxgenotyping_protocols; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxgenotyping_protocols; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxgenotyping_protocols AS
+CREATE VIEW public.breeding_programsxgenotyping_protocols AS
  SELECT materialized_phenoview.breeding_program_id,
     materialized_genoview.genotyping_protocol_id
    FROM (public.materialized_phenoview
      JOIN public.materialized_genoview USING (accession_id))
-  GROUP BY materialized_phenoview.breeding_program_id, materialized_genoview.genotyping_protocol_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, materialized_genoview.genotyping_protocol_id;
 
 
 ALTER TABLE public.breeding_programsxgenotyping_protocols OWNER TO web_usr;
 
 --
--- Name: breeding_programsxlocations; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxlocations; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxlocations AS
+CREATE VIEW public.breeding_programsxlocations AS
  SELECT materialized_phenoview.breeding_program_id,
     materialized_phenoview.location_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.breeding_program_id, materialized_phenoview.location_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, materialized_phenoview.location_id;
 
 
 ALTER TABLE public.breeding_programsxlocations OWNER TO web_usr;
 
 --
--- Name: breeding_programsxplants; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxplants; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxplants AS
+CREATE VIEW public.breeding_programsxplants AS
  SELECT materialized_phenoview.breeding_program_id,
     stock.stock_id AS plant_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY materialized_phenoview.breeding_program_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, stock.stock_id;
 
 
 ALTER TABLE public.breeding_programsxplants OWNER TO web_usr;
 
 --
--- Name: breeding_programsxplots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxplots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxplots AS
+CREATE VIEW public.breeding_programsxplots AS
  SELECT materialized_phenoview.breeding_program_id,
     stock.stock_id AS plot_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))))))
-  GROUP BY materialized_phenoview.breeding_program_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, stock.stock_id;
 
 
 ALTER TABLE public.breeding_programsxplots OWNER TO web_usr;
 
 --
--- Name: breeding_programsxseedlots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: nd_experiment; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxseedlots AS
+CREATE TABLE public.nd_experiment (
+    nd_experiment_id integer NOT NULL,
+    nd_geolocation_id integer NOT NULL,
+    type_id integer NOT NULL,
+    create_date timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.nd_experiment OWNER TO postgres;
+
+--
+-- Name: breeding_programsxseedlots; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.breeding_programsxseedlots AS
  SELECT materialized_phenoview.breeding_program_id,
     nd_experiment_stock.stock_id AS seedlot_id
    FROM (((public.materialized_phenoview
@@ -12002,17 +11846,16 @@ CREATE MATERIALIZED VIEW public.breeding_programsxseedlots AS
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'seedlot_experiment'::text))))))
      LEFT JOIN public.nd_experiment_stock ON ((nd_experiment.nd_experiment_id = nd_experiment_stock.nd_experiment_id)))
-  GROUP BY materialized_phenoview.breeding_program_id, nd_experiment_stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, nd_experiment_stock.stock_id;
 
 
 ALTER TABLE public.breeding_programsxseedlots OWNER TO web_usr;
 
 --
--- Name: breeding_programsxtrait_components; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxtrait_components; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxtrait_components AS
+CREATE VIEW public.breeding_programsxtrait_components AS
  SELECT materialized_phenoview.breeding_program_id,
     trait_component.cvterm_id AS trait_component_id
    FROM (((public.materialized_phenoview
@@ -12021,48 +11864,45 @@ CREATE MATERIALIZED VIEW public.breeding_programsxtrait_components AS
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'contains'::text))))))
      JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY materialized_phenoview.breeding_program_id, trait_component.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, trait_component.cvterm_id;
 
 
 ALTER TABLE public.breeding_programsxtrait_components OWNER TO web_usr;
 
 --
--- Name: breeding_programsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxtraits; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxtraits AS
+CREATE VIEW public.breeding_programsxtraits AS
  SELECT materialized_phenoview.breeding_program_id,
     materialized_phenoview.trait_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.breeding_program_id, materialized_phenoview.trait_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, materialized_phenoview.trait_id;
 
 
 ALTER TABLE public.breeding_programsxtraits OWNER TO web_usr;
 
 --
--- Name: breeding_programsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxtrial_designs AS
+CREATE VIEW public.breeding_programsxtrial_designs AS
  SELECT materialized_phenoview.breeding_program_id,
     trialdesign.value AS trial_design_id
    FROM (public.materialized_phenoview
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY materialized_phenoview.breeding_program_id, trialdesign.value
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, trialdesign.value;
 
 
 ALTER TABLE public.breeding_programsxtrial_designs OWNER TO web_usr;
 
 --
--- Name: breeding_programsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxtrial_types AS
+CREATE VIEW public.breeding_programsxtrial_types AS
  SELECT materialized_phenoview.breeding_program_id,
     trialterm.cvterm_id AS trial_type_id
    FROM ((public.materialized_phenoview
@@ -12071,36 +11911,33 @@ CREATE MATERIALIZED VIEW public.breeding_programsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY materialized_phenoview.breeding_program_id, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, trialterm.cvterm_id;
 
 
 ALTER TABLE public.breeding_programsxtrial_types OWNER TO web_usr;
 
 --
--- Name: breeding_programsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxtrials AS
+CREATE VIEW public.breeding_programsxtrials AS
  SELECT materialized_phenoview.breeding_program_id,
     materialized_phenoview.trial_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.breeding_program_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.breeding_programsxtrials OWNER TO web_usr;
 
 --
--- Name: breeding_programsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: breeding_programsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.breeding_programsxyears AS
+CREATE VIEW public.breeding_programsxyears AS
  SELECT materialized_phenoview.breeding_program_id,
     materialized_phenoview.year_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.breeding_program_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.breeding_program_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.breeding_programsxyears OWNER TO web_usr;
@@ -13796,6 +13633,45 @@ ALTER SEQUENCE public.featureprop_featureprop_id_seq OWNED BY public.featureprop
 
 
 --
+-- Name: featureprop_json; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.featureprop_json (
+    featureprop_json_id integer NOT NULL,
+    feature_id bigint,
+    type_id bigint,
+    nd_protocol_id bigint,
+    start_pos bigint,
+    end_pos bigint,
+    json jsonb
+);
+
+
+ALTER TABLE public.featureprop_json OWNER TO postgres;
+
+--
+-- Name: featureprop_json_featureprop_json_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.featureprop_json_featureprop_json_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.featureprop_json_featureprop_json_id_seq OWNER TO postgres;
+
+--
+-- Name: featureprop_json_featureprop_json_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.featureprop_json_featureprop_json_id_seq OWNED BY public.featureprop_json.featureprop_json_id;
+
+
+--
 -- Name: featureprop_pub; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -14210,45 +14086,6 @@ ALTER SEQUENCE public.fpc_series_fpc_series_id_seq OWNED BY public.fpc_series.fp
 
 
 --
--- Name: genotype; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.genotype (
-    genotype_id integer NOT NULL,
-    name text,
-    uniquename text NOT NULL,
-    description character varying(255),
-    type_id integer NOT NULL,
-    create_date timestamp without time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.genotype OWNER TO postgres;
-
---
--- Name: TABLE genotype; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON TABLE public.genotype IS 'Genetic context. A genotype is defined by a collection of features, mutations, balancers, deficiencies, haplotype blocks, or engineered constructs.';
-
-
---
--- Name: COLUMN genotype.name; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.genotype.name IS 'Optional alternative name for a genotype, 
-for display purposes.';
-
-
---
--- Name: COLUMN genotype.uniquename; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.genotype.uniquename IS 'The unique name for a genotype; 
-typically derived from the features making up the genotype.';
-
-
---
 -- Name: genotype_genotype_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -14306,191 +14143,238 @@ ALTER SEQUENCE public.genotypeprop_genotypeprop_id_seq OWNED BY public.genotypep
 
 
 --
--- Name: genotyping_projectsxaccessions; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_projects; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_projectsxaccessions AS
- SELECT nd_experiment_project.project_id AS genotyping_project_id,
-    materialized_genoview.accession_id
-   FROM ((public.nd_experiment_project
-     JOIN public.nd_experiment_genotype ON ((nd_experiment_project.nd_experiment_id = nd_experiment_genotype.nd_experiment_id)))
-     JOIN public.materialized_genoview ON ((nd_experiment_genotype.genotype_id = materialized_genoview.genotype_id)))
-  WHERE (nd_experiment_project.project_id IN ( SELECT genotyping_projects.genotyping_project_id
-           FROM public.genotyping_projects))
-  GROUP BY nd_experiment_project.project_id, materialized_genoview.accession_id
-  WITH NO DATA;
-
-
-ALTER TABLE public.genotyping_projectsxaccessions OWNER TO web_usr;
-
---
--- Name: genotyping_projectsxbreeding_programs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.genotyping_projectsxbreeding_programs AS
- SELECT project_relationship.subject_project_id AS genotyping_project_id,
-    project_relationship.object_project_id AS breeding_program_id
-   FROM public.project_relationship
-  WHERE ((project_relationship.type_id = ( SELECT cvterm.cvterm_id
+CREATE VIEW public.genotyping_projects AS
+ SELECT project.project_id AS genotyping_project_id,
+    project.name AS genotyping_project_name
+   FROM (public.project
+     JOIN public.projectprop USING (project_id))
+  WHERE ((projectprop.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'breeding_program_trial_relationship'::text))) AND (project_relationship.subject_project_id IN ( SELECT genotyping_projects.genotyping_project_id
-           FROM public.genotyping_projects)))
-  WITH NO DATA;
+          WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop.value = 'genotype_data_project'::text));
 
 
-ALTER TABLE public.genotyping_projectsxbreeding_programs OWNER TO web_usr;
+ALTER TABLE public.genotyping_projects OWNER TO web_usr;
 
 --
--- Name: genotyping_projectsxgenotyping_protocols; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_projectsxgenotyping_protocols; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_projectsxgenotyping_protocols AS
- SELECT genotyping_projects.genotyping_project_id,
-    nd_experiment_protocol.nd_protocol_id AS genotyping_protocol_id
-   FROM ((public.genotyping_projects
-     JOIN public.nd_experiment_project ON ((genotyping_projects.genotyping_project_id = nd_experiment_project.project_id)))
-     JOIN public.nd_experiment_protocol ON ((nd_experiment_project.nd_experiment_id = nd_experiment_protocol.nd_experiment_id)))
-  GROUP BY genotyping_projects.genotyping_project_id, nd_experiment_protocol.nd_protocol_id
-  WITH NO DATA;
+CREATE VIEW public.genotyping_projectsxgenotyping_protocols AS
+ SELECT materialized_genoview.genotyping_project_id,
+    materialized_genoview.genotyping_protocol_id
+   FROM public.materialized_genoview
+  GROUP BY materialized_genoview.genotyping_project_id, materialized_genoview.genotyping_protocol_id;
 
 
 ALTER TABLE public.genotyping_projectsxgenotyping_protocols OWNER TO web_usr;
 
 --
--- Name: genotyping_projectsxlocations; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_projectsxlocations; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_projectsxlocations AS
- SELECT projectprop.project_id AS genotyping_project_id,
-    (projectprop.value)::integer AS location_id
-   FROM public.projectprop
-  WHERE ((projectprop.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'project location'::text))) AND (projectprop.project_id IN ( SELECT genotyping_projects.genotyping_project_id
-           FROM public.genotyping_projects)))
-  WITH NO DATA;
+CREATE VIEW public.genotyping_projectsxlocations AS
+ SELECT materialized_genoview.genotyping_project_id,
+    materialized_phenoview.location_id
+   FROM (public.materialized_genoview
+     JOIN public.materialized_phenoview USING (accession_id))
+  GROUP BY materialized_genoview.genotyping_project_id, materialized_phenoview.location_id;
 
 
 ALTER TABLE public.genotyping_projectsxlocations OWNER TO web_usr;
 
 --
--- Name: genotyping_projectsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_projectsxplants; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_projectsxtraits AS
- SELECT nd_experiment_project.project_id AS genotyping_project_id,
+CREATE VIEW public.genotyping_projectsxplants AS
+ SELECT materialized_genoview.genotyping_project_id,
+    stock.stock_id AS plant_id
+   FROM ((public.materialized_genoview
+     JOIN public.materialized_phenoview USING (accession_id))
+     JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'plant'::text))))))
+  GROUP BY materialized_genoview.genotyping_project_id, stock.stock_id;
+
+
+ALTER TABLE public.genotyping_projectsxplants OWNER TO web_usr;
+
+--
+-- Name: genotyping_projectsxplots; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.genotyping_projectsxplots AS
+ SELECT materialized_genoview.genotyping_project_id,
+    stock.stock_id AS plot_id
+   FROM ((public.materialized_genoview
+     JOIN public.materialized_phenoview USING (accession_id))
+     JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'plot'::text))))))
+  GROUP BY materialized_genoview.genotyping_project_id, stock.stock_id;
+
+
+ALTER TABLE public.genotyping_projectsxplots OWNER TO web_usr;
+
+--
+-- Name: genotyping_projectsxseedlots; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.genotyping_projectsxseedlots AS
+ SELECT materialized_genoview.genotyping_project_id,
+    stock.stock_id AS seedlot_id
+   FROM ((public.materialized_genoview
+     LEFT JOIN public.stock_relationship seedlot_relationship ON (((materialized_genoview.accession_id = seedlot_relationship.subject_id) AND (seedlot_relationship.type_id IN ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'collection_of'::text))))))
+     LEFT JOIN public.stock ON (((seedlot_relationship.object_id = stock.stock_id) AND (stock.type_id IN ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'seedlot'::text))))))
+  GROUP BY materialized_genoview.genotyping_project_id, stock.stock_id;
+
+
+ALTER TABLE public.genotyping_projectsxseedlots OWNER TO web_usr;
+
+--
+-- Name: genotyping_projectsxtrait_components; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.genotyping_projectsxtrait_components AS
+ SELECT materialized_genoview.genotyping_project_id,
+    trait_component.cvterm_id AS trait_component_id
+   FROM ((((public.materialized_genoview
+     JOIN public.materialized_phenoview USING (accession_id))
+     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
+     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'contains'::text))))))
+     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
+  GROUP BY materialized_genoview.genotyping_project_id, trait_component.cvterm_id;
+
+
+ALTER TABLE public.genotyping_projectsxtrait_components OWNER TO web_usr;
+
+--
+-- Name: genotyping_projectsxtraits; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.genotyping_projectsxtraits AS
+ SELECT materialized_genoview.genotyping_project_id,
     materialized_phenoview.trait_id
-   FROM (((public.nd_experiment_project
-     JOIN public.nd_experiment_genotype ON ((nd_experiment_genotype.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
-     JOIN public.materialized_genoview ON ((materialized_genoview.genotype_id = nd_experiment_genotype.genotype_id)))
-     JOIN public.materialized_phenoview ON ((materialized_genoview.accession_id = materialized_phenoview.accession_id)))
-  WHERE (nd_experiment_project.project_id IN ( SELECT projectprop.project_id
-           FROM public.projectprop
-          WHERE ((projectprop.type_id IN ( SELECT cvterm.cvterm_id
-                   FROM public.cvterm
-                  WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop.value = 'genotype_data_project'::text))))
-  GROUP BY nd_experiment_project.project_id, materialized_phenoview.trait_id
-  WITH NO DATA;
+   FROM (public.materialized_genoview
+     JOIN public.materialized_phenoview USING (accession_id))
+  GROUP BY materialized_genoview.genotyping_project_id, materialized_phenoview.trait_id;
 
 
 ALTER TABLE public.genotyping_projectsxtraits OWNER TO web_usr;
 
 --
--- Name: genotyping_projectsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_projectsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_projectsxtrials AS
- SELECT nd_experiment_project.project_id AS genotyping_project_id,
+CREATE VIEW public.genotyping_projectsxtrial_designs AS
+ SELECT materialized_genoview.genotyping_project_id,
+    trialdesign.value AS trial_design_id
+   FROM ((public.materialized_genoview
+     JOIN public.materialized_phenoview USING (accession_id))
+     JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'design'::text))))))
+  GROUP BY materialized_genoview.genotyping_project_id, trialdesign.value;
+
+
+ALTER TABLE public.genotyping_projectsxtrial_designs OWNER TO web_usr;
+
+--
+-- Name: genotyping_projectsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.genotyping_projectsxtrial_types AS
+ SELECT materialized_genoview.genotyping_project_id,
+    trialterm.cvterm_id AS trial_type_id
+   FROM (((public.materialized_genoview
+     JOIN public.materialized_phenoview USING (accession_id))
+     JOIN public.projectprop trialprop ON (((materialized_phenoview.trial_id = trialprop.project_id) AND (trialprop.type_id IN ( SELECT cvterm.cvterm_id
+           FROM (public.cvterm
+             JOIN public.cv USING (cv_id))
+          WHERE ((cv.name)::text = 'project_type'::text))))))
+     JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
+  GROUP BY materialized_genoview.genotyping_project_id, trialterm.cvterm_id;
+
+
+ALTER TABLE public.genotyping_projectsxtrial_types OWNER TO web_usr;
+
+--
+-- Name: genotyping_projectsxtrials; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.genotyping_projectsxtrials AS
+ SELECT materialized_genoview.genotyping_project_id,
     materialized_phenoview.trial_id
-   FROM (((public.nd_experiment_project
-     JOIN public.nd_experiment_genotype ON ((nd_experiment_genotype.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
-     JOIN public.materialized_genoview ON ((materialized_genoview.genotype_id = nd_experiment_genotype.genotype_id)))
-     JOIN public.materialized_phenoview ON ((materialized_phenoview.accession_id = materialized_genoview.accession_id)))
-  WHERE (nd_experiment_project.project_id IN ( SELECT projectprop.project_id
-           FROM public.projectprop
-          WHERE ((projectprop.type_id IN ( SELECT cvterm.cvterm_id
-                   FROM public.cvterm
-                  WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop.value = 'genotype_data_project'::text))))
-  GROUP BY nd_experiment_project.project_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+   FROM (public.materialized_genoview
+     JOIN public.materialized_phenoview USING (accession_id))
+  GROUP BY materialized_genoview.genotyping_project_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.genotyping_projectsxtrials OWNER TO web_usr;
 
 --
--- Name: genotyping_projectsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_projectsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_projectsxyears AS
+CREATE VIEW public.genotyping_projectsxyears AS
  SELECT projectprop.project_id AS genotyping_project_id,
     projectprop.value AS year_id
    FROM public.projectprop
-  WHERE ((projectprop.project_id IN ( SELECT project.project_id
-           FROM (public.project
-             JOIN public.projectprop projectprop_1 USING (project_id))
+  WHERE ((projectprop.project_id IN ( SELECT projectprop_1.project_id
+           FROM public.projectprop projectprop_1
           WHERE ((projectprop_1.type_id = ( SELECT cvterm.cvterm_id
                    FROM public.cvterm
                   WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop_1.value = 'genotype_data_project'::text)))) AND (projectprop.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'project year'::text))))
-  WITH NO DATA;
+          WHERE ((cvterm.name)::text = 'project year'::text))));
 
 
 ALTER TABLE public.genotyping_projectsxyears OWNER TO web_usr;
 
 --
--- Name: genotyping_protocols; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocols; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocols AS
+CREATE VIEW public.genotyping_protocols AS
  SELECT nd_protocol.nd_protocol_id AS genotyping_protocol_id,
     nd_protocol.name AS genotyping_protocol_name
    FROM public.nd_protocol
   WHERE (nd_protocol.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'genotyping_experiment'::text)))
-  GROUP BY nd_protocol.nd_protocol_id, nd_protocol.name
-  WITH NO DATA;
+  GROUP BY nd_protocol.nd_protocol_id, nd_protocol.name;
 
 
 ALTER TABLE public.genotyping_protocols OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxgenotyping_projects; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxlocations; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxgenotyping_projects AS
- SELECT genotyping_protocols.genotyping_protocol_id,
-    nd_experiment_project.project_id AS genotyping_project_id
-   FROM ((public.genotyping_protocols
-     JOIN public.nd_experiment_protocol ON ((genotyping_protocols.genotyping_protocol_id = nd_experiment_protocol.nd_protocol_id)))
-     JOIN public.nd_experiment_project ON ((nd_experiment_protocol.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
-  GROUP BY genotyping_protocols.genotyping_protocol_id, nd_experiment_project.project_id
-  WITH NO DATA;
-
-
-ALTER TABLE public.genotyping_protocolsxgenotyping_projects OWNER TO web_usr;
-
---
--- Name: genotyping_protocolsxlocations; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxlocations AS
+CREATE VIEW public.genotyping_protocolsxlocations AS
  SELECT materialized_genoview.genotyping_protocol_id,
     materialized_phenoview.location_id
    FROM (public.materialized_genoview
      JOIN public.materialized_phenoview USING (accession_id))
-  GROUP BY materialized_genoview.genotyping_protocol_id, materialized_phenoview.location_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, materialized_phenoview.location_id;
 
 
 ALTER TABLE public.genotyping_protocolsxlocations OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxplants; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxplants; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxplants AS
+CREATE VIEW public.genotyping_protocolsxplants AS
  SELECT materialized_genoview.genotyping_protocol_id,
     stock.stock_id AS plant_id
    FROM ((public.materialized_genoview
@@ -14498,17 +14382,16 @@ CREATE MATERIALIZED VIEW public.genotyping_protocolsxplants AS
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY materialized_genoview.genotyping_protocol_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, stock.stock_id;
 
 
 ALTER TABLE public.genotyping_protocolsxplants OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxplots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxplots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxplots AS
+CREATE VIEW public.genotyping_protocolsxplots AS
  SELECT materialized_genoview.genotyping_protocol_id,
     stock.stock_id AS plot_id
    FROM ((public.materialized_genoview
@@ -14516,17 +14399,16 @@ CREATE MATERIALIZED VIEW public.genotyping_protocolsxplots AS
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))))))
-  GROUP BY materialized_genoview.genotyping_protocol_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, stock.stock_id;
 
 
 ALTER TABLE public.genotyping_protocolsxplots OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxseedlots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxseedlots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxseedlots AS
+CREATE VIEW public.genotyping_protocolsxseedlots AS
  SELECT materialized_genoview.genotyping_protocol_id,
     stock.stock_id AS seedlot_id
    FROM ((public.materialized_genoview
@@ -14536,17 +14418,16 @@ CREATE MATERIALIZED VIEW public.genotyping_protocolsxseedlots AS
      LEFT JOIN public.stock ON (((seedlot_relationship.object_id = stock.stock_id) AND (stock.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'seedlot'::text))))))
-  GROUP BY materialized_genoview.genotyping_protocol_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, stock.stock_id;
 
 
 ALTER TABLE public.genotyping_protocolsxseedlots OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxtrait_components; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxtrait_components; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxtrait_components AS
+CREATE VIEW public.genotyping_protocolsxtrait_components AS
  SELECT materialized_genoview.genotyping_protocol_id,
     trait_component.cvterm_id AS trait_component_id
    FROM ((((public.materialized_genoview
@@ -14556,32 +14437,30 @@ CREATE MATERIALIZED VIEW public.genotyping_protocolsxtrait_components AS
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'contains'::text))))))
      JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY materialized_genoview.genotyping_protocol_id, trait_component.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, trait_component.cvterm_id;
 
 
 ALTER TABLE public.genotyping_protocolsxtrait_components OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxtraits; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxtraits AS
+CREATE VIEW public.genotyping_protocolsxtraits AS
  SELECT materialized_genoview.genotyping_protocol_id,
     materialized_phenoview.trait_id
    FROM (public.materialized_genoview
      JOIN public.materialized_phenoview USING (accession_id))
-  GROUP BY materialized_genoview.genotyping_protocol_id, materialized_phenoview.trait_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, materialized_phenoview.trait_id;
 
 
 ALTER TABLE public.genotyping_protocolsxtraits OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxtrial_designs AS
+CREATE VIEW public.genotyping_protocolsxtrial_designs AS
  SELECT materialized_genoview.genotyping_protocol_id,
     trialdesign.value AS trial_design_id
    FROM ((public.materialized_genoview
@@ -14589,17 +14468,16 @@ CREATE MATERIALIZED VIEW public.genotyping_protocolsxtrial_designs AS
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY materialized_genoview.genotyping_protocol_id, trialdesign.value
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, trialdesign.value;
 
 
 ALTER TABLE public.genotyping_protocolsxtrial_designs OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxtrial_types AS
+CREATE VIEW public.genotyping_protocolsxtrial_types AS
  SELECT materialized_genoview.genotyping_protocol_id,
     trialterm.cvterm_id AS trial_type_id
    FROM (((public.materialized_genoview
@@ -14609,38 +14487,35 @@ CREATE MATERIALIZED VIEW public.genotyping_protocolsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY materialized_genoview.genotyping_protocol_id, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, trialterm.cvterm_id;
 
 
 ALTER TABLE public.genotyping_protocolsxtrial_types OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxtrials AS
+CREATE VIEW public.genotyping_protocolsxtrials AS
  SELECT materialized_genoview.genotyping_protocol_id,
     materialized_phenoview.trial_id
    FROM (public.materialized_genoview
      JOIN public.materialized_phenoview USING (accession_id))
-  GROUP BY materialized_genoview.genotyping_protocol_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.genotyping_protocolsxtrials OWNER TO web_usr;
 
 --
--- Name: genotyping_protocolsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: genotyping_protocolsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.genotyping_protocolsxyears AS
+CREATE VIEW public.genotyping_protocolsxyears AS
  SELECT materialized_genoview.genotyping_protocol_id,
     materialized_phenoview.year_id
    FROM (public.materialized_genoview
      JOIN public.materialized_phenoview USING (accession_id))
-  GROUP BY materialized_genoview.genotyping_protocol_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY materialized_genoview.genotyping_protocol_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.genotyping_protocolsxyears OWNER TO web_usr;
@@ -14841,80 +14716,113 @@ ALTER SEQUENCE public.itag_loading_log_id_seq OWNED BY public.itag_loading_log.i
 
 
 --
--- Name: locations; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: nd_geolocation; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW public.locations AS
+CREATE TABLE public.nd_geolocation (
+    nd_geolocation_id integer NOT NULL,
+    description character varying(255),
+    latitude real,
+    longitude real,
+    geodetic_datum character varying(32),
+    altitude real
+);
+
+
+ALTER TABLE public.nd_geolocation OWNER TO postgres;
+
+--
+-- Name: TABLE nd_geolocation; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.nd_geolocation IS 'The geo-referencable location of the stock. NOTE: This entity is subject to change as a more general and possibly more OpenGIS-compliant geolocation module may be introduced into Chado.';
+
+
+--
+-- Name: COLUMN nd_geolocation.description; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nd_geolocation.description IS 'A textual representation of the location, if this is the original georeference. Optional if the original georeference is available in lat/long coordinates.';
+
+
+--
+-- Name: COLUMN nd_geolocation.latitude; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nd_geolocation.latitude IS 'The decimal latitude coordinate of the georeference, using positive and negative sign to indicate N and S, respectively.';
+
+
+--
+-- Name: COLUMN nd_geolocation.longitude; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nd_geolocation.longitude IS 'The decimal longitude coordinate of the georeference, using positive and negative sign to indicate E and W, respectively.';
+
+
+--
+-- Name: COLUMN nd_geolocation.geodetic_datum; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nd_geolocation.geodetic_datum IS 'The geodetic system on which the geo-reference coordinates are based. For geo-references measured between 1984 and 2010, this will typically be WGS84.';
+
+
+--
+-- Name: COLUMN nd_geolocation.altitude; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nd_geolocation.altitude IS 'The altitude (elevation) of the location in meters. If the altitude is only known as a range, this is the average, and altitude_dev will hold half of the width of the range.';
+
+
+--
+-- Name: locations; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.locations AS
  SELECT nd_geolocation.nd_geolocation_id AS location_id,
     nd_geolocation.description AS location_name
    FROM public.nd_geolocation
-  GROUP BY nd_geolocation.nd_geolocation_id, nd_geolocation.description
-  WITH NO DATA;
+  GROUP BY nd_geolocation.nd_geolocation_id, nd_geolocation.description;
 
 
 ALTER TABLE public.locations OWNER TO web_usr;
 
 --
--- Name: locationsxgenotyping_projects; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxplants; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxgenotyping_projects AS
- SELECT projectprop.value AS location_id,
-    projectprop.project_id AS genotyping_project_id
-   FROM public.projectprop
-  WHERE ((projectprop.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'project location'::text))) AND (projectprop.value IN ( SELECT (locations.location_id)::text AS location_id
-           FROM public.locations)) AND (projectprop.project_id IN ( SELECT project.project_id
-           FROM (public.project
-             JOIN public.projectprop projectprop_1 USING (project_id))
-          WHERE ((projectprop_1.type_id = ( SELECT cvterm.cvterm_id
-                   FROM public.cvterm
-                  WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop_1.value = 'genotype_data_project'::text)))))
-  WITH NO DATA;
-
-
-ALTER TABLE public.locationsxgenotyping_projects OWNER TO web_usr;
-
---
--- Name: locationsxplants; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.locationsxplants AS
+CREATE VIEW public.locationsxplants AS
  SELECT materialized_phenoview.location_id,
     stock.stock_id AS plant_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY materialized_phenoview.location_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.location_id, stock.stock_id;
 
 
 ALTER TABLE public.locationsxplants OWNER TO web_usr;
 
 --
--- Name: locationsxplots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxplots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxplots AS
+CREATE VIEW public.locationsxplots AS
  SELECT materialized_phenoview.location_id,
     stock.stock_id AS plot_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))))))
-  GROUP BY materialized_phenoview.location_id, stock.stock_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.location_id, stock.stock_id;
 
 
 ALTER TABLE public.locationsxplots OWNER TO web_usr;
 
 --
--- Name: locationsxseedlots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxseedlots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxseedlots AS
+CREATE VIEW public.locationsxseedlots AS
  SELECT nd_experiment.nd_geolocation_id AS location_id,
     nd_experiment_stock.stock_id AS seedlot_id
    FROM (public.nd_experiment
@@ -14922,17 +14830,16 @@ CREATE MATERIALIZED VIEW public.locationsxseedlots AS
   WHERE (nd_experiment.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'seedlot_experiment'::text)))
-  GROUP BY nd_experiment.nd_geolocation_id, nd_experiment_stock.stock_id
-  WITH NO DATA;
+  GROUP BY nd_experiment.nd_geolocation_id, nd_experiment_stock.stock_id;
 
 
 ALTER TABLE public.locationsxseedlots OWNER TO web_usr;
 
 --
--- Name: locationsxtrait_components; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxtrait_components; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxtrait_components AS
+CREATE VIEW public.locationsxtrait_components AS
  SELECT materialized_phenoview.location_id,
     trait_component.cvterm_id AS trait_component_id
    FROM (((public.materialized_phenoview
@@ -14941,48 +14848,45 @@ CREATE MATERIALIZED VIEW public.locationsxtrait_components AS
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'contains'::text))))))
      JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY materialized_phenoview.location_id, trait_component.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.location_id, trait_component.cvterm_id;
 
 
 ALTER TABLE public.locationsxtrait_components OWNER TO web_usr;
 
 --
--- Name: locationsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxtraits; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxtraits AS
+CREATE VIEW public.locationsxtraits AS
  SELECT materialized_phenoview.location_id,
     materialized_phenoview.trait_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.location_id, materialized_phenoview.trait_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.location_id, materialized_phenoview.trait_id;
 
 
 ALTER TABLE public.locationsxtraits OWNER TO web_usr;
 
 --
--- Name: locationsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxtrial_designs AS
+CREATE VIEW public.locationsxtrial_designs AS
  SELECT materialized_phenoview.location_id,
     trialdesign.value AS trial_design_id
    FROM (public.materialized_phenoview
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY materialized_phenoview.location_id, trialdesign.value
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.location_id, trialdesign.value;
 
 
 ALTER TABLE public.locationsxtrial_designs OWNER TO web_usr;
 
 --
--- Name: locationsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxtrial_types AS
+CREATE VIEW public.locationsxtrial_types AS
  SELECT materialized_phenoview.location_id,
     trialterm.cvterm_id AS trial_type_id
    FROM ((public.materialized_phenoview
@@ -14991,36 +14895,33 @@ CREATE MATERIALIZED VIEW public.locationsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY materialized_phenoview.location_id, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.location_id, trialterm.cvterm_id;
 
 
 ALTER TABLE public.locationsxtrial_types OWNER TO web_usr;
 
 --
--- Name: locationsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxtrials AS
+CREATE VIEW public.locationsxtrials AS
  SELECT materialized_phenoview.location_id,
     materialized_phenoview.trial_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.location_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.location_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.locationsxtrials OWNER TO web_usr;
 
 --
--- Name: locationsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: locationsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.locationsxyears AS
+CREATE VIEW public.locationsxyears AS
  SELECT materialized_phenoview.location_id,
     materialized_phenoview.year_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.location_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.location_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.locationsxyears OWNER TO web_usr;
@@ -15036,6 +14937,27 @@ CREATE TABLE public.marker_names (
 
 
 ALTER TABLE public.marker_names OWNER TO postgres;
+
+--
+-- Name: materialized_markerview; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE MATERIALIZED VIEW public.materialized_markerview AS
+ SELECT (x.column1)::integer AS nd_protocol_id,
+    x.column2 AS species_name,
+    x.column3 AS reference_genome_name,
+    x.column4 AS marker_name,
+    x.column5 AS chrom,
+    (x.column6)::numeric AS pos,
+    x.column7 AS ref,
+    x.column8 AS alt,
+    x.column9 AS variant_name
+   FROM ( VALUES (NULL::text,NULL::text,NULL::text,NULL::text,NULL::text,NULL::text,NULL::text,NULL::text,NULL::text)) x
+  WHERE false
+  WITH NO DATA;
+
+
+ALTER TABLE public.materialized_markerview OWNER TO web_usr;
 
 --
 -- Name: phenotypeprop; Type: TABLE; Schema: public; Owner: postgres
@@ -15264,6 +15186,16 @@ CREATE MATERIALIZED VIEW public.materialized_stockprop AS
     crosstab.dna_person,
     crosstab.tissue_type,
     crosstab.seedlot_quality,
+    crosstab."SelectionMarker",
+    crosstab."CloningOrganism",
+    crosstab."CassetteName",
+    crosstab."Strain",
+    crosstab."InherentMarker",
+    crosstab."Backbone",
+    crosstab."VectorType",
+    crosstab."Gene",
+    crosstab."Promotors",
+    crosstab."Terminators",
     crosstab.ncbi_taxonomy_id
    FROM sgn.crosstab('SELECT stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id, jsonb_object_agg(stockprop.value, ''RANK'' || stockprop.rank) FROM public.stockprop JOIN public.stock USING(stock_id) JOIN public.cvterm as stock_cvterm ON (stock_cvterm.cvterm_id=stock.type_id) GROUP BY (stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id) ORDER by stockprop.stock_id ASC'::text, 'SELECT type_id FROM (VALUES
     (''76460''),
@@ -15318,7 +15250,17 @@ CREATE MATERIALIZED VIEW public.materialized_stockprop AS
     (''77611''),
     (''77613''),
     (''79003''),
-    (''77614'')) AS t (type_id);'::text) crosstab(stock_id integer, uniquename text, stock_type_id integer, stock_type_name text, organism_id integer, block json, col_number jsonb, igd_synonym jsonb, "is a control" jsonb, location_code jsonb, organization jsonb, plant_index_number jsonb, subplot_index_number jsonb, tissue_sample_index_number jsonb, "plot number" jsonb, plot_geo_json jsonb, range jsonb, replicate jsonb, row_number jsonb, stock_synonym jsonb, "T1" jsonb, "T2" jsonb, transgenic jsonb, variety jsonb, notes jsonb, state jsonb, "accession number" jsonb, "PUI" jsonb, donor jsonb, "donor institute" jsonb, "donor PUI" jsonb, "seed source" jsonb, "institute code" jsonb, "institute name" jsonb, "biological status of accession code" jsonb, "country of origin" jsonb, "type of germplasm storage code" jsonb, "entry number" jsonb, "acquisition date" jsonb, current_count jsonb, current_weight_gram jsonb, crossing_metadata_jsonb jsonb, ploidy_level jsonb, genome_structure jsonb, introgression_parent jsonb, introgression_backcross_parent jsonb, introgression_map_version jsonb, introgression_chromosome jsonb, introgression_start_position_bp jsonb, introgression_end_position_bp jsonb, is_blank jsonb, concentration jsonb, volume jsonb, extraction jsonb, dna_person jsonb, tissue_type jsonb, seedlot_quality jsonb, ncbi_taxonomy_id jsonb)
+    (''79111''),
+    (''79112''),
+    (''79113''),
+    (''79115''),
+    (''79114''),
+    (''79116''),
+    (''79120''),
+    (''79117''),
+    (''79118''),
+    (''79119''),
+    (''77614'')) AS t (type_id);'::text) crosstab(stock_id integer, uniquename text, stock_type_id integer, stock_type_name text, organism_id integer, block json, col_number jsonb, igd_synonym jsonb, "is a control" jsonb, location_code jsonb, organization jsonb, plant_index_number jsonb, subplot_index_number jsonb, tissue_sample_index_number jsonb, "plot number" jsonb, plot_geo_json jsonb, range jsonb, replicate jsonb, row_number jsonb, stock_synonym jsonb, "T1" jsonb, "T2" jsonb, transgenic jsonb, variety jsonb, notes jsonb, state jsonb, "accession number" jsonb, "PUI" jsonb, donor jsonb, "donor institute" jsonb, "donor PUI" jsonb, "seed source" jsonb, "institute code" jsonb, "institute name" jsonb, "biological status of accession code" jsonb, "country of origin" jsonb, "type of germplasm storage code" jsonb, "entry number" jsonb, "acquisition date" jsonb, current_count jsonb, current_weight_gram jsonb, crossing_metadata_jsonb jsonb, ploidy_level jsonb, genome_structure jsonb, introgression_parent jsonb, introgression_backcross_parent jsonb, introgression_map_version jsonb, introgression_chromosome jsonb, introgression_start_position_bp jsonb, introgression_end_position_bp jsonb, is_blank jsonb, concentration jsonb, volume jsonb, extraction jsonb, dna_person jsonb, tissue_type jsonb, seedlot_quality jsonb, "SelectionMarker" jsonb, "CloningOrganism" jsonb, "CassetteName" jsonb, "Strain" jsonb, "InherentMarker" jsonb, "Backbone" jsonb, "VectorType" jsonb, "Gene" jsonb, "Promotors" jsonb, "Terminators" jsonb, ncbi_taxonomy_id jsonb)
   WITH NO DATA;
 
 
@@ -15373,7 +15315,8 @@ CREATE TABLE public.matviews (
     mv_name name NOT NULL,
     mv_dependents name[],
     currently_refreshing boolean,
-    last_refresh timestamp with time zone
+    last_refresh timestamp with time zone,
+    refresh_start timestamp with time zone
 );
 
 
@@ -17000,27 +16943,26 @@ ALTER SEQUENCE public.phylotree_pub_phylotree_pub_id_seq OWNED BY public.phylotr
 
 
 --
--- Name: plants; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plants; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plants AS
+CREATE VIEW public.plants AS
  SELECT stock.stock_id AS plant_id,
     stock.uniquename AS plant_name
    FROM public.stock
   WHERE ((stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))) AND (stock.is_obsolete = false))
-  GROUP BY stock.stock_id, stock.uniquename
-  WITH NO DATA;
+  GROUP BY stock.stock_id, stock.uniquename;
 
 
 ALTER TABLE public.plants OWNER TO web_usr;
 
 --
--- Name: plantsxplots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plantsxplots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plantsxplots AS
+CREATE VIEW public.plantsxplots AS
  SELECT plant.stock_id AS plant_id,
     plot.stock_id AS plot_id
    FROM (((public.materialized_phenoview
@@ -17031,34 +16973,32 @@ CREATE MATERIALIZED VIEW public.plantsxplots AS
      JOIN public.stock plant ON (((plant_relationship.object_id = plant.stock_id) AND (plant.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY plant.stock_id, plot.stock_id
-  WITH NO DATA;
+  GROUP BY plant.stock_id, plot.stock_id;
 
 
 ALTER TABLE public.plantsxplots OWNER TO web_usr;
 
 --
--- Name: plantsxseedlots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plantsxseedlots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plantsxseedlots AS
+CREATE VIEW public.plantsxseedlots AS
  SELECT stock.stock_id AS plant_id,
     materialized_phenoview.seedlot_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY stock.stock_id, materialized_phenoview.seedlot_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, materialized_phenoview.seedlot_id;
 
 
 ALTER TABLE public.plantsxseedlots OWNER TO web_usr;
 
 --
--- Name: plantsxtrait_components; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plantsxtrait_components; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plantsxtrait_components AS
+CREATE VIEW public.plantsxtrait_components AS
  SELECT stock.stock_id AS plant_id,
     trait_component.cvterm_id AS trait_component_id
    FROM ((((public.materialized_phenoview
@@ -17070,34 +17010,32 @@ CREATE MATERIALIZED VIEW public.plantsxtrait_components AS
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'contains'::text))))))
      JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY stock.stock_id, trait_component.cvterm_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, trait_component.cvterm_id;
 
 
 ALTER TABLE public.plantsxtrait_components OWNER TO web_usr;
 
 --
--- Name: plantsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plantsxtraits; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plantsxtraits AS
+CREATE VIEW public.plantsxtraits AS
  SELECT stock.stock_id AS plant_id,
     materialized_phenoview.trait_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY stock.stock_id, materialized_phenoview.trait_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, materialized_phenoview.trait_id;
 
 
 ALTER TABLE public.plantsxtraits OWNER TO web_usr;
 
 --
--- Name: plantsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plantsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plantsxtrial_designs AS
+CREATE VIEW public.plantsxtrial_designs AS
  SELECT stock.stock_id AS plant_id,
     trialdesign.value AS trial_design_id
    FROM ((public.materialized_phenoview
@@ -17107,17 +17045,16 @@ CREATE MATERIALIZED VIEW public.plantsxtrial_designs AS
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY stock.stock_id, trialdesign.value
-  WITH NO DATA;
+  GROUP BY stock.stock_id, trialdesign.value;
 
 
 ALTER TABLE public.plantsxtrial_designs OWNER TO web_usr;
 
 --
--- Name: plantsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plantsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plantsxtrial_types AS
+CREATE VIEW public.plantsxtrial_types AS
  SELECT stock.stock_id AS plant_id,
     trialterm.cvterm_id AS trial_type_id
    FROM (((public.materialized_phenoview
@@ -17129,85 +17066,80 @@ CREATE MATERIALIZED VIEW public.plantsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY stock.stock_id, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, trialterm.cvterm_id;
 
 
 ALTER TABLE public.plantsxtrial_types OWNER TO web_usr;
 
 --
--- Name: plantsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plantsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plantsxtrials AS
+CREATE VIEW public.plantsxtrials AS
  SELECT stock.stock_id AS plant_id,
     materialized_phenoview.trial_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY stock.stock_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.plantsxtrials OWNER TO web_usr;
 
 --
--- Name: plantsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plantsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plantsxyears AS
+CREATE VIEW public.plantsxyears AS
  SELECT stock.stock_id AS plant_id,
     materialized_phenoview.year_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plant'::text))))))
-  GROUP BY stock.stock_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.plantsxyears OWNER TO web_usr;
 
 --
--- Name: plots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plots AS
+CREATE VIEW public.plots AS
  SELECT stock.stock_id AS plot_id,
     stock.uniquename AS plot_name
    FROM public.stock
   WHERE ((stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))) AND (stock.is_obsolete = false))
-  GROUP BY stock.stock_id, stock.uniquename
-  WITH NO DATA;
+  GROUP BY stock.stock_id, stock.uniquename;
 
 
 ALTER TABLE public.plots OWNER TO web_usr;
 
 --
--- Name: plotsxseedlots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plotsxseedlots; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plotsxseedlots AS
+CREATE VIEW public.plotsxseedlots AS
  SELECT stock.stock_id AS plot_id,
     materialized_phenoview.seedlot_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))))))
-  GROUP BY stock.stock_id, materialized_phenoview.seedlot_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, materialized_phenoview.seedlot_id;
 
 
 ALTER TABLE public.plotsxseedlots OWNER TO web_usr;
 
 --
--- Name: plotsxtrait_components; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plotsxtrait_components; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plotsxtrait_components AS
+CREATE VIEW public.plotsxtrait_components AS
  SELECT stock.stock_id AS plot_id,
     trait_component.cvterm_id AS trait_component_id
    FROM ((((public.materialized_phenoview
@@ -17219,34 +17151,32 @@ CREATE MATERIALIZED VIEW public.plotsxtrait_components AS
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'contains'::text))))))
      JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY stock.stock_id, trait_component.cvterm_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, trait_component.cvterm_id;
 
 
 ALTER TABLE public.plotsxtrait_components OWNER TO web_usr;
 
 --
--- Name: plotsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plotsxtraits; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plotsxtraits AS
+CREATE VIEW public.plotsxtraits AS
  SELECT stock.stock_id AS plot_id,
     materialized_phenoview.trait_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))))))
-  GROUP BY stock.stock_id, materialized_phenoview.trait_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, materialized_phenoview.trait_id;
 
 
 ALTER TABLE public.plotsxtraits OWNER TO web_usr;
 
 --
--- Name: plotsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plotsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plotsxtrial_designs AS
+CREATE VIEW public.plotsxtrial_designs AS
  SELECT stock.stock_id AS plot_id,
     trialdesign.value AS trial_design_id
    FROM ((public.materialized_phenoview
@@ -17256,17 +17186,16 @@ CREATE MATERIALIZED VIEW public.plotsxtrial_designs AS
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY stock.stock_id, trialdesign.value
-  WITH NO DATA;
+  GROUP BY stock.stock_id, trialdesign.value;
 
 
 ALTER TABLE public.plotsxtrial_designs OWNER TO web_usr;
 
 --
--- Name: plotsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plotsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plotsxtrial_types AS
+CREATE VIEW public.plotsxtrial_types AS
  SELECT stock.stock_id AS plot_id,
     trialterm.cvterm_id AS trial_type_id
    FROM (((public.materialized_phenoview
@@ -17278,42 +17207,39 @@ CREATE MATERIALIZED VIEW public.plotsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY stock.stock_id, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, trialterm.cvterm_id;
 
 
 ALTER TABLE public.plotsxtrial_types OWNER TO web_usr;
 
 --
--- Name: plotsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plotsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plotsxtrials AS
+CREATE VIEW public.plotsxtrials AS
  SELECT stock.stock_id AS plot_id,
     materialized_phenoview.trial_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))))))
-  GROUP BY stock.stock_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.plotsxtrials OWNER TO web_usr;
 
 --
--- Name: plotsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: plotsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.plotsxyears AS
+CREATE VIEW public.plotsxyears AS
  SELECT stock.stock_id AS plot_id,
     materialized_phenoview.year_id
    FROM (public.materialized_phenoview
      JOIN public.stock ON (((materialized_phenoview.stock_id = stock.stock_id) AND (stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'plot'::text))))))
-  GROUP BY stock.stock_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY stock.stock_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.plotsxyears OWNER TO web_usr;
@@ -17766,27 +17692,26 @@ ALTER SEQUENCE public.resource_file_resource_file_id_seq OWNED BY public.resourc
 
 
 --
--- Name: seedlots; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: seedlots; Type: VIEW; Schema: public; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW public.seedlots AS
+CREATE VIEW public.seedlots AS
  SELECT stock.stock_id AS seedlot_id,
     stock.uniquename AS seedlot_name
    FROM public.stock
   WHERE ((stock.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'seedlot'::text))) AND (stock.is_obsolete = false))
-  GROUP BY stock.stock_id, stock.uniquename
-  WITH NO DATA;
+  GROUP BY stock.stock_id, stock.uniquename;
 
 
-ALTER TABLE public.seedlots OWNER TO web_usr;
+ALTER TABLE public.seedlots OWNER TO postgres;
 
 --
--- Name: seedlotsxtrait_components; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: seedlotsxtrait_components; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.seedlotsxtrait_components AS
+CREATE VIEW public.seedlotsxtrait_components AS
  SELECT materialized_phenoview.seedlot_id,
     trait_component.cvterm_id AS trait_component_id
    FROM (((public.materialized_phenoview
@@ -17795,48 +17720,45 @@ CREATE MATERIALIZED VIEW public.seedlotsxtrait_components AS
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'contains'::text))))))
      JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY materialized_phenoview.seedlot_id, trait_component.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.seedlot_id, trait_component.cvterm_id;
 
 
 ALTER TABLE public.seedlotsxtrait_components OWNER TO web_usr;
 
 --
--- Name: seedlotsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: seedlotsxtraits; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.seedlotsxtraits AS
+CREATE VIEW public.seedlotsxtraits AS
  SELECT materialized_phenoview.seedlot_id,
     materialized_phenoview.trait_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.seedlot_id, materialized_phenoview.trait_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.seedlot_id, materialized_phenoview.trait_id;
 
 
 ALTER TABLE public.seedlotsxtraits OWNER TO web_usr;
 
 --
--- Name: seedlotsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: seedlotsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.seedlotsxtrial_designs AS
+CREATE VIEW public.seedlotsxtrial_designs AS
  SELECT materialized_phenoview.seedlot_id,
     trialdesign.value AS trial_design_id
    FROM (public.materialized_phenoview
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY materialized_phenoview.seedlot_id, trialdesign.value
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.seedlot_id, trialdesign.value;
 
 
 ALTER TABLE public.seedlotsxtrial_designs OWNER TO web_usr;
 
 --
--- Name: seedlotsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: seedlotsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.seedlotsxtrial_types AS
+CREATE VIEW public.seedlotsxtrial_types AS
  SELECT materialized_phenoview.seedlot_id,
     trialterm.cvterm_id AS trial_type_id
    FROM ((public.materialized_phenoview
@@ -17845,36 +17767,33 @@ CREATE MATERIALIZED VIEW public.seedlotsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY materialized_phenoview.seedlot_id, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.seedlot_id, trialterm.cvterm_id;
 
 
 ALTER TABLE public.seedlotsxtrial_types OWNER TO web_usr;
 
 --
--- Name: seedlotsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: seedlotsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.seedlotsxtrials AS
+CREATE VIEW public.seedlotsxtrials AS
  SELECT materialized_phenoview.seedlot_id,
     materialized_phenoview.trial_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.seedlot_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.seedlot_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.seedlotsxtrials OWNER TO web_usr;
 
 --
--- Name: seedlotsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: seedlotsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.seedlotsxyears AS
+CREATE VIEW public.seedlotsxyears AS
  SELECT materialized_phenoview.seedlot_id,
     materialized_phenoview.year_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.seedlot_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.seedlot_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.seedlotsxyears OWNER TO web_usr;
@@ -18731,10 +18650,10 @@ CREATE TABLE public.tmp_gff_load_cache (
 ALTER TABLE public.tmp_gff_load_cache OWNER TO postgres;
 
 --
--- Name: trait_components; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trait_components; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trait_components AS
+CREATE VIEW public.trait_components AS
  SELECT cvterm.cvterm_id AS trait_component_id,
     (((((cvterm.name)::text || '|'::text) || (db.name)::text) || ':'::text) || (dbxref.accession)::text) AS trait_component_name
    FROM ((((((public.cv
@@ -18748,17 +18667,96 @@ CREATE MATERIALIZED VIEW public.trait_components AS
      LEFT JOIN public.cvterm_relationship is_object ON ((cvterm.cvterm_id = is_object.object_id)))
   WHERE ((is_object.object_id IS NULL) AND (is_subject.subject_id IS NOT NULL))
   GROUP BY (((((cvterm.name)::text || '|'::text) || (db.name)::text) || ':'::text) || (dbxref.accession)::text), cvterm.cvterm_id
-  ORDER BY (((((cvterm.name)::text || '|'::text) || (db.name)::text) || ':'::text) || (dbxref.accession)::text), cvterm.cvterm_id
-  WITH NO DATA;
+  ORDER BY (((((cvterm.name)::text || '|'::text) || (db.name)::text) || ':'::text) || (dbxref.accession)::text), cvterm.cvterm_id;
 
 
 ALTER TABLE public.trait_components OWNER TO web_usr;
 
 --
--- Name: traits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trait_componentsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.traits AS
+CREATE VIEW public.trait_componentsxtrial_designs AS
+ SELECT trait_component.cvterm_id AS trait_component_id,
+    trialdesign.value AS trial_design_id
+   FROM ((((public.materialized_phenoview
+     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
+     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'contains'::text))))))
+     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
+     JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'design'::text))))))
+  GROUP BY trait_component.cvterm_id, trialdesign.value;
+
+
+ALTER TABLE public.trait_componentsxtrial_designs OWNER TO web_usr;
+
+--
+-- Name: trait_componentsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.trait_componentsxtrial_types AS
+ SELECT trait_component.cvterm_id AS trait_component_id,
+    trialterm.cvterm_id AS trial_type_id
+   FROM (((((public.materialized_phenoview
+     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
+     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'contains'::text))))))
+     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
+     JOIN public.projectprop trialprop ON (((materialized_phenoview.trial_id = trialprop.project_id) AND (trialprop.type_id IN ( SELECT cvterm.cvterm_id
+           FROM (public.cvterm
+             JOIN public.cv USING (cv_id))
+          WHERE ((cv.name)::text = 'project_type'::text))))))
+     JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
+  GROUP BY trait_component.cvterm_id, trialterm.cvterm_id;
+
+
+ALTER TABLE public.trait_componentsxtrial_types OWNER TO web_usr;
+
+--
+-- Name: trait_componentsxtrials; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.trait_componentsxtrials AS
+ SELECT trait_component.cvterm_id AS trait_component_id,
+    materialized_phenoview.trial_id
+   FROM (((public.materialized_phenoview
+     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
+     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'contains'::text))))))
+     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
+  GROUP BY trait_component.cvterm_id, materialized_phenoview.trial_id;
+
+
+ALTER TABLE public.trait_componentsxtrials OWNER TO web_usr;
+
+--
+-- Name: trait_componentsxyears; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.trait_componentsxyears AS
+ SELECT trait_component.cvterm_id AS trait_component_id,
+    materialized_phenoview.year_id
+   FROM (((public.materialized_phenoview
+     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
+     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
+           FROM public.cvterm
+          WHERE ((cvterm.name)::text = 'contains'::text))))))
+     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
+  GROUP BY trait_component.cvterm_id, materialized_phenoview.year_id;
+
+
+ALTER TABLE public.trait_componentsxyears OWNER TO web_usr;
+
+--
+-- Name: traits; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.traits AS
  SELECT cvterm.cvterm_id AS trait_id,
     (((((cvterm.name)::text || '|'::text) || (db.name)::text) || ':'::text) || (dbxref.accession)::text) AS trait_name
    FROM (((((public.cv
@@ -18786,136 +18784,32 @@ UNION
      LEFT JOIN public.cvterm_relationship is_subject ON ((cvterm.cvterm_id = is_subject.subject_id)))
   WHERE (is_subject.subject_id IS NOT NULL)
   GROUP BY cvterm.cvterm_id, (((((cvterm.name)::text || '|'::text) || (db.name)::text) || ':'::text) || (dbxref.accession)::text)
-  ORDER BY 2
-  WITH NO DATA;
+  ORDER BY 2;
 
 
 ALTER TABLE public.traits OWNER TO web_usr;
 
 --
--- Name: trait_componentsxtraits; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: traitsxtrial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trait_componentsxtraits AS
- SELECT traits.trait_id,
-    trait_component.cvterm_id AS trait_component_id
-   FROM ((public.traits
-     JOIN public.cvterm_relationship ON (((traits.trait_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'contains'::text))))))
-     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY traits.trait_id, trait_component.cvterm_id
-  WITH NO DATA;
-
-
-ALTER TABLE public.trait_componentsxtraits OWNER TO web_usr;
-
---
--- Name: trait_componentsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.trait_componentsxtrial_designs AS
- SELECT trait_component.cvterm_id AS trait_component_id,
-    trialdesign.value AS trial_design_id
-   FROM ((((public.materialized_phenoview
-     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
-     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'contains'::text))))))
-     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-     JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY trait_component.cvterm_id, trialdesign.value
-  WITH NO DATA;
-
-
-ALTER TABLE public.trait_componentsxtrial_designs OWNER TO web_usr;
-
---
--- Name: trait_componentsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.trait_componentsxtrial_types AS
- SELECT trait_component.cvterm_id AS trait_component_id,
-    trialterm.cvterm_id AS trial_type_id
-   FROM (((((public.materialized_phenoview
-     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
-     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'contains'::text))))))
-     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-     JOIN public.projectprop trialprop ON (((materialized_phenoview.trial_id = trialprop.project_id) AND (trialprop.type_id IN ( SELECT cvterm.cvterm_id
-           FROM (public.cvterm
-             JOIN public.cv USING (cv_id))
-          WHERE ((cv.name)::text = 'project_type'::text))))))
-     JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY trait_component.cvterm_id, trialterm.cvterm_id
-  WITH NO DATA;
-
-
-ALTER TABLE public.trait_componentsxtrial_types OWNER TO web_usr;
-
---
--- Name: trait_componentsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.trait_componentsxtrials AS
- SELECT trait_component.cvterm_id AS trait_component_id,
-    materialized_phenoview.trial_id
-   FROM (((public.materialized_phenoview
-     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
-     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'contains'::text))))))
-     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY trait_component.cvterm_id, materialized_phenoview.trial_id
-  WITH NO DATA;
-
-
-ALTER TABLE public.trait_componentsxtrials OWNER TO web_usr;
-
---
--- Name: trait_componentsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.trait_componentsxyears AS
- SELECT trait_component.cvterm_id AS trait_component_id,
-    materialized_phenoview.year_id
-   FROM (((public.materialized_phenoview
-     JOIN public.cvterm trait ON ((materialized_phenoview.trait_id = trait.cvterm_id)))
-     JOIN public.cvterm_relationship ON (((trait.cvterm_id = cvterm_relationship.object_id) AND (cvterm_relationship.type_id = ( SELECT cvterm.cvterm_id
-           FROM public.cvterm
-          WHERE ((cvterm.name)::text = 'contains'::text))))))
-     JOIN public.cvterm trait_component ON ((cvterm_relationship.subject_id = trait_component.cvterm_id)))
-  GROUP BY trait_component.cvterm_id, materialized_phenoview.year_id
-  WITH NO DATA;
-
-
-ALTER TABLE public.trait_componentsxyears OWNER TO web_usr;
-
---
--- Name: traitsxtrial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.traitsxtrial_designs AS
+CREATE VIEW public.traitsxtrial_designs AS
  SELECT materialized_phenoview.trait_id,
     trialdesign.value AS trial_design_id
    FROM (public.materialized_phenoview
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY materialized_phenoview.trait_id, trialdesign.value
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.trait_id, trialdesign.value;
 
 
 ALTER TABLE public.traitsxtrial_designs OWNER TO web_usr;
 
 --
--- Name: traitsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: traitsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.traitsxtrial_types AS
+CREATE VIEW public.traitsxtrial_types AS
  SELECT materialized_phenoview.trait_id,
     trialterm.cvterm_id AS trial_type_id
    FROM ((public.materialized_phenoview
@@ -18924,61 +18818,57 @@ CREATE MATERIALIZED VIEW public.traitsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY materialized_phenoview.trait_id, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.trait_id, trialterm.cvterm_id;
 
 
 ALTER TABLE public.traitsxtrial_types OWNER TO web_usr;
 
 --
--- Name: traitsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: traitsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.traitsxtrials AS
+CREATE VIEW public.traitsxtrials AS
  SELECT materialized_phenoview.trait_id,
     materialized_phenoview.trial_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.trait_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.trait_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.traitsxtrials OWNER TO web_usr;
 
 --
--- Name: traitsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: traitsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.traitsxyears AS
+CREATE VIEW public.traitsxyears AS
  SELECT materialized_phenoview.trait_id,
     materialized_phenoview.year_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.trait_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.trait_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.traitsxyears OWNER TO web_usr;
 
 --
--- Name: trial_designs; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trial_designs; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trial_designs AS
+CREATE VIEW public.trial_designs AS
  SELECT projectprop.value AS trial_design_id,
     projectprop.value AS trial_design_name
    FROM (public.projectprop
      JOIN public.cvterm ON ((projectprop.type_id = cvterm.cvterm_id)))
   WHERE ((cvterm.name)::text = 'design'::text)
-  GROUP BY projectprop.value
-  WITH NO DATA;
+  GROUP BY projectprop.value;
 
 
 ALTER TABLE public.trial_designs OWNER TO web_usr;
 
 --
--- Name: trial_designsxtrial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trial_designsxtrial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trial_designsxtrial_types AS
+CREATE VIEW public.trial_designsxtrial_types AS
  SELECT trialdesign.value AS trial_design_id,
     trialterm.cvterm_id AS trial_type_id
    FROM (((public.materialized_phenoview
@@ -18990,51 +18880,60 @@ CREATE MATERIALIZED VIEW public.trial_designsxtrial_types AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY trialdesign.value, trialterm.cvterm_id
-  WITH NO DATA;
+  GROUP BY trialdesign.value, trialterm.cvterm_id;
 
 
 ALTER TABLE public.trial_designsxtrial_types OWNER TO web_usr;
 
 --
--- Name: trial_designsxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trial_designsxtrials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trial_designsxtrials AS
+CREATE VIEW public.trial_designsxtrials AS
  SELECT trialdesign.value AS trial_design_id,
     materialized_phenoview.trial_id
    FROM (public.materialized_phenoview
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY trialdesign.value, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY trialdesign.value, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.trial_designsxtrials OWNER TO web_usr;
 
 --
--- Name: trial_designsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trial_designsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trial_designsxyears AS
+CREATE VIEW public.trial_designsxyears AS
  SELECT trialdesign.value AS trial_design_id,
     materialized_phenoview.year_id
    FROM (public.materialized_phenoview
      JOIN public.projectprop trialdesign ON (((materialized_phenoview.trial_id = trialdesign.project_id) AND (trialdesign.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'design'::text))))))
-  GROUP BY trialdesign.value, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY trialdesign.value, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.trial_designsxyears OWNER TO web_usr;
 
 --
--- Name: trial_typesxtrials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trial_types; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trial_typesxtrials AS
+CREATE VIEW public.trial_types AS
+SELECT
+    NULL::integer AS trial_type_id,
+    NULL::character varying(1024) AS trial_type_name;
+
+
+ALTER TABLE public.trial_types OWNER TO web_usr;
+
+--
+-- Name: trial_typesxtrials; Type: VIEW; Schema: public; Owner: web_usr
+--
+
+CREATE VIEW public.trial_typesxtrials AS
  SELECT trialterm.cvterm_id AS trial_type_id,
     materialized_phenoview.trial_id
    FROM ((public.materialized_phenoview
@@ -19043,17 +18942,16 @@ CREATE MATERIALIZED VIEW public.trial_typesxtrials AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY trialterm.cvterm_id, materialized_phenoview.trial_id
-  WITH NO DATA;
+  GROUP BY trialterm.cvterm_id, materialized_phenoview.trial_id;
 
 
 ALTER TABLE public.trial_typesxtrials OWNER TO web_usr;
 
 --
--- Name: trial_typesxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trial_typesxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trial_typesxyears AS
+CREATE VIEW public.trial_typesxyears AS
  SELECT trialterm.cvterm_id AS trial_type_id,
     materialized_phenoview.year_id
    FROM ((public.materialized_phenoview
@@ -19062,17 +18960,16 @@ CREATE MATERIALIZED VIEW public.trial_typesxyears AS
              JOIN public.cv USING (cv_id))
           WHERE ((cv.name)::text = 'project_type'::text))))))
      JOIN public.cvterm trialterm ON ((trialprop.type_id = trialterm.cvterm_id)))
-  GROUP BY trialterm.cvterm_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY trialterm.cvterm_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.trial_typesxyears OWNER TO web_usr;
 
 --
--- Name: trials; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trials; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trials AS
+CREATE VIEW public.trials AS
  SELECT trial.project_id AS trial_id,
     trial.name AS trial_name
    FROM (((public.project breeding_program
@@ -19083,46 +18980,21 @@ CREATE MATERIALIZED VIEW public.trials AS
      JOIN public.projectprop ON ((trial.project_id = projectprop.project_id)))
   WHERE (NOT (projectprop.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE (((cvterm.name)::text = 'cross'::text) OR ((cvterm.name)::text = 'trial_folder'::text) OR ((cvterm.name)::text = 'folder_for_trials'::text) OR ((cvterm.name)::text = 'folder_for_crosses'::text)))))
-  GROUP BY trial.project_id, trial.name
-  WITH NO DATA;
+          WHERE (((cvterm.name)::text = 'cross'::text) OR ((cvterm.name)::text = 'trial_folder'::text) OR ((cvterm.name)::text = 'folder_for_trials'::text) OR ((cvterm.name)::text = 'folder_for_crosses'::text) OR ((cvterm.name)::text = 'folder_for_genotyping_trials'::text)))))
+  GROUP BY trial.project_id, trial.name;
 
 
 ALTER TABLE public.trials OWNER TO web_usr;
 
 --
--- Name: trialsxgenotyping_projects; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: trialsxyears; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.trialsxgenotyping_projects AS
- SELECT trials.trial_id,
-    nd_experiment_project.project_id AS genotyping_project_id
-   FROM ((((public.trials
-     JOIN public.materialized_phenoview ON ((trials.trial_id = materialized_phenoview.trial_id)))
-     JOIN public.materialized_genoview ON ((materialized_phenoview.accession_id = materialized_genoview.accession_id)))
-     JOIN public.nd_experiment_genotype ON ((materialized_genoview.genotype_id = nd_experiment_genotype.genotype_id)))
-     JOIN public.nd_experiment_project ON ((nd_experiment_genotype.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
-  WHERE (nd_experiment_project.project_id IN ( SELECT projectprop.project_id
-           FROM public.projectprop
-          WHERE ((projectprop.type_id IN ( SELECT cvterm.cvterm_id
-                   FROM public.cvterm
-                  WHERE ((cvterm.name)::text = 'design'::text))) AND (projectprop.value = 'genotype_data_project'::text))))
-  GROUP BY trials.trial_id, nd_experiment_project.project_id
-  WITH NO DATA;
-
-
-ALTER TABLE public.trialsxgenotyping_projects OWNER TO web_usr;
-
---
--- Name: trialsxyears; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.trialsxyears AS
+CREATE VIEW public.trialsxyears AS
  SELECT materialized_phenoview.trial_id,
     materialized_phenoview.year_id
    FROM public.materialized_phenoview
-  GROUP BY materialized_phenoview.trial_id, materialized_phenoview.year_id
-  WITH NO DATA;
+  GROUP BY materialized_phenoview.trial_id, materialized_phenoview.year_id;
 
 
 ALTER TABLE public.trialsxyears OWNER TO web_usr;
@@ -19207,18 +19079,17 @@ CREATE TABLE public.unigene_signalp (
 ALTER TABLE public.unigene_signalp OWNER TO postgres;
 
 --
--- Name: years; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
+-- Name: years; Type: VIEW; Schema: public; Owner: web_usr
 --
 
-CREATE MATERIALIZED VIEW public.years AS
+CREATE VIEW public.years AS
  SELECT projectprop.value AS year_id,
     projectprop.value AS year_name
    FROM public.projectprop
   WHERE (projectprop.type_id = ( SELECT cvterm.cvterm_id
            FROM public.cvterm
           WHERE ((cvterm.name)::text = 'project year'::text)))
-  GROUP BY projectprop.value
-  WITH NO DATA;
+  GROUP BY projectprop.value;
 
 
 ALTER TABLE public.years OWNER TO web_usr;
@@ -23725,7 +23596,9 @@ CREATE TABLE sgn_people.list (
     description text,
     owner integer,
     type_id bigint,
-    is_public boolean DEFAULT false NOT NULL
+    is_public boolean DEFAULT false NOT NULL,
+    "timestamp" character varying,
+    modify_timestamp character varying
 );
 
 
@@ -23840,7 +23713,8 @@ CREATE TABLE sgn_people.sp_dataset (
     name character varying(255),
     description text,
     dataset jsonb,
-    is_live boolean
+    is_live boolean,
+    is_public boolean
 );
 
 
@@ -23952,6 +23826,82 @@ ALTER TABLE sgn_people.sp_login_old_sp_login_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE sgn_people.sp_login_old_sp_login_id_seq OWNED BY sgn_people.sp_login_old.sp_login_id;
+
+
+--
+-- Name: sp_order; Type: TABLE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE TABLE sgn_people.sp_order (
+    sp_order_id integer NOT NULL,
+    order_from_id bigint,
+    order_to_id bigint,
+    order_status character varying(100),
+    comments text,
+    create_date character varying(100),
+    completion_date character varying(100)
+);
+
+
+ALTER TABLE sgn_people.sp_order OWNER TO postgres;
+
+--
+-- Name: sp_order_sp_order_id_seq; Type: SEQUENCE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE SEQUENCE sgn_people.sp_order_sp_order_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE sgn_people.sp_order_sp_order_id_seq OWNER TO postgres;
+
+--
+-- Name: sp_order_sp_order_id_seq; Type: SEQUENCE OWNED BY; Schema: sgn_people; Owner: postgres
+--
+
+ALTER SEQUENCE sgn_people.sp_order_sp_order_id_seq OWNED BY sgn_people.sp_order.sp_order_id;
+
+
+--
+-- Name: sp_orderprop; Type: TABLE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE TABLE sgn_people.sp_orderprop (
+    sp_orderprop_id integer NOT NULL,
+    sp_order_id bigint,
+    type_id bigint,
+    value jsonb,
+    rank integer NOT NULL
+);
+
+
+ALTER TABLE sgn_people.sp_orderprop OWNER TO postgres;
+
+--
+-- Name: sp_orderprop_sp_orderprop_id_seq; Type: SEQUENCE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE SEQUENCE sgn_people.sp_orderprop_sp_orderprop_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE sgn_people.sp_orderprop_sp_orderprop_id_seq OWNER TO postgres;
+
+--
+-- Name: sp_orderprop_sp_orderprop_id_seq; Type: SEQUENCE OWNED BY; Schema: sgn_people; Owner: postgres
+--
+
+ALTER SEQUENCE sgn_people.sp_orderprop_sp_orderprop_id_seq OWNED BY sgn_people.sp_orderprop.sp_orderprop_id;
 
 
 --
@@ -24417,6 +24367,43 @@ ALTER TABLE sgn_people.sp_roles_sp_role_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE sgn_people.sp_roles_sp_role_id_seq OWNED BY sgn_people.sp_roles.sp_role_id;
+
+
+--
+-- Name: sp_token; Type: TABLE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE TABLE sgn_people.sp_token (
+    sp_token_id integer NOT NULL,
+    cookie_string text,
+    last_access_time timestamp without time zone,
+    source_ip_address character varying(64),
+    sp_person_id bigint
+);
+
+
+ALTER TABLE sgn_people.sp_token OWNER TO postgres;
+
+--
+-- Name: sp_token_sp_token_id_seq; Type: SEQUENCE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE SEQUENCE sgn_people.sp_token_sp_token_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE sgn_people.sp_token_sp_token_id_seq OWNER TO postgres;
+
+--
+-- Name: sp_token_sp_token_id_seq; Type: SEQUENCE OWNED BY; Schema: sgn_people; Owner: postgres
+--
+
+ALTER SEQUENCE sgn_people.sp_token_sp_token_id_seq OWNED BY sgn_people.sp_token.sp_token_id;
 
 
 --
@@ -26006,6 +25993,13 @@ ALTER TABLE ONLY phenome.project_md_image ALTER COLUMN project_md_image_id SET D
 
 
 --
+-- Name: project_owner project_owner_id; Type: DEFAULT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.project_owner ALTER COLUMN project_owner_id SET DEFAULT nextval('phenome.project_owner_project_owner_id_seq'::regclass);
+
+
+--
 -- Name: pub_curator pub_curator_id; Type: DEFAULT; Schema: phenome; Owner: postgres
 --
 
@@ -26542,6 +26536,13 @@ ALTER TABLE ONLY public.featureloc_pub ALTER COLUMN featureloc_pub_id SET DEFAUL
 --
 
 ALTER TABLE ONLY public.featureprop ALTER COLUMN featureprop_id SET DEFAULT nextval('public.featureprop_featureprop_id_seq'::regclass);
+
+
+--
+-- Name: featureprop_json featureprop_json_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.featureprop_json ALTER COLUMN featureprop_json_id SET DEFAULT nextval('public.featureprop_json_featureprop_json_id_seq'::regclass);
 
 
 --
@@ -28008,6 +28009,20 @@ ALTER TABLE ONLY sgn_people.sp_login_old ALTER COLUMN sp_login_id SET DEFAULT ne
 
 
 --
+-- Name: sp_order sp_order_id; Type: DEFAULT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_order ALTER COLUMN sp_order_id SET DEFAULT nextval('sgn_people.sp_order_sp_order_id_seq'::regclass);
+
+
+--
+-- Name: sp_orderprop sp_orderprop_id; Type: DEFAULT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_orderprop ALTER COLUMN sp_orderprop_id SET DEFAULT nextval('sgn_people.sp_orderprop_sp_orderprop_id_seq'::regclass);
+
+
+--
 -- Name: sp_organisms organism_id; Type: DEFAULT; Schema: sgn_people; Owner: postgres
 --
 
@@ -28089,6 +28104,13 @@ ALTER TABLE ONLY sgn_people.sp_project_person ALTER COLUMN sp_project_person_id 
 --
 
 ALTER TABLE ONLY sgn_people.sp_roles ALTER COLUMN sp_role_id SET DEFAULT nextval('sgn_people.sp_roles_sp_role_id_seq'::regclass);
+
+
+--
+-- Name: sp_token sp_token_id; Type: DEFAULT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_token ALTER COLUMN sp_token_id SET DEFAULT nextval('sgn_people.sp_token_sp_token_id_seq'::regclass);
 
 
 --
@@ -29075,6 +29097,7 @@ COPY metadata.md_dbversion (dbversion_id, patch_name, patch_description, metadat
 95	LinkPlantEntriesToProject	This patch updates the way that plant entries were being created and stored. Previously, plant entries were not linked directly to the project they are in. This made uploading of phenotypes slow because of additional searches to go from plant to plot to project. Now the connnection of plant to project is available.\n	106
 96	AddPlantOfCvterm	This patch will find_or_create a cvterm name of vector, which is a new stock type\n	107
 97	PlantEntriesInheritPlotProperties	This patch updates the way that plant entries were being created and stored. Previously, plant entries did not inherit plot properties (block, replicate, plot number), as well as a relationship to the accession. Now they are created with these associations.\n	108
+205	AddProtocoltoStoredNIRSRetroactively	This patch retroactively adds a protocol for the uploaded NIRS data\n	218
 98	RenameObsoleteStocks	This patch renames obsolete stocks by adding _OBSOLETED and a timestamp to the end of the uniquename and name. This then allows new stocks to be added with the same name as the obsoleted stock.\n	109
 99	AddNdprotocolDescriptionChado	patch for adding descriotion column to chado table nd_protocol. This change will go into Chado version 1.4. DO NOT ALTER CHADO TABLES WITHOUT COORDINATING FIRST WITH GMOD!\n	110
 100	RedefineStockViews	This patch updates the materialized view that stores traits\n	111
@@ -29131,6 +29154,7 @@ COPY metadata.md_dbversion (dbversion_id, patch_name, patch_description, metadat
 151	ChangeGenotypepropGTKeyToDS	Allows addition of a link to the raw data file for genotyping plates\n	162
 152	GenotypepropUserPermissions	This patch gives web_usr permissions for inserting and using genotypeprop table. Your database may already have been modified manually, but this patch explicitly grants the needed permissions.\n	163
 153	AddManagementFactorPropertyCvterms	This patch adds the necessary cvterms for field management factor properties\n	164
+206	AddCrossTransactionRelatedCvterms	This patch adds the 'cross_identifier' and 'cross_transaction_json' stock_property cvterms\n	219
 154	DefaultMdImageCreateDateTimestamp	This patch sets a default NOW() value for the create_date and modified_date columns in metadata.md_images, metadata.md_tag_image, and metadata.md_tag\n	165
 155	AddCrossCombinationCvterm	This patch adds the 'cross_combination' stock_property cvterm\n	166
 156	AddFamilyNamesListTypesCvterm	Add cvterm for family_names list types\n	167
@@ -29180,6 +29204,65 @@ COPY metadata.md_dbversion (dbversion_id, patch_name, patch_description, metadat
 200	AddVendorOrderIDProjectProp	Description of this patch goes here\n	213
 201	AddMixedModelProtocol	Description of this patch goes here\n	214
 202	AddProductProfileCvterm	This patch adds the 'product_profile_json' project_property cvterm\n	215
+203	AddHighDimPhenotypeProtocolCvterms	This patch adds cvterms for high dimensional phenotype protocols e.g. nirs, metabolite, transcriptomics\n	216
+204	AddReleasedVarietyName	This patch adds the 'released_variety_name' stock_property cvterm\n	217
+207	UpdateWizardMaterializedViewsForGenoProtocols	This patch updates the materialized views to allow genotypes from mixed stock types\n	220
+208	AddIsPublicDataset	This patch adds the column 'is_public' to the sgn_people.sp_dataset table\n	221
+209	AddLabId	This patch add new cvterm lab_id to nd_experiment_property\n	222
+210	AddCrossAdditionalInfoCvterm	This patch adds the 'cross_additional_info stock_property cvterm\n	223
+211	AddGblupRrblupProtocol	Description of this patch goes here\n	224
+212	AddMiscellaneousTrialType	This patch add a sytem cvterm that is used to store miscellaneous trial types for trials.\n	225
+213	AddNdProtocolTerms	This patch adds a sequence_metadata_protocol term to the protocol_type cv and a sequence_metadata_protocol_properties term to the protocol_property cv\n	226
+214	AddSequenceMetadataTypes	This patch adds the CV and CVTerms for the Sequence Metadata Types (used by the featureprop_json table)\n	227
+215	CreateFeaturepropJSONTable	This patch creates the featureprop_json table used for storing sequence metadata as JSON objects\n	228
+216	AddVendorSubmissionIDProjectProp	Description of this patch goes here\n	229
+217	CreateProjectOwnerTable	This patch creates a phenome.project_owner table used for assigning sp_person_id to created trials \n	230
+218	AddVcfType	This patch add new cvterm vcf_snp_dbxref to nd_protocol\n	231
+219	FixMatviewsTable	This patch updates the matviews table making each mv_name unique\n	232
+220	AddAdditionalInfoType	This patch add a sytem cvterm that is used to store additional info for stock and projects.\n	233
+221	AddCatalogRelatedCvterms	This patch adds the 'stock_catalog_json stock_property cvterm and catalog_items list_types cvterm\n	234
+222	AddOrderTables	Description of this patch goes here\n	235
+223	AddSpOrderPropertyCvAndCvterms	This patch adds the 'sp_order_property' cv and 'order_batch_json', 'order_progress_json' sp_order_property cvterms\n	236
+224	AddVendorRole	This patch adds vendor role on sgn_people.sp_roles\n	237
+225	SpeedUpMatviews	This patch updates the materialized_phenoview and materialized_genoview to speed up their underlying queries (prevents joining through nd_experiment, drops indexes). Also redefines trials view to exclude genotyping trial folders\n	238
+226	AddAnalysisSingleMultiTrialCvterm	This patch adds cvterm for single multi trial analysis\n	239
+227	AddAnalyticsProtocolCvterms	This patch adds cvterms for analytics protocols. These protocols are for saving results/graphs/files from analytics processes\n	240
+228	AddDroneImageryODMRunningCvterm	This patch adds cvterm for marking a running ODM process\n	241
+229	AddImagingEventBaseDateCvterm	This patch adds cvterm for an imaging event's base date. Useful when multiple, fixed, camera rigs are capturing different sections of the field experiment, and the cameras are not capturing at the exact same times.\n	242
+230	AddImagingEventGeoParamCoordinatesCvterm	This patch adds cvterm for an imaging event's geoparam coordinates for GeoTIFFs pixel to geo-coordinate position.\n	243
+231	AddImagingEventGeoParamCoordinatesUTMWGSCvterm	This patch adds cvterm for an imaging event's geoparam coordinates for GeoTIFFs pixel to geo-coordinate position.\n	244
+232	FixFieldbookImageCvterm	This patch used to fix the fieldbook_image cvterm from showing up in the trait search as an ontology. This term was missing the upper link to its ontology.\nNow it does nothing because it should not be linked to a crop ontology cv. A future patch will remove it from databases that ran the old version of this patch \nhas '+prereq' => (\n\tdefault => sub {\n        [],\n    },\n	245
+233	UpdateMetadataMdImageTableCharacterLength	This patch changes fields character length to greater than 100 chars\n	246
+234	AddPCRMarkerCvterms	This patch adds the 'pcr_marker_details' protocol_property cvterm, 'pcr_marker_genotyping' genotype_property cvterm and pcr_marker_protocol protocol_type cvterm.\n	247
+235	CreateSpTokenTable	This patch creates the sgn_people.sp_token table.\n	248
+236	AddGenotypeProjectViews	This patch updates the materialized_genoview matview and adds the genotype project binary views\n	249
+237	AddMissingSeedlotViews	This patch adds the missing seedlots and locationsXseedlots views\n	250
+238	AddSeedlotMaintenanceType	This patch adds the cvterm 'seedlot_maintenance_json' to the 'stock_property' cv\n	251
+239	AddPhenotypeAdditionalInfoCvterm	This patch adds phenotype_property cvterm for storing additional information for phenotype.\n	252
+240	CreateMaterializedMarkerviewUpdated2	This patch adds the create_materialized_markerview function to build and populate the materialized_markerview mat view\n	253
+241	RemoveFieldbookImageCvterm	This patch removes the fieldbook_image cvterm from the ontology.\n	254
+242	SaveChromosomeRankInNdProtocol	This patch saves the genotypeprop rank of the chromosomes in the nd_protocolprop JSONb\n	255
+243	SaveChromosomeRankInNdProtocolFix	This patch saves the genotypeprop rank of the chromosomes in the nd_protocolprop JSONb\n	256
+244	AddEntryNumberCvterm	This patch adds project_entry_number_map cvterm for storing a map of entry numbers for project stocks.\n	257
+245	AddFamilyTypeCvterm	This patch adds the 'family_type' stock_property cvterm\n	258
+246	AddFileMetadataJsonCvterm	This patch adds the 'file_metadata_json' project_property cvterm\n	259
+247	FixOutOfSyncNdGeolocations	This patch updates nd_experiment.nd_geolocation_ids that are out of sync with the location specified in linked projectprop.values\n	260
+248	AddProjectTypeId	Add type_id foreign key to the project table as added to the Chado 1.4 release\nhas '+prereq' => (\n    default => sub {\n        [''],\n    },\n  );\n	261
+249	AddTrialStatusCvterm	This patch adds the 'trial_status_json' project_property cvterm\n	262
+250	AlterDescriptionToText	Alters project table description column from varchar(255) to text\nhas '+prereq' => (\n    default => sub {\n        [''],\n    },\n  );\n	263
+251	AddCascadeDeletes	Adds missing cascade deletes to the following linking tables: phenome.stock_image, phenome.locus_owner, phenome.nd_experiment_md_files, phenome.nd_experiment_md_json, phenome.nd_experiment_md_images, phenome.project_md_image, phenome.project_owner, phenome.stock_owner, metadata.md_image_cvterm\nhas '+prereq' => (\n    default => sub {\n        [''],\n    },\n  );\n	264
+252	GenotypeDosageChange	This patch changes calculated dosage from REF to ALT\n	265
+253	AddTimestampFields	Add timestamp fields to sgn_people.list	266
+254	AddSensoryTrialType	Description of this patch goes here\n	267
+255	AddTrialSoilDataCvterm	This patch adds the 'soil_data_json' project_property cvterm\n	268
+256	AddFacilityIdentifierCvterm	This patch adds the 'facility_identifier stock_property cvterm\n	269
+257	AddGenotypingProjectCvterms	Description of this patch goes here\n	270
+258	AddGenomicPredictionStatCvterms	Description of this patch goes here\n	271
+259	AddTargetNumbersJsonCvterm	This patch adds the 'target_numbers_json' project_property cvterm\n	272
+260	AddVectorStockProps	This patch will find_or_create a cvterm for vectors\n	273
+261	AddVectorStockPropsToMatviewStockprop	 This patch adds required stock prop types for seedlot quality.	274
+262	AddListAdditionalInfoCvterm	This patch adds the 'list_additional_info stock_property cvterm\n	275
+263	AddPhenotypeExternalReferencesCvterm	This patch adds phenotype_property cvterm for storing external references data for phenotype.\n	276
 \.
 
 
@@ -29245,219 +29328,280 @@ COPY metadata.md_json (json_id, json_type, json) FROM stdin;
 --
 
 COPY metadata.md_metadata (metadata_id, create_date, create_person_id, modified_date, modified_person_id, modification_note, previous_metadata_id, obsolete, obsolete_note, permission_id) FROM stdin;
-17	2014-01-03 17:44:29.059282+00	40	\N	\N	\N	\N	0	\N	\N
-18	2014-01-03 22:13:32.335503+00	40	\N	\N	\N	\N	1	\N	\N
-29	2015-02-04 20:06:40.169408+00	41	\N	\N	\N	\N	0	\N	\N
-30	2015-02-06 16:07:45.355755+00	41	\N	\N	\N	\N	0	\N	\N
-31	2015-02-06 20:07:38.136354+00	41	\N	\N	\N	\N	0	\N	\N
-1	2011-12-20 17:58:26.736933+00	41	\N	\N	\N	\N	0	\N	\N
-2	2011-12-20 17:59:02.671505+00	41	\N	\N	\N	\N	0	\N	\N
-3	2011-12-20 17:59:19.844545+00	41	\N	\N	\N	\N	0	\N	\N
-4	2012-01-19 20:46:35.153106+00	41	\N	\N	\N	\N	0	\N	\N
-5	2012-01-23 17:25:06.637079+00	41	\N	\N	\N	\N	0	\N	\N
-6	2012-06-28 20:34:36.265863+00	41	\N	\N	\N	\N	0	\N	\N
-7	2012-06-28 20:35:00.551065+00	41	\N	\N	\N	\N	0	\N	\N
-8	2012-06-28 20:36:04.901638+00	41	\N	\N	\N	\N	0	\N	\N
-9	2012-06-28 20:36:30.035938+00	41	\N	\N	\N	\N	0	\N	\N
-12	2013-10-09 14:47:20.320423+00	41	\N	\N	\N	\N	0	\N	\N
-13	2013-10-09 14:49:37.243178+00	41	\N	\N	\N	\N	0	\N	\N
-14	2013-10-09 14:49:49.683672+00	41	\N	\N	\N	\N	0	\N	\N
-15	2013-10-09 14:50:09.982246+00	41	\N	\N	\N	\N	0	\N	\N
-16	2013-10-09 14:50:46.875676+00	41	\N	\N	\N	\N	0	\N	\N
-19	2014-01-10 23:11:16.337745+00	41	\N	\N	\N	\N	0	\N	\N
-20	2014-02-13 00:42:52.573584+00	41	\N	\N	\N	\N	0	\N	\N
-21	2014-12-19 14:12:05.270521+00	41	\N	\N	\N	\N	0	\N	\N
-22	2014-12-19 14:14:21.150006+00	41	\N	\N	\N	\N	0	\N	\N
-23	2014-12-19 14:14:53.610443+00	41	\N	\N	\N	\N	0	\N	\N
-24	2014-12-19 14:15:25.567852+00	41	\N	\N	\N	\N	0	\N	\N
-25	2014-12-19 14:16:05.753633+00	41	\N	\N	\N	\N	0	\N	\N
-26	2014-12-19 14:16:25.843792+00	41	\N	\N	\N	\N	0	\N	\N
-27	2014-12-19 14:26:02.50047+00	41	\N	\N	\N	\N	0	\N	\N
-28	2014-12-19 21:22:22.583344+00	41	\N	\N	\N	\N	0	\N	\N
-32	2015-06-02 12:16:04.529974+00	41	\N	\N	\N	\N	0	\N	\N
-33	2016-02-04 18:58:52.339025+00	41	\N	\N	\N	\N	0	\N	\N
-34	2016-02-04 18:59:53.76135+00	41	\N	\N	\N	\N	0	\N	\N
-35	2016-02-04 19:00:26.992463+00	41	\N	\N	\N	\N	0	\N	\N
-36	2016-02-04 19:00:53.818881+00	41	\N	\N	\N	\N	0	\N	\N
-37	2016-02-17 20:34:04.967354+00	40	\N	\N	\N	\N	0	\N	\N
-38	2016-02-25 21:29:32.465167+00	40	\N	\N	\N	\N	0	\N	\N
-39	2016-03-07 17:28:59.083711+00	41	\N	\N	\N	\N	0	\N	\N
-40	2016-03-07 17:29:05.349106+00	41	\N	\N	\N	\N	0	\N	\N
-41	2016-03-07 17:30:33.01634+00	41	\N	\N	\N	\N	0	\N	\N
-42	2016-03-07 17:30:48.618187+00	41	\N	\N	\N	\N	0	\N	\N
-43	2016-03-07 17:30:59.870503+00	41	\N	\N	\N	\N	0	\N	\N
-44	2016-03-08 02:08:23.919972+00	41	\N	\N	\N	\N	0	\N	\N
-45	2016-03-08 03:35:28.565872+00	41	\N	\N	\N	\N	0	\N	\N
-46	2016-05-09 17:54:13.75916+00	41	\N	\N	\N	\N	0	\N	\N
-47	2016-05-09 21:49:25.421545+00	41	\N	\N	\N	\N	0	\N	\N
-48	2016-05-12 21:14:24.101559+00	41	\N	\N	\N	\N	0	\N	\N
-49	2016-08-02 16:57:34.432201+00	40	\N	\N	\N	\N	0	\N	\N
-50	2016-08-02 16:57:57.411613+00	40	\N	\N	\N	\N	0	\N	\N
-51	2016-08-04 15:35:21.249132+00	40	\N	\N	\N	\N	0	\N	\N
-52	2016-10-12 17:29:59.74206+00	41	\N	\N	\N	\N	0	\N	\N
-53	2016-10-17 17:51:17.740278+00	41	\N	\N	\N	\N	0	\N	\N
-54	2016-11-11 14:47:39.732402+00	41	\N	\N	\N	\N	0	\N	\N
-55	2017-01-04 15:25:47.878796+00	41	\N	\N	\N	\N	0	\N	\N
-56	2017-02-20 21:54:13.041208+00	41	\N	\N	\N	\N	0	\N	\N
-57	2017-03-28 18:48:59.237899+00	41	\N	\N	\N	\N	0	\N	\N
-58	2017-04-21 20:38:42.140825+00	40	\N	\N	\N	\N	0	\N	\N
-59	2017-04-21 20:38:47.264129+00	40	\N	\N	\N	\N	0	\N	\N
-60	2017-04-21 20:40:28.934828+00	40	\N	\N	\N	\N	0	\N	\N
-61	2017-04-21 20:40:54.719142+00	40	\N	\N	\N	\N	0	\N	\N
-62	2017-04-21 21:12:02.017627+00	40	\N	\N	\N	\N	0	\N	\N
-63	2017-05-08 16:12:57.002519+00	41	\N	\N	\N	\N	0	\N	\N
-64	2017-05-31 14:08:18.88001+00	41	\N	\N	\N	\N	0	\N	\N
-65	2017-06-08 16:11:32.805234+00	41	\N	\N	\N	\N	0	\N	\N
-66	2017-06-08 16:53:22.864556+00	41	\N	\N	\N	\N	0	\N	\N
-67	2017-06-30 13:41:36.162383+00	41	\N	\N	\N	\N	0	\N	\N
-68	2017-06-30 13:41:47.39034+00	41	\N	\N	\N	\N	0	\N	\N
-69	2017-07-17 17:31:42.837473+00	41	\N	\N	\N	\N	0	\N	\N
-70	2017-07-27 19:09:24.635054+00	41	\N	\N	\N	\N	0	\N	\N
-71	2017-07-27 19:09:56.99407+00	41	\N	\N	\N	\N	0	\N	\N
-72	2017-08-16 18:07:04.409576+00	41	\N	\N	\N	\N	0	\N	\N
-73	2017-08-16 18:07:17.022312+00	41	\N	\N	\N	\N	0	\N	\N
-74	2017-08-16 18:07:38.778388+00	41	\N	\N	\N	\N	0	\N	\N
-75	2017-09-01 17:08:01.703879+00	41	\N	\N	\N	\N	0	\N	\N
-76	2017-09-18 15:42:28.250977+00	41	\N	\N	\N	\N	0	\N	\N
-77	2017-09-18 15:43:58.719398+00	41	\N	\N	\N	\N	0	\N	\N
-78	2017-10-10 15:10:41.4496+00	41	\N	\N	\N	\N	0	\N	\N
-79	2017-10-10 15:10:52.863376+00	41	\N	\N	\N	\N	0	\N	\N
-80	2017-10-10 15:11:22.791118+00	41	\N	\N	\N	\N	0	\N	\N
-81	2017-10-10 15:13:14.819036+00	41	\N	\N	\N	\N	0	\N	\N
-82	2017-10-10 15:13:30.873535+00	41	\N	\N	\N	\N	0	\N	\N
-83	2017-10-10 15:17:59.09749+00	41	\N	\N	\N	\N	0	\N	\N
-84	2017-10-10 18:46:10.177605+00	41	\N	\N	\N	\N	0	\N	\N
-85	2017-10-28 09:27:19.914912+00	41	\N	\N	\N	\N	0	\N	\N
-86	2017-10-28 09:27:31.016472+00	41	\N	\N	\N	\N	0	\N	\N
-87	2018-03-15 18:22:23.716655+00	41	\N	\N	\N	\N	0	\N	\N
-88	2018-03-15 18:22:38.694441+00	41	\N	\N	\N	\N	0	\N	\N
-89	2018-03-15 18:22:50.086659+00	41	\N	\N	\N	\N	0	\N	\N
-90	2018-03-15 18:23:18.356881+00	41	\N	\N	\N	\N	0	\N	\N
-91	2018-03-15 18:23:27.198638+00	41	\N	\N	\N	\N	0	\N	\N
-92	2018-03-15 18:23:42.849766+00	41	\N	\N	\N	\N	0	\N	\N
-93	2018-03-15 18:23:53.182309+00	41	\N	\N	\N	\N	0	\N	\N
-94	2018-03-15 18:24:08.119533+00	41	\N	\N	\N	\N	0	\N	\N
-95	2018-03-15 18:24:20.893402+00	41	\N	\N	\N	\N	0	\N	\N
-96	2018-03-15 18:24:30.449553+00	41	\N	\N	\N	\N	0	\N	\N
-97	2018-03-15 18:24:48.650789+00	41	\N	\N	\N	\N	0	\N	\N
-98	2018-03-15 18:25:52.818933+00	41	\N	\N	\N	\N	0	\N	\N
-99	2018-03-15 18:27:22.075265+00	41	\N	\N	\N	\N	0	\N	\N
-100	2018-03-15 18:27:31.137628+00	41	\N	\N	\N	\N	0	\N	\N
-101	2018-03-15 18:27:34.05858+00	41	\N	\N	\N	\N	0	\N	\N
-102	2018-03-15 18:27:35.098042+00	41	\N	\N	\N	\N	0	\N	\N
-103	2018-03-15 18:27:36.863938+00	41	\N	\N	\N	\N	0	\N	\N
-104	2018-03-15 18:27:44.327055+00	41	\N	\N	\N	\N	0	\N	\N
-105	2018-03-15 18:27:47.338533+00	41	\N	\N	\N	\N	0	\N	\N
-106	2018-03-15 18:27:50.954148+00	41	\N	\N	\N	\N	0	\N	\N
-107	2018-03-15 18:27:54.330223+00	41	\N	\N	\N	\N	0	\N	\N
-108	2018-03-15 18:28:04.11018+00	41	\N	\N	\N	\N	0	\N	\N
-109	2018-03-15 18:28:07.980957+00	41	\N	\N	\N	\N	0	\N	\N
-110	2018-03-15 18:28:09.301863+00	41	\N	\N	\N	\N	0	\N	\N
-111	2018-03-15 18:28:10.524295+00	41	\N	\N	\N	\N	0	\N	\N
-112	2018-03-15 18:28:12.704359+00	41	\N	\N	\N	\N	0	\N	\N
-113	2018-03-15 18:28:14.967406+00	41	\N	\N	\N	\N	0	\N	\N
-114	2018-03-15 18:28:17.296695+00	41	\N	\N	\N	\N	0	\N	\N
-115	2018-03-15 18:28:19.55644+00	41	\N	\N	\N	\N	0	\N	\N
-116	2018-03-15 18:33:22.456325+00	41	\N	\N	\N	\N	0	\N	\N
-117	2018-03-15 18:34:21.334624+00	41	\N	\N	\N	\N	0	\N	\N
-118	2018-03-15 18:35:12.538822+00	41	\N	\N	\N	\N	0	\N	\N
-119	2018-03-15 18:36:00.770895+00	41	\N	\N	\N	\N	0	\N	\N
-120	2018-03-15 18:36:49.307398+00	41	\N	\N	\N	\N	0	\N	\N
-121	2018-03-15 18:39:49.100827+00	41	\N	\N	\N	\N	0	\N	\N
-122	2018-03-15 18:40:54.965061+00	41	\N	\N	\N	\N	0	\N	\N
-123	2018-03-15 18:41:46.412116+00	41	\N	\N	\N	\N	0	\N	\N
-124	2018-03-15 18:42:55.118412+00	41	\N	\N	\N	\N	0	\N	\N
-125	2018-03-15 18:43:42.52683+00	41	\N	\N	\N	\N	0	\N	\N
-126	2018-03-15 18:44:43.779954+00	41	\N	\N	\N	\N	0	\N	\N
-127	2018-03-15 18:46:05.081789+00	41	\N	\N	\N	\N	0	\N	\N
-128	2018-03-15 18:47:06.79931+00	41	\N	\N	\N	\N	0	\N	\N
-129	2018-03-15 18:47:49.912357+00	41	\N	\N	\N	\N	0	\N	\N
-130	2018-03-15 18:48:31.490473+00	41	\N	\N	\N	\N	0	\N	\N
-131	2018-03-15 18:49:17.403215+00	41	\N	\N	\N	\N	0	\N	\N
-132	2018-03-15 18:50:01.866697+00	41	\N	\N	\N	\N	0	\N	\N
-133	2018-03-15 18:52:01.920667+00	41	\N	\N	\N	\N	0	\N	\N
-134	2018-03-15 18:56:21.786723+00	41	\N	\N	\N	\N	0	\N	\N
-135	2018-03-15 18:57:23.524967+00	41	\N	\N	\N	\N	0	\N	\N
-136	2018-03-15 18:59:13.473233+00	41	\N	\N	\N	\N	0	\N	\N
-137	2018-08-07 19:33:30.680892+00	41	\N	\N	\N	\N	0	\N	\N
-138	2018-08-07 19:33:32.459585+00	41	\N	\N	\N	\N	0	\N	\N
-139	2018-08-07 19:33:34.412633+00	41	\N	\N	\N	\N	0	\N	\N
-140	2018-08-07 19:33:36.167087+00	41	\N	\N	\N	\N	0	\N	\N
-141	2018-08-07 19:33:37.222176+00	41	\N	\N	\N	\N	0	\N	\N
-142	2018-08-07 19:33:38.900354+00	41	\N	\N	\N	\N	0	\N	\N
-143	2018-08-07 19:33:41.547063+00	41	\N	\N	\N	\N	0	\N	\N
-144	2018-08-07 19:33:44.11407+00	41	\N	\N	\N	\N	0	\N	\N
-145	2018-08-07 19:33:45.851851+00	41	\N	\N	\N	\N	0	\N	\N
-146	2018-08-07 19:33:47.617691+00	41	\N	\N	\N	\N	0	\N	\N
-147	2018-08-07 19:33:50.103259+00	41	\N	\N	\N	\N	0	\N	\N
-148	2018-08-07 19:33:52.612056+00	41	\N	\N	\N	\N	0	\N	\N
-149	2018-08-07 19:33:55.128981+00	41	\N	\N	\N	\N	0	\N	\N
-150	2018-08-19 22:28:38.254282+00	41	\N	\N	\N	\N	0	\N	\N
-151	2018-08-19 22:28:41.219338+00	41	\N	\N	\N	\N	0	\N	\N
-152	2018-10-17 19:34:10.537627+00	41	\N	\N	\N	\N	0	\N	\N
-153	2018-10-17 19:34:11.840185+00	41	\N	\N	\N	\N	0	\N	\N
-154	2018-10-17 19:34:13.089358+00	41	\N	\N	\N	\N	0	\N	\N
-155	2018-10-17 19:34:15.04039+00	41	\N	\N	\N	\N	0	\N	\N
-156	2018-10-17 19:34:17.251416+00	41	\N	\N	\N	\N	0	\N	\N
-157	2018-10-17 19:34:19.268252+00	41	\N	\N	\N	\N	0	\N	\N
-158	2019-04-03 19:07:52.723312+00	41	\N	\N	\N	\N	0	\N	\N
-159	2019-04-03 19:07:53.774721+00	41	\N	\N	\N	\N	0	\N	\N
-160	2019-04-03 19:07:55.444201+00	41	\N	\N	\N	\N	0	\N	\N
-161	2019-04-03 19:07:57.201098+00	41	\N	\N	\N	\N	0	\N	\N
-162	2019-04-03 19:07:58.878388+00	41	\N	\N	\N	\N	0	\N	\N
-163	2019-06-05 21:33:52.895902+00	41	\N	\N	\N	\N	0	\N	\N
-164	2019-06-05 21:33:54.076159+00	41	\N	\N	\N	\N	0	\N	\N
-165	2019-08-06 16:35:16.339494+00	41	\N	\N	\N	\N	0	\N	\N
-166	2019-08-06 16:35:17.89881+00	41	\N	\N	\N	\N	0	\N	\N
-167	2019-08-06 16:35:19.280207+00	41	\N	\N	\N	\N	0	\N	\N
-168	2019-08-06 16:35:21.282284+00	41	\N	\N	\N	\N	0	\N	\N
-169	2019-08-06 16:35:22.148169+00	41	\N	\N	\N	\N	0	\N	\N
-170	2019-08-07 22:56:34.894513+00	41	\N	\N	\N	\N	0	\N	\N
-171	2020-01-22 20:12:16.928502+00	41	\N	\N	\N	\N	0	\N	\N
-172	2020-01-22 20:12:29.485024+00	41	\N	\N	\N	\N	0	\N	\N
-173	2020-01-22 20:12:31.038054+00	41	\N	\N	\N	\N	0	\N	\N
-174	2020-01-22 20:12:33.972515+00	41	\N	\N	\N	\N	0	\N	\N
-175	2020-01-22 20:12:36.71407+00	41	\N	\N	\N	\N	0	\N	\N
-176	2020-01-22 20:12:39.453074+00	41	\N	\N	\N	\N	0	\N	\N
-177	2020-01-22 20:12:42.868603+00	41	\N	\N	\N	\N	0	\N	\N
-178	2020-01-22 20:12:45.743603+00	41	\N	\N	\N	\N	0	\N	\N
-179	2020-01-22 20:12:48.129976+00	41	\N	\N	\N	\N	0	\N	\N
-180	2020-02-21 19:26:14.344237+00	41	\N	\N	\N	\N	0	\N	\N
-181	2020-02-21 19:26:16.286043+00	41	\N	\N	\N	\N	0	\N	\N
-182	2020-02-21 19:26:18.454662+00	41	\N	\N	\N	\N	0	\N	\N
-183	2020-04-09 13:28:49.143965+00	41	\N	\N	\N	\N	0	\N	\N
-184	2020-04-09 13:28:50.799902+00	41	\N	\N	\N	\N	0	\N	\N
-185	2020-04-09 13:28:54.790587+00	41	\N	\N	\N	\N	0	\N	\N
-186	2020-04-09 13:28:58.773546+00	41	\N	\N	\N	\N	0	\N	\N
-187	2020-04-09 13:29:01.086215+00	41	\N	\N	\N	\N	0	\N	\N
-188	2020-04-09 13:29:14.372195+00	41	\N	\N	\N	\N	0	\N	\N
-189	2020-04-09 14:43:29.697094+00	41	\N	\N	\N	\N	0	\N	\N
+216	2023-03-16 23:54:13.240995+00	41	\N	\N	\N	\N	0	\N	\N
+219	2023-03-16 23:54:17.890869+00	41	\N	\N	\N	\N	0	\N	\N
+222	2023-03-16 23:54:22.40001+00	41	\N	\N	\N	\N	0	\N	\N
+225	2023-03-16 23:54:25.948304+00	41	\N	\N	\N	\N	0	\N	\N
+228	2023-03-16 23:54:29.112524+00	41	\N	\N	\N	\N	0	\N	\N
+231	2023-03-16 23:54:32.270246+00	41	\N	\N	\N	\N	0	\N	\N
+234	2023-03-16 23:54:35.860622+00	41	\N	\N	\N	\N	0	\N	\N
+237	2023-03-16 23:54:38.542045+00	41	\N	\N	\N	\N	0	\N	\N
+240	2023-03-16 23:54:41.884722+00	41	\N	\N	\N	\N	0	\N	\N
+243	2023-03-16 23:54:45.345668+00	41	\N	\N	\N	\N	0	\N	\N
+246	2023-03-16 23:54:49.101723+00	41	\N	\N	\N	\N	0	\N	\N
+249	2023-03-16 23:54:51.653193+00	41	\N	\N	\N	\N	0	\N	\N
+252	2023-03-16 23:54:54.883837+00	41	\N	\N	\N	\N	0	\N	\N
+255	2023-03-16 23:54:59.833435+00	41	\N	\N	\N	\N	0	\N	\N
+258	2023-03-16 23:55:04.77599+00	41	\N	\N	\N	\N	0	\N	\N
+261	2023-03-16 23:55:09.270928+00	41	\N	\N	\N	\N	0	\N	\N
+264	2023-03-16 23:55:18.572545+00	41	\N	\N	\N	\N	0	\N	\N
+267	2023-03-16 23:55:22.312522+00	41	\N	\N	\N	\N	0	\N	\N
+270	2023-03-16 23:55:25.832704+00	41	\N	\N	\N	\N	0	\N	\N
+273	2023-03-16 23:55:30.177299+00	41	\N	\N	\N	\N	0	\N	\N
+276	2023-03-16 23:55:34.746446+00	41	\N	\N	\N	\N	0	\N	\N
+217	2023-03-16 23:54:14.543178+00	41	\N	\N	\N	\N	0	\N	\N
+220	2023-03-16 23:54:18.670938+00	41	\N	\N	\N	\N	0	\N	\N
+223	2023-03-16 23:54:23.609743+00	41	\N	\N	\N	\N	0	\N	\N
+226	2023-03-16 23:54:27.165385+00	41	\N	\N	\N	\N	0	\N	\N
+229	2023-03-16 23:54:30.303194+00	41	\N	\N	\N	\N	0	\N	\N
+232	2023-03-16 23:54:33.494153+00	41	\N	\N	\N	\N	0	\N	\N
+235	2023-03-16 23:54:36.637964+00	41	\N	\N	\N	\N	0	\N	\N
+238	2023-03-16 23:54:39.212095+00	41	\N	\N	\N	\N	0	\N	\N
+241	2023-03-16 23:54:43.061082+00	41	\N	\N	\N	\N	0	\N	\N
+244	2023-03-16 23:54:46.476214+00	41	\N	\N	\N	\N	0	\N	\N
+247	2023-03-16 23:54:50.226733+00	41	\N	\N	\N	\N	0	\N	\N
+250	2023-03-16 23:54:52.458014+00	41	\N	\N	\N	\N	0	\N	\N
+253	2023-03-16 23:54:56.07527+00	41	\N	\N	\N	\N	0	\N	\N
+256	2023-03-16 23:55:01.731235+00	41	\N	\N	\N	\N	0	\N	\N
+259	2023-03-16 23:55:06.630811+00	41	\N	\N	\N	\N	0	\N	\N
+262	2023-03-16 23:55:10.422583+00	41	\N	\N	\N	\N	0	\N	\N
+265	2023-03-16 23:55:20.400031+00	41	\N	\N	\N	\N	0	\N	\N
+268	2023-03-16 23:55:23.485046+00	41	\N	\N	\N	\N	0	\N	\N
+271	2023-03-16 23:55:27.04597+00	41	\N	\N	\N	\N	0	\N	\N
+274	2023-03-16 23:55:32.15323+00	41	\N	\N	\N	\N	0	\N	\N
+17	2014-01-03 17:44:29.059282+00	41	\N	41	\N	\N	0	\N	\N
+18	2014-01-03 22:13:32.335503+00	41	\N	41	\N	\N	1	\N	\N
+29	2015-02-04 20:06:40.169408+00	41	\N	41	\N	\N	0	\N	\N
+30	2015-02-06 16:07:45.355755+00	41	\N	41	\N	\N	0	\N	\N
+31	2015-02-06 20:07:38.136354+00	41	\N	41	\N	\N	0	\N	\N
+1	2011-12-20 17:58:26.736933+00	41	\N	41	\N	\N	0	\N	\N
+2	2011-12-20 17:59:02.671505+00	41	\N	41	\N	\N	0	\N	\N
+3	2011-12-20 17:59:19.844545+00	41	\N	41	\N	\N	0	\N	\N
+4	2012-01-19 20:46:35.153106+00	41	\N	41	\N	\N	0	\N	\N
+5	2012-01-23 17:25:06.637079+00	41	\N	41	\N	\N	0	\N	\N
+6	2012-06-28 20:34:36.265863+00	41	\N	41	\N	\N	0	\N	\N
+7	2012-06-28 20:35:00.551065+00	41	\N	41	\N	\N	0	\N	\N
+8	2012-06-28 20:36:04.901638+00	41	\N	41	\N	\N	0	\N	\N
+9	2012-06-28 20:36:30.035938+00	41	\N	41	\N	\N	0	\N	\N
+12	2013-10-09 14:47:20.320423+00	41	\N	41	\N	\N	0	\N	\N
+13	2013-10-09 14:49:37.243178+00	41	\N	41	\N	\N	0	\N	\N
+14	2013-10-09 14:49:49.683672+00	41	\N	41	\N	\N	0	\N	\N
+15	2013-10-09 14:50:09.982246+00	41	\N	41	\N	\N	0	\N	\N
+16	2013-10-09 14:50:46.875676+00	41	\N	41	\N	\N	0	\N	\N
+19	2014-01-10 23:11:16.337745+00	41	\N	41	\N	\N	0	\N	\N
+20	2014-02-13 00:42:52.573584+00	41	\N	41	\N	\N	0	\N	\N
+21	2014-12-19 14:12:05.270521+00	41	\N	41	\N	\N	0	\N	\N
+22	2014-12-19 14:14:21.150006+00	41	\N	41	\N	\N	0	\N	\N
+23	2014-12-19 14:14:53.610443+00	41	\N	41	\N	\N	0	\N	\N
+24	2014-12-19 14:15:25.567852+00	41	\N	41	\N	\N	0	\N	\N
+25	2014-12-19 14:16:05.753633+00	41	\N	41	\N	\N	0	\N	\N
+26	2014-12-19 14:16:25.843792+00	41	\N	41	\N	\N	0	\N	\N
+27	2014-12-19 14:26:02.50047+00	41	\N	41	\N	\N	0	\N	\N
+28	2014-12-19 21:22:22.583344+00	41	\N	41	\N	\N	0	\N	\N
+32	2015-06-02 12:16:04.529974+00	41	\N	41	\N	\N	0	\N	\N
+33	2016-02-04 18:58:52.339025+00	41	\N	41	\N	\N	0	\N	\N
+34	2016-02-04 18:59:53.76135+00	41	\N	41	\N	\N	0	\N	\N
+35	2016-02-04 19:00:26.992463+00	41	\N	41	\N	\N	0	\N	\N
+36	2016-02-04 19:00:53.818881+00	41	\N	41	\N	\N	0	\N	\N
+37	2016-02-17 20:34:04.967354+00	41	\N	41	\N	\N	0	\N	\N
+38	2016-02-25 21:29:32.465167+00	41	\N	41	\N	\N	0	\N	\N
+39	2016-03-07 17:28:59.083711+00	41	\N	41	\N	\N	0	\N	\N
+40	2016-03-07 17:29:05.349106+00	41	\N	41	\N	\N	0	\N	\N
+41	2016-03-07 17:30:33.01634+00	41	\N	41	\N	\N	0	\N	\N
+42	2016-03-07 17:30:48.618187+00	41	\N	41	\N	\N	0	\N	\N
+43	2016-03-07 17:30:59.870503+00	41	\N	41	\N	\N	0	\N	\N
+44	2016-03-08 02:08:23.919972+00	41	\N	41	\N	\N	0	\N	\N
+45	2016-03-08 03:35:28.565872+00	41	\N	41	\N	\N	0	\N	\N
+46	2016-05-09 17:54:13.75916+00	41	\N	41	\N	\N	0	\N	\N
+47	2016-05-09 21:49:25.421545+00	41	\N	41	\N	\N	0	\N	\N
+48	2016-05-12 21:14:24.101559+00	41	\N	41	\N	\N	0	\N	\N
+49	2016-08-02 16:57:34.432201+00	41	\N	41	\N	\N	0	\N	\N
+50	2016-08-02 16:57:57.411613+00	41	\N	41	\N	\N	0	\N	\N
+51	2016-08-04 15:35:21.249132+00	41	\N	41	\N	\N	0	\N	\N
+52	2016-10-12 17:29:59.74206+00	41	\N	41	\N	\N	0	\N	\N
+53	2016-10-17 17:51:17.740278+00	41	\N	41	\N	\N	0	\N	\N
+54	2016-11-11 14:47:39.732402+00	41	\N	41	\N	\N	0	\N	\N
+55	2017-01-04 15:25:47.878796+00	41	\N	41	\N	\N	0	\N	\N
+56	2017-02-20 21:54:13.041208+00	41	\N	41	\N	\N	0	\N	\N
+57	2017-03-28 18:48:59.237899+00	41	\N	41	\N	\N	0	\N	\N
+58	2017-04-21 20:38:42.140825+00	41	\N	41	\N	\N	0	\N	\N
+59	2017-04-21 20:38:47.264129+00	41	\N	41	\N	\N	0	\N	\N
+60	2017-04-21 20:40:28.934828+00	41	\N	41	\N	\N	0	\N	\N
+61	2017-04-21 20:40:54.719142+00	41	\N	41	\N	\N	0	\N	\N
+62	2017-04-21 21:12:02.017627+00	41	\N	41	\N	\N	0	\N	\N
+63	2017-05-08 16:12:57.002519+00	41	\N	41	\N	\N	0	\N	\N
+64	2017-05-31 14:08:18.88001+00	41	\N	41	\N	\N	0	\N	\N
+65	2017-06-08 16:11:32.805234+00	41	\N	41	\N	\N	0	\N	\N
+66	2017-06-08 16:53:22.864556+00	41	\N	41	\N	\N	0	\N	\N
+67	2017-06-30 13:41:36.162383+00	41	\N	41	\N	\N	0	\N	\N
+68	2017-06-30 13:41:47.39034+00	41	\N	41	\N	\N	0	\N	\N
+69	2017-07-17 17:31:42.837473+00	41	\N	41	\N	\N	0	\N	\N
+70	2017-07-27 19:09:24.635054+00	41	\N	41	\N	\N	0	\N	\N
+71	2017-07-27 19:09:56.99407+00	41	\N	41	\N	\N	0	\N	\N
+72	2017-08-16 18:07:04.409576+00	41	\N	41	\N	\N	0	\N	\N
+73	2017-08-16 18:07:17.022312+00	41	\N	41	\N	\N	0	\N	\N
+74	2017-08-16 18:07:38.778388+00	41	\N	41	\N	\N	0	\N	\N
+75	2017-09-01 17:08:01.703879+00	41	\N	41	\N	\N	0	\N	\N
+76	2017-09-18 15:42:28.250977+00	41	\N	41	\N	\N	0	\N	\N
+77	2017-09-18 15:43:58.719398+00	41	\N	41	\N	\N	0	\N	\N
+78	2017-10-10 15:10:41.4496+00	41	\N	41	\N	\N	0	\N	\N
+79	2017-10-10 15:10:52.863376+00	41	\N	41	\N	\N	0	\N	\N
+80	2017-10-10 15:11:22.791118+00	41	\N	41	\N	\N	0	\N	\N
+81	2017-10-10 15:13:14.819036+00	41	\N	41	\N	\N	0	\N	\N
+82	2017-10-10 15:13:30.873535+00	41	\N	41	\N	\N	0	\N	\N
+83	2017-10-10 15:17:59.09749+00	41	\N	41	\N	\N	0	\N	\N
+84	2017-10-10 18:46:10.177605+00	41	\N	41	\N	\N	0	\N	\N
+85	2017-10-28 09:27:19.914912+00	41	\N	41	\N	\N	0	\N	\N
+86	2017-10-28 09:27:31.016472+00	41	\N	41	\N	\N	0	\N	\N
+87	2018-03-15 18:22:23.716655+00	41	\N	41	\N	\N	0	\N	\N
+88	2018-03-15 18:22:38.694441+00	41	\N	41	\N	\N	0	\N	\N
+89	2018-03-15 18:22:50.086659+00	41	\N	41	\N	\N	0	\N	\N
+90	2018-03-15 18:23:18.356881+00	41	\N	41	\N	\N	0	\N	\N
+91	2018-03-15 18:23:27.198638+00	41	\N	41	\N	\N	0	\N	\N
+92	2018-03-15 18:23:42.849766+00	41	\N	41	\N	\N	0	\N	\N
+93	2018-03-15 18:23:53.182309+00	41	\N	41	\N	\N	0	\N	\N
+94	2018-03-15 18:24:08.119533+00	41	\N	41	\N	\N	0	\N	\N
+95	2018-03-15 18:24:20.893402+00	41	\N	41	\N	\N	0	\N	\N
+96	2018-03-15 18:24:30.449553+00	41	\N	41	\N	\N	0	\N	\N
+97	2018-03-15 18:24:48.650789+00	41	\N	41	\N	\N	0	\N	\N
+98	2018-03-15 18:25:52.818933+00	41	\N	41	\N	\N	0	\N	\N
+99	2018-03-15 18:27:22.075265+00	41	\N	41	\N	\N	0	\N	\N
+100	2018-03-15 18:27:31.137628+00	41	\N	41	\N	\N	0	\N	\N
+101	2018-03-15 18:27:34.05858+00	41	\N	41	\N	\N	0	\N	\N
+102	2018-03-15 18:27:35.098042+00	41	\N	41	\N	\N	0	\N	\N
+103	2018-03-15 18:27:36.863938+00	41	\N	41	\N	\N	0	\N	\N
+104	2018-03-15 18:27:44.327055+00	41	\N	41	\N	\N	0	\N	\N
+105	2018-03-15 18:27:47.338533+00	41	\N	41	\N	\N	0	\N	\N
+106	2018-03-15 18:27:50.954148+00	41	\N	41	\N	\N	0	\N	\N
+107	2018-03-15 18:27:54.330223+00	41	\N	41	\N	\N	0	\N	\N
+108	2018-03-15 18:28:04.11018+00	41	\N	41	\N	\N	0	\N	\N
+109	2018-03-15 18:28:07.980957+00	41	\N	41	\N	\N	0	\N	\N
+110	2018-03-15 18:28:09.301863+00	41	\N	41	\N	\N	0	\N	\N
+111	2018-03-15 18:28:10.524295+00	41	\N	41	\N	\N	0	\N	\N
+112	2018-03-15 18:28:12.704359+00	41	\N	41	\N	\N	0	\N	\N
+113	2018-03-15 18:28:14.967406+00	41	\N	41	\N	\N	0	\N	\N
+114	2018-03-15 18:28:17.296695+00	41	\N	41	\N	\N	0	\N	\N
+115	2018-03-15 18:28:19.55644+00	41	\N	41	\N	\N	0	\N	\N
+116	2018-03-15 18:33:22.456325+00	41	\N	41	\N	\N	0	\N	\N
+117	2018-03-15 18:34:21.334624+00	41	\N	41	\N	\N	0	\N	\N
+118	2018-03-15 18:35:12.538822+00	41	\N	41	\N	\N	0	\N	\N
+119	2018-03-15 18:36:00.770895+00	41	\N	41	\N	\N	0	\N	\N
+120	2018-03-15 18:36:49.307398+00	41	\N	41	\N	\N	0	\N	\N
+121	2018-03-15 18:39:49.100827+00	41	\N	41	\N	\N	0	\N	\N
+122	2018-03-15 18:40:54.965061+00	41	\N	41	\N	\N	0	\N	\N
+123	2018-03-15 18:41:46.412116+00	41	\N	41	\N	\N	0	\N	\N
+124	2018-03-15 18:42:55.118412+00	41	\N	41	\N	\N	0	\N	\N
+125	2018-03-15 18:43:42.52683+00	41	\N	41	\N	\N	0	\N	\N
+126	2018-03-15 18:44:43.779954+00	41	\N	41	\N	\N	0	\N	\N
+127	2018-03-15 18:46:05.081789+00	41	\N	41	\N	\N	0	\N	\N
+128	2018-03-15 18:47:06.79931+00	41	\N	41	\N	\N	0	\N	\N
+129	2018-03-15 18:47:49.912357+00	41	\N	41	\N	\N	0	\N	\N
+130	2018-03-15 18:48:31.490473+00	41	\N	41	\N	\N	0	\N	\N
+131	2018-03-15 18:49:17.403215+00	41	\N	41	\N	\N	0	\N	\N
+132	2018-03-15 18:50:01.866697+00	41	\N	41	\N	\N	0	\N	\N
+133	2018-03-15 18:52:01.920667+00	41	\N	41	\N	\N	0	\N	\N
+134	2018-03-15 18:56:21.786723+00	41	\N	41	\N	\N	0	\N	\N
+135	2018-03-15 18:57:23.524967+00	41	\N	41	\N	\N	0	\N	\N
+136	2018-03-15 18:59:13.473233+00	41	\N	41	\N	\N	0	\N	\N
+137	2018-08-07 19:33:30.680892+00	41	\N	41	\N	\N	0	\N	\N
+138	2018-08-07 19:33:32.459585+00	41	\N	41	\N	\N	0	\N	\N
+139	2018-08-07 19:33:34.412633+00	41	\N	41	\N	\N	0	\N	\N
+140	2018-08-07 19:33:36.167087+00	41	\N	41	\N	\N	0	\N	\N
+141	2018-08-07 19:33:37.222176+00	41	\N	41	\N	\N	0	\N	\N
+142	2018-08-07 19:33:38.900354+00	41	\N	41	\N	\N	0	\N	\N
+143	2018-08-07 19:33:41.547063+00	41	\N	41	\N	\N	0	\N	\N
+144	2018-08-07 19:33:44.11407+00	41	\N	41	\N	\N	0	\N	\N
+145	2018-08-07 19:33:45.851851+00	41	\N	41	\N	\N	0	\N	\N
+146	2018-08-07 19:33:47.617691+00	41	\N	41	\N	\N	0	\N	\N
+147	2018-08-07 19:33:50.103259+00	41	\N	41	\N	\N	0	\N	\N
+148	2018-08-07 19:33:52.612056+00	41	\N	41	\N	\N	0	\N	\N
+149	2018-08-07 19:33:55.128981+00	41	\N	41	\N	\N	0	\N	\N
+150	2018-08-19 22:28:38.254282+00	41	\N	41	\N	\N	0	\N	\N
+151	2018-08-19 22:28:41.219338+00	41	\N	41	\N	\N	0	\N	\N
+152	2018-10-17 19:34:10.537627+00	41	\N	41	\N	\N	0	\N	\N
+153	2018-10-17 19:34:11.840185+00	41	\N	41	\N	\N	0	\N	\N
+154	2018-10-17 19:34:13.089358+00	41	\N	41	\N	\N	0	\N	\N
+155	2018-10-17 19:34:15.04039+00	41	\N	41	\N	\N	0	\N	\N
+156	2018-10-17 19:34:17.251416+00	41	\N	41	\N	\N	0	\N	\N
+157	2018-10-17 19:34:19.268252+00	41	\N	41	\N	\N	0	\N	\N
+158	2019-04-03 19:07:52.723312+00	41	\N	41	\N	\N	0	\N	\N
+159	2019-04-03 19:07:53.774721+00	41	\N	41	\N	\N	0	\N	\N
+160	2019-04-03 19:07:55.444201+00	41	\N	41	\N	\N	0	\N	\N
+161	2019-04-03 19:07:57.201098+00	41	\N	41	\N	\N	0	\N	\N
+162	2019-04-03 19:07:58.878388+00	41	\N	41	\N	\N	0	\N	\N
+163	2019-06-05 21:33:52.895902+00	41	\N	41	\N	\N	0	\N	\N
+164	2019-06-05 21:33:54.076159+00	41	\N	41	\N	\N	0	\N	\N
+165	2019-08-06 16:35:16.339494+00	41	\N	41	\N	\N	0	\N	\N
+166	2019-08-06 16:35:17.89881+00	41	\N	41	\N	\N	0	\N	\N
+167	2019-08-06 16:35:19.280207+00	41	\N	41	\N	\N	0	\N	\N
+168	2019-08-06 16:35:21.282284+00	41	\N	41	\N	\N	0	\N	\N
+169	2019-08-06 16:35:22.148169+00	41	\N	41	\N	\N	0	\N	\N
+170	2019-08-07 22:56:34.894513+00	41	\N	41	\N	\N	0	\N	\N
+171	2020-01-22 20:12:16.928502+00	41	\N	41	\N	\N	0	\N	\N
+172	2020-01-22 20:12:29.485024+00	41	\N	41	\N	\N	0	\N	\N
+173	2020-01-22 20:12:31.038054+00	41	\N	41	\N	\N	0	\N	\N
+174	2020-01-22 20:12:33.972515+00	41	\N	41	\N	\N	0	\N	\N
+175	2020-01-22 20:12:36.71407+00	41	\N	41	\N	\N	0	\N	\N
+176	2020-01-22 20:12:39.453074+00	41	\N	41	\N	\N	0	\N	\N
+177	2020-01-22 20:12:42.868603+00	41	\N	41	\N	\N	0	\N	\N
+178	2020-01-22 20:12:45.743603+00	41	\N	41	\N	\N	0	\N	\N
+179	2020-01-22 20:12:48.129976+00	41	\N	41	\N	\N	0	\N	\N
+180	2020-02-21 19:26:14.344237+00	41	\N	41	\N	\N	0	\N	\N
+181	2020-02-21 19:26:16.286043+00	41	\N	41	\N	\N	0	\N	\N
+182	2020-02-21 19:26:18.454662+00	41	\N	41	\N	\N	0	\N	\N
+183	2020-04-09 13:28:49.143965+00	41	\N	41	\N	\N	0	\N	\N
+184	2020-04-09 13:28:50.799902+00	41	\N	41	\N	\N	0	\N	\N
+185	2020-04-09 13:28:54.790587+00	41	\N	41	\N	\N	0	\N	\N
+186	2020-04-09 13:28:58.773546+00	41	\N	41	\N	\N	0	\N	\N
+187	2020-04-09 13:29:01.086215+00	41	\N	41	\N	\N	0	\N	\N
+188	2020-04-09 13:29:14.372195+00	41	\N	41	\N	\N	0	\N	\N
+189	2020-04-09 14:43:29.697094+00	41	\N	41	\N	\N	0	\N	\N
 190	2020-04-09 14:43:29.697094+00	41	2020-04-09 14:43:29.697094+00	41	Bulk load of accession information	189	0	\N	\N
-191	2020-06-27 16:30:33.970546+00	41	\N	\N	\N	\N	0	\N	\N
-192	2020-06-27 16:31:08.146366+00	41	\N	\N	\N	\N	0	\N	\N
-193	2020-06-27 16:31:34.328798+00	41	\N	\N	\N	\N	0	\N	\N
-194	2020-06-27 16:32:05.049948+00	41	\N	\N	\N	\N	0	\N	\N
-195	2020-06-27 16:32:20.437788+00	41	\N	\N	\N	\N	0	\N	\N
-196	2020-06-27 16:32:38.081425+00	41	\N	\N	\N	\N	0	\N	\N
-197	2020-06-27 16:33:02.002609+00	41	\N	\N	\N	\N	0	\N	\N
-198	2020-07-16 19:28:30.985547+00	41	\N	\N	\N	\N	0	\N	\N
-199	2020-07-16 19:28:34.216065+00	41	\N	\N	\N	\N	0	\N	\N
-200	2020-07-16 19:28:35.498009+00	41	\N	\N	\N	\N	0	\N	\N
-201	2020-07-30 17:46:20.213307+00	41	\N	\N	\N	\N	0	\N	\N
-202	2020-07-30 17:46:33.932416+00	41	\N	\N	\N	\N	0	\N	\N
-203	2020-08-21 02:48:39.117945+00	41	\N	\N	\N	\N	0	\N	\N
-204	2020-08-21 02:48:40.500789+00	41	\N	\N	\N	\N	0	\N	\N
-205	2020-08-21 02:48:42.018041+00	41	\N	\N	\N	\N	0	\N	\N
-206	2020-09-04 21:06:50.649866+00	41	\N	\N	\N	\N	0	\N	\N
-207	2020-09-04 21:07:35.065837+00	41	\N	\N	\N	\N	0	\N	\N
-208	2020-09-14 15:41:40.496852+00	41	\N	\N	\N	\N	0	\N	\N
-209	2020-09-17 22:21:38.715859+00	41	\N	\N	\N	\N	0	\N	\N
-210	2020-09-17 22:22:05.958752+00	41	\N	\N	\N	\N	0	\N	\N
-211	2020-09-23 17:35:58.809559+00	41	\N	\N	\N	\N	0	\N	\N
-212	2020-10-03 22:04:01.315147+00	41	\N	\N	\N	\N	0	\N	\N
-213	2020-10-30 02:06:28.159077+00	41	\N	\N	\N	\N	0	\N	\N
-214	2020-10-30 02:09:20.737725+00	41	\N	\N	\N	\N	0	\N	\N
-215	2020-10-30 02:09:39.410676+00	41	\N	\N	\N	\N	0	\N	\N
+191	2020-06-27 16:30:33.970546+00	41	\N	41	\N	\N	0	\N	\N
+192	2020-06-27 16:31:08.146366+00	41	\N	41	\N	\N	0	\N	\N
+193	2020-06-27 16:31:34.328798+00	41	\N	41	\N	\N	0	\N	\N
+194	2020-06-27 16:32:05.049948+00	41	\N	41	\N	\N	0	\N	\N
+195	2020-06-27 16:32:20.437788+00	41	\N	41	\N	\N	0	\N	\N
+196	2020-06-27 16:32:38.081425+00	41	\N	41	\N	\N	0	\N	\N
+197	2020-06-27 16:33:02.002609+00	41	\N	41	\N	\N	0	\N	\N
+198	2020-07-16 19:28:30.985547+00	41	\N	41	\N	\N	0	\N	\N
+199	2020-07-16 19:28:34.216065+00	41	\N	41	\N	\N	0	\N	\N
+200	2020-07-16 19:28:35.498009+00	41	\N	41	\N	\N	0	\N	\N
+201	2020-07-30 17:46:20.213307+00	41	\N	41	\N	\N	0	\N	\N
+202	2020-07-30 17:46:33.932416+00	41	\N	41	\N	\N	0	\N	\N
+203	2020-08-21 02:48:39.117945+00	41	\N	41	\N	\N	0	\N	\N
+204	2020-08-21 02:48:40.500789+00	41	\N	41	\N	\N	0	\N	\N
+205	2020-08-21 02:48:42.018041+00	41	\N	41	\N	\N	0	\N	\N
+206	2020-09-04 21:06:50.649866+00	41	\N	41	\N	\N	0	\N	\N
+207	2020-09-04 21:07:35.065837+00	41	\N	41	\N	\N	0	\N	\N
+208	2020-09-14 15:41:40.496852+00	41	\N	41	\N	\N	0	\N	\N
+209	2020-09-17 22:21:38.715859+00	41	\N	41	\N	\N	0	\N	\N
+210	2020-09-17 22:22:05.958752+00	41	\N	41	\N	\N	0	\N	\N
+211	2020-09-23 17:35:58.809559+00	41	\N	41	\N	\N	0	\N	\N
+212	2020-10-03 22:04:01.315147+00	41	\N	41	\N	\N	0	\N	\N
+213	2020-10-30 02:06:28.159077+00	41	\N	41	\N	\N	0	\N	\N
+214	2020-10-30 02:09:20.737725+00	41	\N	41	\N	\N	0	\N	\N
+215	2020-10-30 02:09:39.410676+00	41	\N	41	\N	\N	0	\N	\N
+218	2023-03-16 23:54:16.636187+00	41	\N	\N	\N	\N	0	\N	\N
+221	2023-03-16 23:54:21.201615+00	41	\N	\N	\N	\N	0	\N	\N
+224	2023-03-16 23:54:24.771882+00	41	\N	\N	\N	\N	0	\N	\N
+227	2023-03-16 23:54:28.343298+00	41	\N	\N	\N	\N	0	\N	\N
+230	2023-03-16 23:54:31.05921+00	41	\N	\N	\N	\N	0	\N	\N
+233	2023-03-16 23:54:34.64962+00	41	\N	\N	\N	\N	0	\N	\N
+236	2023-03-16 23:54:37.797284+00	41	\N	\N	\N	\N	0	\N	\N
+239	2023-03-16 23:54:40.703815+00	41	\N	\N	\N	\N	0	\N	\N
+242	2023-03-16 23:54:44.204444+00	41	\N	\N	\N	\N	0	\N	\N
+245	2023-03-16 23:54:48.374165+00	41	\N	\N	\N	\N	0	\N	\N
+248	2023-03-16 23:54:50.972127+00	41	\N	\N	\N	\N	0	\N	\N
+251	2023-03-16 23:54:53.579513+00	41	\N	\N	\N	\N	0	\N	\N
+254	2023-03-16 23:54:58.006512+00	41	\N	\N	\N	\N	0	\N	\N
+257	2023-03-16 23:55:02.984844+00	41	\N	\N	\N	\N	0	\N	\N
+260	2023-03-16 23:55:08.519442+00	41	\N	\N	\N	\N	0	\N	\N
+263	2023-03-16 23:55:11.14479+00	41	\N	\N	\N	\N	0	\N	\N
+266	2023-03-16 23:55:21.176608+00	41	\N	\N	\N	\N	0	\N	\N
+269	2023-03-16 23:55:24.671918+00	41	\N	\N	\N	\N	0	\N	\N
+272	2023-03-16 23:55:29.014802+00	41	\N	\N	\N	\N	0	\N	\N
+275	2023-03-16 23:55:33.559379+00	41	\N	\N	\N	\N	0	\N	\N
 \.
 
 
@@ -29731,8 +29875,8 @@ COPY phenome.is_public (is_public_id, population_id, is_public, owner_id) FROM s
 --
 
 COPY phenome.locus (locus_id, locus_name, locus_symbol, original_symbol, gene_activity, locus_notes, obsolete, sp_person_id, create_date, modified_date, description, linkage_group, lg_arm, common_name_id, updated_by, locus, organism_id) FROM stdin;
-2	test	T1	\N	testblablabla	\N	f	\N	2014-01-06 21:25:00.611864+00	2014-01-06 21:47:23.803621+00	\N	\N	\N	1	40	test	\N
-3	test2	test2	\N	test	\N	f	\N	2014-01-06 22:08:44.539434+00	\N	\N	\N	\N	1	\N	test2	\N
+2	test	T1	\N	testblablabla	\N	f	41	2014-01-06 21:25:00.611864+00	2014-01-06 21:47:23.803621+00	\N	\N	\N	1	41	test	\N
+3	test2	test2	\N	test	\N	f	41	2014-01-06 22:08:44.539434+00	\N	\N	\N	\N	1	41	test2	\N
 \.
 
 
@@ -29782,9 +29926,9 @@ COPY phenome.locus_dbxref_evidence_history (locus_dbxref_evidence_history_id, lo
 --
 
 COPY phenome.locus_history (locus_history_id, locus_id, locus_name, locus_symbol, original_symbol, gene_activity, locus_description, locus_notes, linkage_group, lg_arm, sp_person_id, updated_by, obsolete, create_date) FROM stdin;
-1	2	test	T1	\N	\N	\N	\N	\N	\N	\N	40	f	2014-01-06 21:31:44.678775+00
-2	2	test	T1	\N	\N	\N	\N	\N	\N	\N	40	f	2014-01-06 21:35:55.408797+00
-3	2	test	T1	\N	\N	\N	\N	\N	\N	\N	40	f	2014-01-06 21:47:23.801806+00
+1	2	test	T1	\N	\N	\N	\N	\N	\N	41	41	f	2014-01-06 21:31:44.678775+00
+2	2	test	T1	\N	\N	\N	\N	\N	\N	41	41	f	2014-01-06 21:35:55.408797+00
+3	2	test	T1	\N	\N	\N	\N	\N	\N	41	41	f	2014-01-06 21:47:23.801806+00
 \.
 
 
@@ -29809,7 +29953,7 @@ COPY phenome.locus_marker (locus_marker_id, locus_id, marker_id, obsolete, sp_pe
 --
 
 COPY phenome.locus_owner (locus_owner_id, locus_id, sp_person_id, granted_by, obsolete, create_date, modified_date) FROM stdin;
-1	3	40	\N	f	2014-01-06 22:08:44.546768+00	\N
+1	3	41	\N	f	2014-01-06 22:08:44.546768+00	\N
 \.
 
 
@@ -29930,6 +30074,14 @@ COPY phenome.population_dbxref (population_dbxref_id, population_id, dbxref_id, 
 --
 
 COPY phenome.project_md_image (project_md_image_id, project_id, image_id, type_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: project_owner; Type: TABLE DATA; Schema: phenome; Owner: postgres
+--
+
+COPY phenome.project_owner (project_owner_id, project_id, sp_person_id, create_date) FROM stdin;
 \.
 
 
@@ -30492,6 +30644,8 @@ COPY public.cv (cv_id, name, definition) FROM stdin;
 72	cxgn_plant_level_ontology	\N
 73	cxgn_plant_treatment	\N
 74	cxgn_rtb_cuts	\N
+75	sequence_metadata_types	\N
+76	sp_order_property	\N
 \.
 
 
@@ -38047,7 +38201,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77105	47	Variety Release Trial	\N	210007	0	0
 77106	47	Clonal Evaluation	\N	210008	0	0
 76514	47	Advanced Yield Trial	\N	209411	0	0
-77107	16	fieldbook_image	\N	210009	0	0
 77123	51	number_of_progeny	\N	210026	0	0
 77124	45	dataset	\N	210027	0	0
 77125	45	crosses	\N	210028	0	0
@@ -39814,6 +39967,8 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78941	72	leaf rank 15	Fifteenth standing leaf, counting the rank by starting with youngest completly unrolled leaf as 1 and moving downwards.	214100	0	0
 78942	72	hand rank 03	Record the third rank hand 	214101	0	0
 78943	72	leaf rank 24	Twenty fourth standing leaf, counting the rank by starting with youngest completly unrolled leaf as 1 and moving downwards.	214102	0	0
+79105	47	Sensory Trial	\N	214264	0	0
+79107	46	facility_identifier	\N	214266	0	0
 78944	72	hand rank	Record the rank (order) of a hand in the bunch, starting with the hand at the proximal end (closest to the pseudostem) of the bunch as 1 and continuing to the hand at the most distal end (closest to the male bud).	214103	0	0
 78945	72	hand rank 12	Record the twelfth rank hand 	214104	0	0
 78946	72	hand rank 13	Record the thirteenth rank hand 	214105	0	0
@@ -39898,6 +40053,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 79025	70	Support vector machine (SVM) with linear kernel as implemented with the kernLab package in R	\N	214184	0	0
 79026	70	Multivariate linear mixed model genetic BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using AIREMLf90	\N	214185	0	0
 79027	70	Multivariate linear mixed model permanent environment BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using AIREMLf90	\N	214186	0	0
+79106	38	soil_data_json	\N	214265	0	0
 79028	70	Multivariate linear mixed model permanent environment BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on growing degree days computed using AIREMLf90	\N	214187	0	0
 79029	70	Multivariate linear mixed model genetic BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on growing degree days computed using AIREMLf90	\N	214188	0	0
 79030	67	airemlf90_grm_random_regression_dap_blups	\N	214189	0	0
@@ -39928,6 +40084,68 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 79055	70	Adjusted means from BLUEs using LMER R	\N	214214	0	0
 79056	70	Multivariate linear mixed model residual using genetic relationship matrix and temporal Legendre polynomial random regression on growing degree days computed using AIREMLf90	\N	214215	0	0
 79057	70	Multivariate linear mixed model residual using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using AIREMLf90	\N	214216	0	0
+79058	67	high_dimensional_phenotype_nirs_protocol	\N	214217	0	0
+79059	67	high_dimensional_phenotype_transcriptomics_protocol	\N	214218	0	0
+79060	67	high_dimensional_phenotype_metabolomics_protocol	\N	214219	0	0
+79061	56	high_dimensional_phenotype_protocol_properties	\N	214220	0	0
+79062	35	sampling_layout	\N	214221	0	0
+79063	52	sampling_trial_from_field_trial	\N	214222	0	0
+79064	38	sampling_facility	\N	214223	0	0
+79065	38	sampling_trial_sample_type	\N	214224	0	0
+79066	46	released_variety_name	\N	214225	0	0
+79067	46	cross_identifier	\N	214226	0	0
+79068	46	cross_transaction_json	\N	214227	0	0
+79069	51	lab_id	\N	214228	0	0
+79070	46	cross_additional_info	\N	214229	0	0
+79071	67	gblup_model_rrblup	\N	214230	0	0
+79072	47	misc_trial	\N	214231	0	0
+79073	67	sequence_metadata_protocol	\N	214232	0	0
+79074	56	sequence_metadata_protocol_properties	\N	214233	0	0
+79075	75	Gene Annotation	Provides sequence features (gene, mRNA, UTR, exon, CDS) and annotations based on alignments of biological evidence.	214234	0	0
+79076	75	GWAS Results	Report of quantitative trait loci (QTLs) indentified by running rrBLUP analysis on phenotype trials and genotype trials within the T3 database.	214235	0	0
+79077	75	MNase	Report of chromatine accessibility score.  The report can be used to prioritize genomic variants and explain phenotypes. (https://genomebiology.biomedcentral.com/track/pdf/10.1186/s13059-020-02093-1)	214236	0	0
+79078	38	genotyping_vendor_submission_id	\N	214237	0	0
+79079	56	vcf_snp_dbxref	\N	214238	0	0
+79080	46	stock_additional_info	\N	214239	0	0
+79081	38	project_additional_info	\N	214240	0	0
+79082	45	catalog_items	\N	214241	0	0
+79083	46	stock_catalog_json	\N	214242	0	0
+79084	76	order_batch_json	\N	214243	0	0
+79085	76	order_progress_json	\N	214244	0	0
+79086	56	analysis_model_properties_multi_trial	\N	214245	0	0
+79087	67	drone_imagery_analytics_env_simulation_protocol	\N	214246	0	0
+79088	35	analytics_protocol_experiment	\N	214247	0	0
+79089	56	analytics_protocol_properties	\N	214248	0	0
+79090	56	analytics_protocol_result_summary	\N	214249	0	0
+79091	38	drone_run_opendronemap_process_running	\N	214250	0	0
+79092	38	drone_run_base_date	\N	214251	0	0
+79093	38	drone_run_camera_rig_description	\N	214252	0	0
+79094	38	drone_run_geoparam_coordinates	\N	214253	0	0
+79095	38	drone_run_geoparam_coordinates_type	\N	214254	0	0
+79096	42	pcr_marker_genotyping	\N	214255	0	0
+79097	67	pcr_marker_protocol	\N	214256	0	0
+79098	56	pcr_marker_details	\N	214257	0	0
+79099	46	seedlot_maintenance_json	\N	214258	0	0
+79100	65	phenotype_additional_info	\N	214259	0	0
+79101	38	project_entry_number_map	\N	214260	0	0
+79102	46	family_type	\N	214261	0	0
+79103	38	file_metadata_json	\N	214262	0	0
+79104	38	trial_status_json	\N	214263	0	0
+79108	52	genotyping_project_and_plate_relationship	\N	214267	0	0
+79109	47	genotyping_project	\N	214268	0	0
+79110	38	target_numbers_json	\N	214269	0	0
+79111	46	SelectionMarker	\N	214270	0	0
+79112	46	CloningOrganism	\N	214271	0	0
+79113	46	CassetteName	\N	214272	0	0
+79114	46	InherentMarker	\N	214273	0	0
+79115	46	Strain	\N	214274	0	0
+79116	46	Backbone	\N	214275	0	0
+79117	46	Gene	\N	214276	0	0
+79118	46	Promotors	\N	214277	0	0
+79119	46	Terminators	\N	214278	0	0
+79120	46	VectorType	\N	214279	0	0
+79121	45	list_additional_info	\N	214280	0	0
+79122	65	phenotype_external_references	\N	214281	0	0
 \.
 
 
@@ -65877,7 +66095,6 @@ COPY public.cvtermpath (cvtermpath_id, type_id, subject_id, object_id, cv_id, pa
 
 COPY public.cvtermprop (cvtermprop_id, cvterm_id, type_id, value, rank) FROM stdin;
 8079	70666	76465	numeric	0
-8080	77107	76465	image	0
 \.
 
 
@@ -130961,6 +131178,71 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 214214	308	0000036		\N
 214215	308	0000027		\N
 214216	308	0000026		\N
+214217	2	autocreated:high_dimensional_phenotype_nirs_protocol		\N
+214218	2	autocreated:high_dimensional_phenotype_transcriptomics_protocol		\N
+214219	2	autocreated:high_dimensional_phenotype_metabolomics_protocol		\N
+214220	2	autocreated:high_dimensional_phenotype_protocol_properties		\N
+214221	2	autocreated:sampling_layout		\N
+214222	2	autocreated:sampling_trial_from_field_trial		\N
+214223	2	autocreated:sampling_facility		\N
+214224	2	autocreated:sampling_trial_sample_type		\N
+214225	2	autocreated:released_variety_name		\N
+214226	2	autocreated:cross_identifier		\N
+214227	2	autocreated:cross_transaction_json		\N
+214228	2	autocreated:lab_id		\N
+214229	2	autocreated:cross_additional_info		\N
+214230	2	autocreated:gblup_model_rrblup		\N
+214231	2	autocreated:misc_trial		\N
+214232	2	autocreated:sequence_metadata_protocol		\N
+214233	2	autocreated:sequence_metadata_protocol_properties		\N
+214234	2	autocreated:Gene Annotation		\N
+214235	2	autocreated:GWAS Results		\N
+214236	2	autocreated:MNase		\N
+214237	2	autocreated:genotyping_vendor_submission_id		\N
+214238	2	autocreated:vcf_snp_dbxref		\N
+214239	2	autocreated:stock_additional_info		\N
+214240	2	autocreated:project_additional_info		\N
+214241	2	autocreated:catalog_items		\N
+214242	2	autocreated:stock_catalog_json		\N
+214243	2	autocreated:order_batch_json		\N
+214244	2	autocreated:order_progress_json		\N
+214245	2	autocreated:analysis_model_properties_multi_trial		\N
+214246	2	autocreated:drone_imagery_analytics_env_simulation_protocol		\N
+214247	2	autocreated:analytics_protocol_experiment		\N
+214248	2	autocreated:analytics_protocol_properties		\N
+214249	2	autocreated:analytics_protocol_result_summary		\N
+214250	2	autocreated:drone_run_opendronemap_process_running		\N
+214251	2	autocreated:drone_run_base_date		\N
+214252	2	autocreated:drone_run_camera_rig_description		\N
+214253	2	autocreated:drone_run_geoparam_coordinates		\N
+214254	2	autocreated:drone_run_geoparam_coordinates_type		\N
+214255	2	autocreated:pcr_marker_genotyping		\N
+214256	2	autocreated:pcr_marker_protocol		\N
+214257	2	autocreated:pcr_marker_details		\N
+214258	2	autocreated:seedlot_maintenance_json		\N
+214259	2	autocreated:phenotype_additional_info		\N
+214260	2	autocreated:project_entry_number_map		\N
+214261	2	autocreated:family_type		\N
+214262	2	autocreated:file_metadata_json		\N
+214263	2	autocreated:trial_status_json		\N
+214264	2	autocreated:Sensory Trial		\N
+214265	2	autocreated:soil_data_json		\N
+214266	2	autocreated:facility_identifier		\N
+214267	2	autocreated:genotyping_project_and_plate_relationship		\N
+214268	2	autocreated:genotyping_project		\N
+214269	2	autocreated:target_numbers_json		\N
+214270	2	autocreated:SelectionMarker		\N
+214271	2	autocreated:CloningOrganism		\N
+214272	2	autocreated:CassetteName		\N
+214273	2	autocreated:InherentMarker		\N
+214274	2	autocreated:Strain		\N
+214275	2	autocreated:Backbone		\N
+214276	2	autocreated:Gene		\N
+214277	2	autocreated:Promotors		\N
+214278	2	autocreated:Terminators		\N
+214279	2	autocreated:VectorType		\N
+214280	2	autocreated:list_additional_info		\N
+214281	2	autocreated:phenotype_external_references		\N
 \.
 
 
@@ -131125,6 +131407,14 @@ COPY public.featureprop (featureprop_id, feature_id, type_id, value, rank) FROM 
 
 
 --
+-- Data for Name: featureprop_json; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.featureprop_json (featureprop_json_id, feature_id, type_id, nd_protocol_id, start_pos, end_pos, json) FROM stdin;
+\.
+
+
+--
 -- Data for Name: featureprop_pub; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -131264,154 +131554,11 @@ COPY public.materialized_view (materialized_view_id, last_update, refresh_time, 
 -- Data for Name: matviews; Type: TABLE DATA; Schema: public; Owner: web_usr
 --
 
-COPY public.matviews (mv_id, mv_name, mv_dependents, currently_refreshing, last_refresh) FROM stdin;
-110	trait_components	\N	f	2020-04-23 21:51:35.613545+00
-111	accessionsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-112	breeding_programsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-113	genotyping_protocolsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-114	locationsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-115	plantsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-116	plotsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-117	trait_componentsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-118	trait_componentsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-119	trait_componentsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-120	trait_componentsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-121	trait_componentsXyears	\N	f	2020-04-23 21:51:35.613545+00
-122	plantsXplots	\N	f	2020-04-23 21:51:35.613545+00
-84	trait_components	\N	f	2020-04-23 21:51:35.613545+00
-85	accessionsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-86	breeding_programsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-87	genotyping_protocolsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-88	locationsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-89	plantsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-90	plotsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-91	trait_componentsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-92	trait_componentsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-93	trait_componentsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-3	accessions	\N	f	2020-04-23 21:51:35.613545+00
-4	accessionsXbreeding_programs	\N	f	2020-04-23 21:51:35.613545+00
-5	accessionsXgenotyping_protocols	\N	f	2020-04-23 21:51:35.613545+00
-6	accessionsXlocations	\N	f	2020-04-23 21:51:35.613545+00
-7	accessionsXplants	\N	f	2020-04-23 21:51:35.613545+00
-8	accessionsXplots	\N	f	2020-04-23 21:51:35.613545+00
-9	accessionsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-10	accessionsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-11	accessionsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-12	accessionsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-13	accessionsXyears	\N	f	2020-04-23 21:51:35.613545+00
-94	trait_componentsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-95	trait_componentsXyears	\N	f	2020-04-23 21:51:35.613545+00
-96	plantsXplots	\N	f	2020-04-23 21:51:35.613545+00
-69	all_gs_traits	\N	f	2020-04-23 21:51:35.613545+00
-64	trial_typesXtrials	\N	f	2020-04-23 21:51:35.613545+00
-65	trial_typesXyears	\N	f	2020-04-23 21:51:35.613545+00
-66	trials	\N	f	2020-04-23 21:51:35.613545+00
-67	trialsXyears	\N	f	2020-04-23 21:51:35.613545+00
-68	years	\N	f	2020-04-23 21:51:35.613545+00
-70	trait_components	\N	f	2020-04-23 21:51:35.613545+00
-71	accessionsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-72	breeding_programsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-73	genotyping_protocolsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-74	locationsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-75	plantsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-76	plotsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-77	trait_componentsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-78	trait_componentsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-79	trait_componentsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-80	trait_componentsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-81	trait_componentsXyears	\N	f	2020-04-23 21:51:35.613545+00
-82	plantsXplots	\N	f	2020-04-23 21:51:35.613545+00
-54	traits	\N	f	2020-04-23 21:51:35.613545+00
-55	traitsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-56	traitsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-57	traitsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-2	materialized_genoview	{accessionsXgenotyping_protocols,breeding_programsXgenotyping_protocols,genotyping_protocolsXlocations,genotyping_protocolsXplants,genotyping_protocolsXplots,genotyping_protocolsXtraits,genotyping_protocolsXtrials,genotyping_protocolsXtrial_designs,genotyping_protocolsXtrial_types,genotyping_protocolsXyears}	f	2020-04-23 21:51:35.613545+00
-14	breeding_programs	\N	f	2020-04-23 21:51:35.613545+00
-15	breeding_programsXgenotyping_protocols	\N	f	2020-04-23 21:51:35.613545+00
-16	breeding_programsXlocations	\N	f	2020-04-23 21:51:35.613545+00
-17	breeding_programsXplants	\N	f	2020-04-23 21:51:35.613545+00
-18	breeding_programsXplots	\N	f	2020-04-23 21:51:35.613545+00
-19	breeding_programsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-20	breeding_programsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-21	breeding_programsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-22	breeding_programsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-23	breeding_programsXyears	\N	f	2020-04-23 21:51:35.613545+00
-24	genotyping_protocols	\N	f	2020-04-23 21:51:35.613545+00
-25	genotyping_protocolsXlocations	\N	f	2020-04-23 21:51:35.613545+00
-26	genotyping_protocolsXplants	\N	f	2020-04-23 21:51:35.613545+00
-27	genotyping_protocolsXplots	\N	f	2020-04-23 21:51:35.613545+00
-28	genotyping_protocolsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-29	genotyping_protocolsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-30	genotyping_protocolsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-31	genotyping_protocolsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-32	genotyping_protocolsXyears	\N	f	2020-04-23 21:51:35.613545+00
-33	locations	\N	f	2020-04-23 21:51:35.613545+00
-34	locationsXplants	\N	f	2020-04-23 21:51:35.613545+00
-35	locationsXplots	\N	f	2020-04-23 21:51:35.613545+00
-36	locationsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-37	locationsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-38	locationsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-39	locationsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-40	locationsXyears	\N	f	2020-04-23 21:51:35.613545+00
-41	plants	\N	f	2020-04-23 21:51:35.613545+00
-42	plantsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-43	plantsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-44	plantsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-45	plantsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-46	plantsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-47	plantsXyears	\N	f	2020-04-23 21:51:35.613545+00
-48	plots	\N	f	2020-04-23 21:51:35.613545+00
-49	plotsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-50	plotsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-51	plotsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-52	plotsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-53	plotsXyears	\N	f	2020-04-23 21:51:35.613545+00
-58	traitsXyears	\N	f	2020-04-23 21:51:35.613545+00
-59	trial_designs	\N	f	2020-04-23 21:51:35.613545+00
-60	trial_designsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-61	trial_designsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-62	trial_designsXyears	\N	f	2020-04-23 21:51:35.613545+00
-63	trial_types	\N	f	2020-04-23 21:51:35.613545+00
-97	trait_components	\N	f	2020-04-23 21:51:35.613545+00
-98	accessionsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-99	breeding_programsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-100	genotyping_protocolsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-101	locationsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-102	plantsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-103	plotsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-104	trait_componentsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-105	trait_componentsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-106	trait_componentsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-107	trait_componentsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-108	trait_componentsXyears	\N	f	2020-04-23 21:51:35.613545+00
-109	plantsXplots	\N	f	2020-04-23 21:51:35.613545+00
-123	accessionsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-124	breeding_programsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-125	genotyping_protocolsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-126	locationsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-127	plantsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-128	plotsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-129	trait_componentsXtraits	\N	f	2020-04-23 21:51:35.613545+00
-130	trait_componentsXtrials	\N	f	2020-04-23 21:51:35.613545+00
-131	trait_componentsXtrial_designs	\N	f	2020-04-23 21:51:35.613545+00
-132	trait_componentsXtrial_types	\N	f	2020-04-23 21:51:35.613545+00
-133	trait_componentsXyears	\N	f	2020-04-23 21:51:35.613545+00
-134	plantsXplots	\N	f	2020-04-23 21:51:35.613545+00
-135	genotyping_protocolsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-136	genotyping_protocolsXtrait_components	\N	f	2020-04-23 21:51:35.613545+00
-1	materialized_phenoview	{accessionsXbreeding_programs,accessionsXlocations,accessionsXplants,accessionsXplots,accessionsXseedlots,accessionsXtrait_components,accessionsXtraits,accessionsXtrials,accessionsXtrial_designs,accessionsXtrial_types,accessionsXyears,breeding_programsXgenotyping_protocols,breeding_programsXlocations,breeding_programsXplants,breeding_programsXplots,breeding_programsXseedlots,breeding_programsXtrait_components,breeding_programsXtraits,breeding_programsXtrials,breeding_programsXtrial_designs,breeding_programsXtrial_types,breeding_programsXyears,genotyping_protocolsXlocations,genotyping_protocolsXplants,genotyping_protocolsXplots,genotyping_protocolsXseedlots,genotyping_protocolsXtrait_components,genotyping_protocolsXtraits,genotyping_protocolsXtrials,genotyping_protocolsXtrial_designs,genotyping_protocolsXtrial_types,genotyping_protocolsXyears,locationsXplants,locationsXplots,locationsXseedlots,locationsXtrait_components,locationsXtraits,locationsXtrials,locationsXtrial_designs,locationsXtrial_types,locationsXyears,plantsXplots,plantsXseedlots,plantsXtrait_components,plantsXtraits,plantsXtrials,plantsXtrial_designs,plantsXtrial_types,plantsXyears,plotsXseedlots,plotsXtrait_components,plotsXtraits,plotsXtrials,plotsXtrial_designs,plotsXtrial_types,plotsXyears,seedlotsXtrait_components,seedlotsXtraits,seedlotsXtrial_designs,seedlotsXtrial_types,seedlotsXtrials,seedlotsXyears,trait_componentsXtraits,trait_componentsXtrial_designs,trait_componentsXtrial_types,trait_componentsXtrials,trait_componentsXyears,traitsXtrials,traitsXtrial_designs,traitsXtrial_types,traitsXyears,trial_designsXtrials,trial_typesXtrials,trialsXyears,trial_designsXtrial_types,trial_designsXyears,trial_typesXyears}	f	2020-04-23 21:51:35.613545+00
-137	accessionsXtrait_components	\N	f	2020-06-27 16:33:02.010745+00
-138	breeding_programsXtrait_components	\N	f	2020-06-27 16:33:02.010745+00
-139	genotyping_protocolsXtrait_components	\N	f	2020-06-27 16:33:02.010745+00
-140	locationsXtrait_components	\N	f	2020-06-27 16:33:02.010745+00
-141	plantsXtrait_components	\N	f	2020-06-27 16:33:02.010745+00
-142	plotsXtrait_components	\N	f	2020-06-27 16:33:02.010745+00
-143	trait_componentsXtraits	\N	f	2020-06-27 16:33:02.010745+00
-144	trait_componentsXtrials	\N	f	2020-06-27 16:33:02.010745+00
-145	trait_componentsXtrial_designs	\N	f	2020-06-27 16:33:02.010745+00
-146	trait_componentsXtrial_types	\N	f	2020-06-27 16:33:02.010745+00
-147	trait_componentsXyears	\N	f	2020-06-27 16:33:02.010745+00
-148	plantsXplots	\N	f	2020-06-27 16:33:02.010745+00
+COPY public.matviews (mv_id, mv_name, mv_dependents, currently_refreshing, last_refresh, refresh_start) FROM stdin;
+2	materialized_genoview	{accessionsXgenotyping_protocols,breeding_programsXgenotyping_protocols,genotyping_protocolsXlocations,genotyping_protocolsXplants,genotyping_protocolsXplots,genotyping_protocolsXtraits,genotyping_protocolsXtrials,genotyping_protocolsXtrial_designs,genotyping_protocolsXtrial_types,genotyping_protocolsXyears}	f	2020-04-23 21:51:35.613545+00	\N
+1	materialized_phenoview	{accessionsXbreeding_programs,accessionsXlocations,accessionsXplants,accessionsXplots,accessionsXseedlots,accessionsXtrait_components,accessionsXtraits,accessionsXtrials,accessionsXtrial_designs,accessionsXtrial_types,accessionsXyears,breeding_programsXgenotyping_protocols,breeding_programsXlocations,breeding_programsXplants,breeding_programsXplots,breeding_programsXseedlots,breeding_programsXtrait_components,breeding_programsXtraits,breeding_programsXtrials,breeding_programsXtrial_designs,breeding_programsXtrial_types,breeding_programsXyears,genotyping_protocolsXlocations,genotyping_protocolsXplants,genotyping_protocolsXplots,genotyping_protocolsXseedlots,genotyping_protocolsXtrait_components,genotyping_protocolsXtraits,genotyping_protocolsXtrials,genotyping_protocolsXtrial_designs,genotyping_protocolsXtrial_types,genotyping_protocolsXyears,locationsXplants,locationsXplots,locationsXseedlots,locationsXtrait_components,locationsXtraits,locationsXtrials,locationsXtrial_designs,locationsXtrial_types,locationsXyears,plantsXplots,plantsXseedlots,plantsXtrait_components,plantsXtraits,plantsXtrials,plantsXtrial_designs,plantsXtrial_types,plantsXyears,plotsXseedlots,plotsXtrait_components,plotsXtraits,plotsXtrials,plotsXtrial_designs,plotsXtrial_types,plotsXyears,seedlotsXtrait_components,seedlotsXtraits,seedlotsXtrial_designs,seedlotsXtrial_types,seedlotsXtrials,seedlotsXyears,trait_componentsXtraits,trait_componentsXtrial_designs,trait_componentsXtrial_types,trait_componentsXtrials,trait_componentsXyears,traitsXtrials,traitsXtrial_designs,traitsXtrial_types,traitsXyears,trial_designsXtrials,trial_typesXtrials,trialsXyears,trial_designsXtrial_types,trial_designsXyears,trial_typesXyears}	f	2020-04-23 21:51:35.613545+00	\N
+161	materialized_stockprop	\N	\N	\N	\N
+162	materialized_phenotype_jsonb_table	\N	\N	\N	\N
 \.
 
 
@@ -131543,6 +131690,7 @@ COPY public.nd_geolocationprop (nd_geolocationprop_id, nd_geolocation_id, type_i
 --
 
 COPY public.nd_protocol (nd_protocol_id, name, type_id, create_date, description) FROM stdin;
+2	NIRS Protocol	79058	2023-03-16 23:54:16.693608	Default NIRS protocol
 \.
 
 
@@ -131559,6 +131707,7 @@ COPY public.nd_protocol_reagent (nd_protocol_reagent_id, nd_protocol_id, reagent
 --
 
 COPY public.nd_protocolprop (nd_protocolprop_id, nd_protocol_id, type_id, value, rank) FROM stdin;
+1	2	79061	{"device_type": "SCIO"}	0
 \.
 
 
@@ -241142,8 +241291,8 @@ COPY public.phylotree_pub (phylotree_pub_id, phylotree_id, pub_id) FROM stdin;
 -- Data for Name: project; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.project (project_id, name, description, create_date) FROM stdin;
-166	Breedbase	Breedbase Test Program	2020-02-21 14:36:58.694904
+COPY public.project (project_id, name, description, create_date, type_id) FROM stdin;
+166	Breedbase	Breedbase Test Program	2020-02-21 14:36:58.694904	\N
 \.
 
 
@@ -243545,23 +243694,15 @@ COPY sgn_people.forum_topic (forum_topic_id, person_id, topic_name, parent_topic
 -- Data for Name: list; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
 --
 
-COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, type_id, is_public) FROM stdin;
-3	f	\N	test_stocks	\N	41	76451	f
-4	f	\N	test_list	\N	40	76451	f
-5	f	\N	accessions_for_solgs_tests	\N	41	76451	f
-6	f	\N	accessions_for_trial2	\N	41	76451	f
-7	f	\N	selection_acc	\N	41	\N	f
-808	f	\N	johndoe_1_public	\N	40	\N	t
-809	f	\N	janedoe_1_public	\N	41	\N	t
-810	f	\N	johndoe_1_private	\N	40	\N	f
-811	f	\N	janedoe_1_private	\N	41	\N	f
-8	f	\N	trial2 NaCRRI plots	\N	40	76450	f
-9	f	\N	trial2 NaCRRI clones	\N	40	76451	f
-10	f	\N	Trials list	\N	40	76453	f
-11	f	\N	accessions2add	\N	40	76451	f
-12	f	\N	desynonymize_test_list	\N	41	76451	f
-13	f	\N	traits	\N	41	76455	f
-14	f	\N	test_accession_list	Adds the first accession to database	43	76451	f
+COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, type_id, is_public, "timestamp", modify_timestamp) FROM stdin;
+3	f	\N	test_stocks	\N	41	76451	f	\N	\N
+5	f	\N	accessions_for_solgs_tests	\N	41	76451	f	\N	\N
+6	f	\N	accessions_for_trial2	\N	41	76451	f	\N	\N
+7	f	\N	selection_acc	\N	41	\N	f	\N	\N
+809	f	\N	janedoe_1_public	\N	41	\N	t	\N	\N
+811	f	\N	janedoe_1_private	\N	41	\N	f	\N	\N
+12	f	\N	desynonymize_test_list	\N	41	76451	f	\N	\N
+13	f	\N	traits	\N	41	76455	f	\N	\N
 \.
 
 
@@ -243575,11 +243716,6 @@ COPY sgn_people.list_item (list_item_id, content, list_id) FROM stdin;
 16	test_accession1	3
 17	test_accession2	3
 18	test_accession3	3
-19	test_accession1	4
-20	test_accession2	4
-21	test_accession3	4
-22	test_accession4	4
-23	test_accession5	4
 24	UG120001	5
 25	UG120002	5
 26	UG120003	5
@@ -244281,636 +244417,10 @@ COPY sgn_people.list_item (list_item_id, content, list_id) FROM stdin;
 722	XG120104	7
 723	XG120071	7
 724	XG120083	7
-800	test_accession1	808
-801	test_accession2	808
 802	item1	809
 803	item2	809
-804	test1	810
-805	test2	810
 806	item11	811
 807	item12	811
-808	UG120001_block:1_plot:TP1_2012_NaCRRI	8
-809	UG120002_block:1_plot:TP2_2012_NaCRRI	8
-810	UG120003_block:1_plot:TP3_2012_NaCRRI	8
-811	UG120004_block:1_plot:TP4_2012_NaCRRI	8
-812	UG120005_block:1_plot:TP5_2012_NaCRRI	8
-813	UG120006_block:1_plot:TP6_2012_NaCRRI	8
-814	UG120007_block:1_plot:TP7_2012_NaCRRI	8
-815	UG120008_block:1_plot:TP8_2012_NaCRRI	8
-816	UG120009_block:1_plot:TP9_2012_NaCRRI	8
-817	UG120010_block:1_plot:TP10_2012_NaCRRI	8
-818	UG120011_block:1_plot:TP11_2012_NaCRRI	8
-819	UG120012_block:1_plot:TP12_2012_NaCRRI	8
-820	UG120013_block:1_plot:TP13_2012_NaCRRI	8
-821	UG120014_block:1_plot:TP14_2012_NaCRRI	8
-822	UG120015_block:1_plot:TP15_2012_NaCRRI	8
-823	UG120016_block:1_plot:TP16_2012_NaCRRI	8
-824	UG120017_block:1_plot:TP17_2012_NaCRRI	8
-825	UG120018_block:1_plot:TP18_2012_NaCRRI	8
-826	UG120019_block:1_plot:TP19_2012_NaCRRI	8
-827	UG120020_block:1_plot:TP20_2012_NaCRRI	8
-828	UG120021_block:1_plot:TP21_2012_NaCRRI	8
-829	UG120022_block:1_plot:TP22_2012_NaCRRI	8
-830	UG120023_block:2_plot:TP23_2012_NaCRRI	8
-831	UG120024_block:2_plot:TP24_2012_NaCRRI	8
-832	UG120025_block:2_plot:TP25_2012_NaCRRI	8
-833	UG120026_block:2_plot:TP26_2012_NaCRRI	8
-834	UG120027_block:2_plot:TP27_2012_NaCRRI	8
-835	UG120028_block:2_plot:TP28_2012_NaCRRI	8
-836	UG120029_block:2_plot:TP29_2012_NaCRRI	8
-837	UG120030_block:2_plot:TP30_2012_NaCRRI	8
-838	UG120031_block:2_plot:TP31_2012_NaCRRI	8
-839	UG120032_block:2_plot:TP32_2012_NaCRRI	8
-840	UG120033_block:2_plot:TP33_2012_NaCRRI	8
-841	UG120034_block:2_plot:TP34_2012_NaCRRI	8
-842	UG120035_block:2_plot:TP35_2012_NaCRRI	8
-843	UG120036_block:2_plot:TP36_2012_NaCRRI	8
-844	UG120037_block:2_plot:TP37_2012_NaCRRI	8
-845	UG120038_block:2_plot:TP38_2012_NaCRRI	8
-846	UG120039_block:2_plot:TP39_2012_NaCRRI	8
-847	UG120040_block:2_plot:TP40_2012_NaCRRI	8
-848	UG120041_block:2_plot:TP41_2012_NaCRRI	8
-849	UG120042_block:2_plot:TP42_2012_NaCRRI	8
-850	UG120043_block:2_plot:TP43_2012_NaCRRI	8
-851	UG120044_block:2_plot:TP44_2012_NaCRRI	8
-852	UG120045_block:3_plot:TP45_2012_NaCRRI	8
-853	UG120046_block:3_plot:TP46_2012_NaCRRI	8
-854	UG120047_block:3_plot:TP47_2012_NaCRRI	8
-855	UG120048_block:3_plot:TP48_2012_NaCRRI	8
-856	UG120049_block:3_plot:TP49_2012_NaCRRI	8
-857	UG120050_block:3_plot:TP50_2012_NaCRRI	8
-858	UG120051_block:3_plot:TP51_2012_NaCRRI	8
-859	UG120052_block:3_plot:TP52_2012_NaCRRI	8
-860	UG120053_block:3_plot:TP53_2012_NaCRRI	8
-861	UG120054_block:3_plot:TP54_2012_NaCRRI	8
-862	UG120055_block:3_plot:TP55_2012_NaCRRI	8
-863	UG120056_block:3_plot:TP56_2012_NaCRRI	8
-864	UG120057_block:3_plot:TP57_2012_NaCRRI	8
-865	UG120058_block:3_plot:TP58_2012_NaCRRI	8
-866	UG120059_block:3_plot:TP59_2012_NaCRRI	8
-867	UG120060_block:3_plot:TP60_2012_NaCRRI	8
-868	UG120061_block:3_plot:TP61_2012_NaCRRI	8
-1143	UG120029	9
-869	UG120062_block:3_plot:TP62_2012_NaCRRI	8
-870	UG120063_block:3_plot:TP63_2012_NaCRRI	8
-871	UG120064_block:3_plot:TP64_2012_NaCRRI	8
-872	UG120065_block:3_plot:TP65_2012_NaCRRI	8
-873	UG120066_block:3_plot:TP66_2012_NaCRRI	8
-874	UG120067_block:4_plot:TP67_2012_NaCRRI	8
-875	UG120068_block:4_plot:TP68_2012_NaCRRI	8
-876	UG120069_block:4_plot:TP69_2012_NaCRRI	8
-877	UG120070_block:4_plot:TP70_2012_NaCRRI	8
-878	UG120071_block:4_plot:TP71_2012_NaCRRI	8
-879	UG120072_block:4_plot:TP72_2012_NaCRRI	8
-880	UG120073_block:4_plot:TP73_2012_NaCRRI	8
-881	UG120074_block:4_plot:TP74_2012_NaCRRI	8
-882	UG120075_block:4_plot:TP75_2012_NaCRRI	8
-883	UG120076_block:4_plot:TP76_2012_NaCRRI	8
-884	UG120077_block:4_plot:TP77_2012_NaCRRI	8
-885	UG120078_block:4_plot:TP78_2012_NaCRRI	8
-886	UG120079_block:4_plot:TP79_2012_NaCRRI	8
-887	UG120080_block:4_plot:TP80_2012_NaCRRI	8
-888	UG120081_block:4_plot:TP81_2012_NaCRRI	8
-889	UG120082_block:4_plot:TP82_2012_NaCRRI	8
-890	UG120083_block:4_plot:TP83_2012_NaCRRI	8
-891	UG120084_block:4_plot:TP84_2012_NaCRRI	8
-892	UG120085_block:4_plot:TP85_2012_NaCRRI	8
-893	UG120086_block:4_plot:TP86_2012_NaCRRI	8
-894	UG120087_block:4_plot:TP87_2012_NaCRRI	8
-895	UG120088_block:4_plot:TP88_2012_NaCRRI	8
-896	UG120089_block:5_plot:TP89_2012_NaCRRI	8
-897	UG120090_block:5_plot:TP90_2012_NaCRRI	8
-898	UG120091_block:5_plot:TP91_2012_NaCRRI	8
-899	UG120092_block:5_plot:TP92_2012_NaCRRI	8
-900	UG120093_block:5_plot:TP93_2012_NaCRRI	8
-901	UG120094_block:5_plot:TP94_2012_NaCRRI	8
-902	UG120095_block:5_plot:TP95_2012_NaCRRI	8
-903	UG120096_block:5_plot:TP96_2012_NaCRRI	8
-904	UG120097_block:5_plot:TP97_2012_NaCRRI	8
-905	UG120098_block:5_plot:TP98_2012_NaCRRI	8
-906	UG120099_block:5_plot:TP99_2012_NaCRRI	8
-907	UG120100_block:5_plot:TP100_2012_NaCRRI	8
-908	UG120101_block:5_plot:TP101_2012_NaCRRI	8
-909	UG120102_block:5_plot:TP102_2012_NaCRRI	8
-910	UG120103_block:5_plot:TP103_2012_NaCRRI	8
-911	UG120104_block:5_plot:TP104_2012_NaCRRI	8
-912	UG120105_block:5_plot:TP105_2012_NaCRRI	8
-913	UG120106_block:5_plot:TP106_2012_NaCRRI	8
-914	UG120107_block:5_plot:TP107_2012_NaCRRI	8
-915	UG120108_block:5_plot:TP108_2012_NaCRRI	8
-916	UG120109_block:5_plot:TP109_2012_NaCRRI	8
-917	UG120110_block:5_plot:TP110_2012_NaCRRI	8
-918	UG120111_block:6_plot:TP111_2012_NaCRRI	8
-919	UG120112_block:6_plot:TP112_2012_NaCRRI	8
-920	UG120113_block:6_plot:TP113_2012_NaCRRI	8
-921	UG120114_block:6_plot:TP114_2012_NaCRRI	8
-922	UG120115_block:6_plot:TP115_2012_NaCRRI	8
-923	UG120116_block:6_plot:TP116_2012_NaCRRI	8
-924	UG120117_block:6_plot:TP117_2012_NaCRRI	8
-925	UG120118_block:6_plot:TP118_2012_NaCRRI	8
-926	UG120119_block:6_plot:TP119_2012_NaCRRI	8
-927	UG120120_block:6_plot:TP120_2012_NaCRRI	8
-928	UG120121_block:6_plot:TP121_2012_NaCRRI	8
-929	UG120122_block:6_plot:TP122_2012_NaCRRI	8
-930	UG120123_block:6_plot:TP123_2012_NaCRRI	8
-931	UG120124_block:6_plot:TP124_2012_NaCRRI	8
-932	UG120125_block:6_plot:TP125_2012_NaCRRI	8
-933	UG120126_block:6_plot:TP126_2012_NaCRRI	8
-934	UG120127_block:6_plot:TP127_2012_NaCRRI	8
-935	UG120128_block:6_plot:TP128_2012_NaCRRI	8
-936	UG120129_block:6_plot:TP129_2012_NaCRRI	8
-937	UG120130_block:6_plot:TP130_2012_NaCRRI	8
-938	UG120131_block:6_plot:TP131_2012_NaCRRI	8
-939	UG120132_block:6_plot:TP132_2012_NaCRRI	8
-940	UG120133_block:7_plot:TP133_2012_NaCRRI	8
-941	UG120134_block:7_plot:TP134_2012_NaCRRI	8
-942	UG120135_block:7_plot:TP135_2012_NaCRRI	8
-943	UG120136_block:7_plot:TP136_2012_NaCRRI	8
-944	UG120137_block:7_plot:TP137_2012_NaCRRI	8
-945	UG120138_block:7_plot:TP138_2012_NaCRRI	8
-946	UG120139_block:7_plot:TP139_2012_NaCRRI	8
-947	UG120140_block:7_plot:TP140_2012_NaCRRI	8
-948	UG120141_block:7_plot:TP141_2012_NaCRRI	8
-949	UG120142_block:7_plot:TP142_2012_NaCRRI	8
-950	UG120143_block:7_plot:TP143_2012_NaCRRI	8
-951	UG120144_block:7_plot:TP144_2012_NaCRRI	8
-952	UG120145_block:7_plot:TP145_2012_NaCRRI	8
-953	UG120146_block:7_plot:TP146_2012_NaCRRI	8
-954	UG120147_block:7_plot:TP147_2012_NaCRRI	8
-955	UG120148_block:7_plot:TP148_2012_NaCRRI	8
-956	UG120149_block:7_plot:TP149_2012_NaCRRI	8
-1144	UG120030	9
-957	UG120150_block:7_plot:TP150_2012_NaCRRI	8
-958	UG120151_block:7_plot:TP151_2012_NaCRRI	8
-959	UG120152_block:7_plot:TP152_2012_NaCRRI	8
-960	UG120153_block:7_plot:TP153_2012_NaCRRI	8
-961	UG120154_block:7_plot:TP154_2012_NaCRRI	8
-962	UG120155_block:8_plot:TP155_2012_NaCRRI	8
-963	UG120156_block:8_plot:TP156_2012_NaCRRI	8
-964	UG120157_block:8_plot:TP157_2012_NaCRRI	8
-965	UG120158_block:8_plot:TP158_2012_NaCRRI	8
-966	UG120159_block:8_plot:TP159_2012_NaCRRI	8
-967	UG120160_block:8_plot:TP160_2012_NaCRRI	8
-968	UG120161_block:8_plot:TP161_2012_NaCRRI	8
-969	UG120162_block:8_plot:TP162_2012_NaCRRI	8
-970	UG120163_block:8_plot:TP163_2012_NaCRRI	8
-971	UG120164_block:8_plot:TP164_2012_NaCRRI	8
-972	UG120165_block:8_plot:TP165_2012_NaCRRI	8
-973	UG120166_block:8_plot:TP166_2012_NaCRRI	8
-974	UG120167_block:8_plot:TP167_2012_NaCRRI	8
-975	UG120168_block:8_plot:TP168_2012_NaCRRI	8
-976	UG120169_block:8_plot:TP169_2012_NaCRRI	8
-977	UG120170_block:8_plot:TP170_2012_NaCRRI	8
-978	UG120171_block:8_plot:TP171_2012_NaCRRI	8
-979	UG120172_block:8_plot:TP172_2012_NaCRRI	8
-980	UG120173_block:8_plot:TP173_2012_NaCRRI	8
-981	UG120174_block:8_plot:TP174_2012_NaCRRI	8
-982	UG120175_block:8_plot:TP175_2012_NaCRRI	8
-983	UG120176_block:8_plot:TP176_2012_NaCRRI	8
-984	UG120177_block:9_plot:TP177_2012_NaCRRI	8
-985	UG120178_block:9_plot:TP178_2012_NaCRRI	8
-986	UG120179_block:9_plot:TP179_2012_NaCRRI	8
-987	UG120180_block:9_plot:TP180_2012_NaCRRI	8
-988	UG120181_block:9_plot:TP181_2012_NaCRRI	8
-989	UG120182_block:9_plot:TP182_2012_NaCRRI	8
-990	UG120183_block:9_plot:TP183_2012_NaCRRI	8
-991	UG120184_block:9_plot:TP184_2012_NaCRRI	8
-992	UG120185_block:9_plot:TP185_2012_NaCRRI	8
-993	UG120186_block:9_plot:TP186_2012_NaCRRI	8
-994	UG120187_block:9_plot:TP187_2012_NaCRRI	8
-995	UG120188_block:9_plot:TP188_2012_NaCRRI	8
-996	UG120189_block:9_plot:TP189_2012_NaCRRI	8
-997	UG120190_block:9_plot:TP190_2012_NaCRRI	8
-998	UG120191_block:9_plot:TP191_2012_NaCRRI	8
-999	UG120192_block:9_plot:TP192_2012_NaCRRI	8
-1000	UG120193_block:9_plot:TP193_2012_NaCRRI	8
-1001	UG120194_block:9_plot:TP194_2012_NaCRRI	8
-1002	UG120195_block:9_plot:TP195_2012_NaCRRI	8
-1003	UG120196_block:9_plot:TP196_2012_NaCRRI	8
-1004	UG120197_block:9_plot:TP197_2012_NaCRRI	8
-1005	UG120198_block:9_plot:TP198_2012_NaCRRI	8
-1006	UG120199_block:10_plot:TP199_2012_NaCRRI	8
-1007	UG120200_block:10_plot:TP200_2012_NaCRRI	8
-1008	UG120201_block:10_plot:TP201_2012_NaCRRI	8
-1009	UG120202_block:10_plot:TP202_2012_NaCRRI	8
-1010	UG120203_block:10_plot:TP203_2012_NaCRRI	8
-1011	UG120204_block:10_plot:TP204_2012_NaCRRI	8
-1012	UG120205_block:10_plot:TP205_2012_NaCRRI	8
-1013	UG120206_block:10_plot:TP206_2012_NaCRRI	8
-1014	UG120207_block:10_plot:TP207_2012_NaCRRI	8
-1015	UG120208_block:10_plot:TP208_2012_NaCRRI	8
-1016	UG120209_block:10_plot:TP209_2012_NaCRRI	8
-1017	UG120210_block:10_plot:TP210_2012_NaCRRI	8
-1018	UG120211_block:10_plot:TP211_2012_NaCRRI	8
-1019	UG120212_block:10_plot:TP212_2012_NaCRRI	8
-1020	UG120213_block:10_plot:TP213_2012_NaCRRI	8
-1021	UG120214_block:10_plot:TP214_2012_NaCRRI	8
-1022	UG120215_block:10_plot:TP215_2012_NaCRRI	8
-1023	UG120216_block:10_plot:TP216_2012_NaCRRI	8
-1024	UG120217_block:10_plot:TP217_2012_NaCRRI	8
-1025	UG120218_block:10_plot:TP218_2012_NaCRRI	8
-1026	UG120219_block:10_plot:TP219_2012_NaCRRI	8
-1027	UG120220_block:10_plot:TP220_2012_NaCRRI	8
-1028	UG120221_block:11_plot:TP221_2012_NaCRRI	8
-1029	UG120222_block:11_plot:TP222_2012_NaCRRI	8
-1030	UG120223_block:11_plot:TP223_2012_NaCRRI	8
-1031	UG120224_block:11_plot:TP224_2012_NaCRRI	8
-1032	UG120225_block:11_plot:TP225_2012_NaCRRI	8
-1033	UG120226_block:11_plot:TP226_2012_NaCRRI	8
-1034	UG120227_block:11_plot:TP227_2012_NaCRRI	8
-1035	UG120228_block:11_plot:TP228_2012_NaCRRI	8
-1036	UG120229_block:11_plot:TP229_2012_NaCRRI	8
-1037	UG120230_block:11_plot:TP230_2012_NaCRRI	8
-1038	UG120231_block:11_plot:TP231_2012_NaCRRI	8
-1039	UG120232_block:11_plot:TP232_2012_NaCRRI	8
-1040	UG120233_block:11_plot:TP233_2012_NaCRRI	8
-1041	UG120234_block:11_plot:TP234_2012_NaCRRI	8
-1042	UG120235_block:11_plot:TP235_2012_NaCRRI	8
-1043	UG120236_block:11_plot:TP236_2012_NaCRRI	8
-1044	UG120237_block:11_plot:TP237_2012_NaCRRI	8
-1145	UG120031	9
-1045	UG120238_block:11_plot:TP238_2012_NaCRRI	8
-1046	UG120239_block:11_plot:TP239_2012_NaCRRI	8
-1047	UG120240_block:11_plot:TP240_2012_NaCRRI	8
-1048	UG120241_block:11_plot:TP241_2012_NaCRRI	8
-1049	UG120242_block:11_plot:TP242_2012_NaCRRI	8
-1050	UG120243_block:12_plot:TP243_2012_NaCRRI	8
-1051	UG120244_block:12_plot:TP244_2012_NaCRRI	8
-1052	UG120245_block:12_plot:TP245_2012_NaCRRI	8
-1053	UG120246_block:12_plot:TP246_2012_NaCRRI	8
-1054	UG120247_block:12_plot:TP247_2012_NaCRRI	8
-1055	UG120248_block:12_plot:TP248_2012_NaCRRI	8
-1056	UG120249_block:12_plot:TP249_2012_NaCRRI	8
-1057	UG120250_block:12_plot:TP250_2012_NaCRRI	8
-1058	UG120251_block:12_plot:TP251_2012_NaCRRI	8
-1059	UG120252_block:12_plot:TP252_2012_NaCRRI	8
-1060	UG120253_block:12_plot:TP253_2012_NaCRRI	8
-1061	UG120254_block:12_plot:TP254_2012_NaCRRI	8
-1062	UG120255_block:12_plot:TP255_2012_NaCRRI	8
-1063	UG120256_block:12_plot:TP256_2012_NaCRRI	8
-1064	UG120257_block:12_plot:TP257_2012_NaCRRI	8
-1065	UG120258_block:12_plot:TP258_2012_NaCRRI	8
-1066	UG120259_block:12_plot:TP259_2012_NaCRRI	8
-1067	UG120260_block:12_plot:TP260_2012_NaCRRI	8
-1068	UG120261_block:12_plot:TP261_2012_NaCRRI	8
-1069	UG120262_block:12_plot:TP262_2012_NaCRRI	8
-1070	UG120263_block:12_plot:TP263_2012_NaCRRI	8
-1071	UG120264_block:12_plot:TP264_2012_NaCRRI	8
-1072	UG120265_block:13_plot:TP265_2012_NaCRRI	8
-1073	UG120266_block:13_plot:TP266_2012_NaCRRI	8
-1074	UG120267_block:13_plot:TP267_2012_NaCRRI	8
-1075	UG120268_block:13_plot:TP268_2012_NaCRRI	8
-1076	UG120269_block:13_plot:TP269_2012_NaCRRI	8
-1077	UG120270_block:13_plot:TP270_2012_NaCRRI	8
-1078	UG120271_block:13_plot:TP271_2012_NaCRRI	8
-1079	UG120272_block:13_plot:TP272_2012_NaCRRI	8
-1080	UG120273_block:13_plot:TP273_2012_NaCRRI	8
-1081	UG120274_block:13_plot:TP274_2012_NaCRRI	8
-1082	UG120275_block:13_plot:TP275_2012_NaCRRI	8
-1083	UG120276_block:13_plot:TP276_2012_NaCRRI	8
-1084	UG120277_block:13_plot:TP277_2012_NaCRRI	8
-1085	UG120278_block:13_plot:TP278_2012_NaCRRI	8
-1086	UG120279_block:13_plot:TP279_2012_NaCRRI	8
-1087	UG120280_block:13_plot:TP280_2012_NaCRRI	8
-1088	UG120281_block:13_plot:TP281_2012_NaCRRI	8
-1089	UG120282_block:13_plot:TP282_2012_NaCRRI	8
-1090	UG120283_block:13_plot:TP283_2012_NaCRRI	8
-1091	UG120284_block:13_plot:TP284_2012_NaCRRI	8
-1092	UG120285_block:13_plot:TP285_2012_NaCRRI	8
-1093	UG120286_block:13_plot:TP286_2012_NaCRRI	8
-1094	UG120287_block:14_plot:TP287_2012_NaCRRI	8
-1095	UG120288_block:14_plot:TP288_2012_NaCRRI	8
-1096	UG120289_block:14_plot:TP289_2012_NaCRRI	8
-1097	UG120290_block:14_plot:TP290_2012_NaCRRI	8
-1098	UG120291_block:14_plot:TP291_2012_NaCRRI	8
-1099	UG120292_block:14_plot:TP292_2012_NaCRRI	8
-1100	UG120293_block:14_plot:TP293_2012_NaCRRI	8
-1101	UG120294_block:14_plot:TP294_2012_NaCRRI	8
-1102	UG120295_block:14_plot:TP295_2012_NaCRRI	8
-1103	UG120296_block:14_plot:TP296_2012_NaCRRI	8
-1104	UG120297_block:14_plot:TP297_2012_NaCRRI	8
-1105	UG120298_block:14_plot:TP298_2012_NaCRRI	8
-1106	UG120299_block:14_plot:TP299_2012_NaCRRI	8
-1107	UG120300_block:14_plot:TP300_2012_NaCRRI	8
-1108	UG120301_block:14_plot:TP301_2012_NaCRRI	8
-1109	UG120303_block:14_plot:TP303_2012_NaCRRI	8
-1110	UG120304_block:14_plot:TP304_2012_NaCRRI	8
-1111	UG120305_block:14_plot:TP305_2012_NaCRRI	8
-1112	UG120306_block:14_plot:TP306_2012_NaCRRI	8
-1113	UG120307_block:14_plot:TP307_2012_NaCRRI	8
-1114	UG120308_block:14_plot:TP308_2012_NaCRRI	8
-1115	UG120001	9
-1116	UG120002	9
-1117	UG120003	9
-1118	UG120004	9
-1119	UG120005	9
-1120	UG120006	9
-1121	UG120007	9
-1122	UG120008	9
-1123	UG120009	9
-1124	UG120010	9
-1125	UG120011	9
-1126	UG120012	9
-1127	UG120013	9
-1128	UG120014	9
-1129	UG120015	9
-1130	UG120016	9
-1131	UG120017	9
-1132	UG120018	9
-1133	UG120019	9
-1134	UG120020	9
-1135	UG120021	9
-1136	UG120022	9
-1137	UG120023	9
-1138	UG120024	9
-1139	UG120025	9
-1140	UG120026	9
-1141	UG120027	9
-1142	UG120028	9
-1146	UG120032	9
-1147	UG120033	9
-1148	UG120034	9
-1149	UG120035	9
-1150	UG120036	9
-1151	UG120037	9
-1152	UG120038	9
-1153	UG120039	9
-1154	UG120040	9
-1155	UG120041	9
-1156	UG120042	9
-1157	UG120043	9
-1158	UG120044	9
-1159	UG120045	9
-1160	UG120046	9
-1161	UG120047	9
-1162	UG120048	9
-1163	UG120049	9
-1164	UG120050	9
-1165	UG120051	9
-1166	UG120052	9
-1167	UG120053	9
-1168	UG120054	9
-1169	UG120055	9
-1170	UG120056	9
-1171	UG120057	9
-1172	UG120058	9
-1173	UG120059	9
-1174	UG120060	9
-1175	UG120061	9
-1176	UG120062	9
-1177	UG120063	9
-1178	UG120064	9
-1179	UG120065	9
-1180	UG120066	9
-1181	UG120067	9
-1182	UG120068	9
-1183	UG120069	9
-1184	UG120070	9
-1185	UG120071	9
-1186	UG120072	9
-1187	UG120073	9
-1188	UG120074	9
-1189	UG120075	9
-1190	UG120076	9
-1191	UG120077	9
-1192	UG120078	9
-1193	UG120079	9
-1194	UG120080	9
-1195	UG120081	9
-1196	UG120082	9
-1197	UG120083	9
-1198	UG120084	9
-1199	UG120085	9
-1200	UG120086	9
-1201	UG120087	9
-1202	UG120088	9
-1203	UG120089	9
-1204	UG120090	9
-1205	UG120091	9
-1206	UG120092	9
-1207	UG120093	9
-1208	UG120094	9
-1209	UG120095	9
-1210	UG120096	9
-1211	UG120097	9
-1212	UG120098	9
-1213	UG120099	9
-1214	UG120100	9
-1215	UG120101	9
-1216	UG120102	9
-1217	UG120103	9
-1218	UG120104	9
-1219	UG120105	9
-1220	UG120106	9
-1221	UG120107	9
-1222	UG120108	9
-1223	UG120109	9
-1224	UG120110	9
-1225	UG120111	9
-1226	UG120112	9
-1227	UG120113	9
-1228	UG120114	9
-1229	UG120115	9
-1230	UG120116	9
-1231	UG120117	9
-1232	UG120118	9
-1233	UG120119	9
-1234	UG120120	9
-1235	UG120121	9
-1236	UG120122	9
-1237	UG120123	9
-1238	UG120124	9
-1239	UG120125	9
-1240	UG120126	9
-1241	UG120127	9
-1242	UG120128	9
-1243	UG120129	9
-1244	UG120130	9
-1245	UG120131	9
-1246	UG120132	9
-1247	UG120133	9
-1248	UG120134	9
-1249	UG120135	9
-1250	UG120136	9
-1251	UG120137	9
-1252	UG120138	9
-1253	UG120139	9
-1254	UG120140	9
-1255	UG120141	9
-1256	UG120142	9
-1257	UG120143	9
-1258	UG120144	9
-1259	UG120145	9
-1260	UG120146	9
-1261	UG120147	9
-1262	UG120148	9
-1263	UG120149	9
-1264	UG120150	9
-1265	UG120151	9
-1266	UG120152	9
-1267	UG120153	9
-1268	UG120154	9
-1269	UG120155	9
-1270	UG120156	9
-1271	UG120157	9
-1272	UG120158	9
-1273	UG120159	9
-1274	UG120160	9
-1275	UG120161	9
-1276	UG120162	9
-1277	UG120163	9
-1278	UG120164	9
-1279	UG120165	9
-1280	UG120166	9
-1281	UG120167	9
-1282	UG120168	9
-1283	UG120169	9
-1284	UG120170	9
-1285	UG120171	9
-1286	UG120172	9
-1287	UG120173	9
-1288	UG120174	9
-1289	UG120175	9
-1290	UG120176	9
-1291	UG120177	9
-1292	UG120178	9
-1293	UG120179	9
-1294	UG120180	9
-1295	UG120181	9
-1296	UG120182	9
-1297	UG120183	9
-1298	UG120184	9
-1299	UG120185	9
-1300	UG120186	9
-1301	UG120187	9
-1302	UG120188	9
-1303	UG120189	9
-1304	UG120190	9
-1305	UG120191	9
-1306	UG120192	9
-1307	UG120193	9
-1308	UG120194	9
-1309	UG120195	9
-1310	UG120196	9
-1311	UG120197	9
-1312	UG120198	9
-1313	UG120199	9
-1314	UG120200	9
-1315	UG120201	9
-1316	UG120202	9
-1317	UG120203	9
-1318	UG120204	9
-1319	UG120205	9
-1320	UG120206	9
-1321	UG120207	9
-1322	UG120208	9
-1323	UG120209	9
-1324	UG120210	9
-1325	UG120211	9
-1326	UG120212	9
-1327	UG120213	9
-1328	UG120214	9
-1329	UG120215	9
-1330	UG120216	9
-1331	UG120217	9
-1332	UG120218	9
-1333	UG120219	9
-1334	UG120220	9
-1335	UG120221	9
-1336	UG120222	9
-1337	UG120223	9
-1338	UG120224	9
-1339	UG120225	9
-1340	UG120226	9
-1341	UG120227	9
-1342	UG120228	9
-1343	UG120229	9
-1344	UG120230	9
-1345	UG120231	9
-1346	UG120232	9
-1347	UG120233	9
-1348	UG120234	9
-1349	UG120235	9
-1350	UG120236	9
-1351	UG120237	9
-1352	UG120238	9
-1353	UG120239	9
-1354	UG120240	9
-1355	UG120241	9
-1356	UG120242	9
-1357	UG120243	9
-1358	UG120244	9
-1359	UG120245	9
-1360	UG120246	9
-1361	UG120247	9
-1362	UG120248	9
-1363	UG120249	9
-1364	UG120250	9
-1365	UG120251	9
-1366	UG120252	9
-1367	UG120253	9
-1368	UG120254	9
-1369	UG120255	9
-1370	UG120256	9
-1371	UG120257	9
-1372	UG120258	9
-1373	UG120259	9
-1374	UG120260	9
-1375	UG120261	9
-1376	UG120262	9
-1377	UG120263	9
-1378	UG120264	9
-1379	UG120265	9
-1380	UG120266	9
-1381	UG120267	9
-1382	UG120268	9
-1383	UG120269	9
-1384	UG120270	9
-1385	UG120271	9
-1386	UG120272	9
-1387	UG120273	9
-1388	UG120274	9
-1389	UG120275	9
-1390	UG120276	9
-1391	UG120277	9
-1392	UG120278	9
-1393	UG120279	9
-1394	UG120280	9
-1395	UG120281	9
-1396	UG120282	9
-1397	UG120283	9
-1398	UG120284	9
-1399	UG120285	9
-1400	UG120286	9
-1401	UG120287	9
-1402	UG120288	9
-1403	UG120289	9
-1404	UG120290	9
-1405	UG120291	9
-1406	UG120292	9
-1407	UG120293	9
-1408	UG120294	9
-1409	UG120295	9
-1410	UG120296	9
-1411	UG120297	9
-1412	UG120298	9
-1413	UG120299	9
-1414	UG120300	9
-1415	UG120301	9
-1416	UG120303	9
-1417	UG120304	9
-1418	UG120305	9
-1419	UG120306	9
-1420	UG120307	9
-1421	UG120308	9
-1422	Kasese solgs trial	10
-1423	trial2 NaCRRI	10
-1424	TMEB419	11
-1425	IITA-TMS-IBA30572	11
-1426	TMEB693	11
-1427	IITA-TMS-IBA011412	11
-1428	IITA-TMS-IBA980002	11
-1429	IITA-TMS-IBA980581	11
 1430	new_test_crossP005	12
 1431	new_test_crossP009	12
 1432	test_accession1	12
@@ -244927,7 +244437,6 @@ COPY sgn_people.list_item (list_item_id, content, list_id) FROM stdin;
 1443	CO_334:0000015	13
 1444	CO_334:0000016	13
 1445	CO_334:0000017	13
-1446	test_accession	14
 \.
 
 
@@ -244943,7 +244452,7 @@ COPY sgn_people.sp_clone_il_mapping_segment_log (sp_clone_il_mapping_segment_log
 -- Data for Name: sp_dataset; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
 --
 
-COPY sgn_people.sp_dataset (sp_dataset_id, sp_person_id, name, description, dataset, is_live) FROM stdin;
+COPY sgn_people.sp_dataset (sp_dataset_id, sp_person_id, name, description, dataset, is_live, is_public) FROM stdin;
 \.
 
 
@@ -244968,6 +244477,22 @@ COPY sgn_people.sp_group_member (sp_person_id, sp_group_id, status) FROM stdin;
 --
 
 COPY sgn_people.sp_login_old (sp_login_id, username, private_email, pending_email, password, confirm_code, disabled, user_type) FROM stdin;
+\.
+
+
+--
+-- Data for Name: sp_order; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
+--
+
+COPY sgn_people.sp_order (sp_order_id, order_from_id, order_to_id, order_status, comments, create_date, completion_date) FROM stdin;
+\.
+
+
+--
+-- Data for Name: sp_orderprop; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
+--
+
+COPY sgn_people.sp_orderprop (sp_orderprop_id, sp_order_id, type_id, value, rank) FROM stdin;
 \.
 
 
@@ -245008,10 +244533,7 @@ COPY sgn_people.sp_papers (sp_paper_id, person_id, title, author_list, journal, 
 --
 
 COPY sgn_people.sp_person (sp_person_id, censor, salutation, last_name, first_name, organization, address, country, phone_number, fax, contact_email, webpage, research_keywords, user_format, research_interests, formatted_interests, contact_update, research_update, sp_login_id, username, private_email, pending_email, password, confirm_code, disabled, user_type, cookie_string, last_access_time, user_prefs, developer_settings) FROM stdin;
-42	0	\N	Sanger	Fred	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	freddy	\N	\N	$2a$06$GWBtnOVFPiJekF9k0Iouv.5DTHmbVzkc8UZeg2CCnvTzZPpt.Q6Em	\N	\N	user	\N	2014-01-03 17:22:43.111627	\N	\N
-40	0	\N	Doe	John	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	johndoe	\N	\N	$2a$06$J4Me6MnN22EuC5Cy13J1YOJ/s9qL4LcMVkbB1q0af3lbDuMChm9/y	\N	\N	user	yksjzeqhmehpnwzdrkikhttacojlrwcbvmuxuzzybwzvnegjycqgrofwunsurytzdfairlv	2017-07-18 14:55:25.912619	\N	\N
-43	0	\N	admin	admin	BTI	\N	\N	\N	\N	\N	\N	\N	auto	\N	\N	\N	2020-04-09	\N	admin	\N	admintest@admin.test	$2a$06$KRJVgSpAVn3DU4K1p/OvR.FFOyOaB28FDeb39AIIRHZLTrFJgGGCi	3WZZIlbaM1d29TnJ	\N	user	\N	2020-04-09 10:43:13.62851	\N	\N
-41	0	\N	Doe	Jane	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	janedoe	\N	\N	$2a$06$7/Mf/NvUCeLkxpL4LGxVuOlUs0nrSWxehQTsmTg03M2cTbbiMDP5u	\N	\N	user	yxuijzwyblqemqxvfmeklhvumzpvonlxqhcxmsttjpiqwsgzhllknaewreyytzsibiacnyq	2020-08-21 02:50:52.101952	\N	\N
+41	0	\N	admin	admin	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	admin	\N	\N	$2a$06$qgEw8U6C05g6zWv7djWDyekjZRlD6VOEsSsogI4YRvNYoKHBdTSjC	\N	\N	user	yxuijzwyblqemqxvfmeklhvumzpvonlxqhcxmsttjpiqwsgzhllknaewreyytzsibiacnyq	2020-08-21 02:50:52.101952	\N	\N
 \.
 
 
@@ -245028,14 +244550,8 @@ COPY sgn_people.sp_person_organisms (sp_person_organisms_id, sp_person_id, organ
 --
 
 COPY sgn_people.sp_person_roles (sp_person_role_id, sp_person_id, sp_role_id) FROM stdin;
-71	40	3
 72	41	1
-73	42	4
-74	40	6
 75	41	6
-76	43	4
-77	43	1
-78	43	7
 79	41	7
 \.
 
@@ -245084,6 +244600,16 @@ COPY sgn_people.sp_roles (sp_role_id, name) FROM stdin;
 4	user
 6	test
 7	Breedbase
+8	vendor
+\.
+
+
+--
+-- Data for Name: sp_token; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
+--
+
+COPY sgn_people.sp_token (sp_token_id, cookie_string, last_access_time, source_ip_address, sp_person_id) FROM stdin;
+1	yylrebthmsdgbiwvguatberxcbfmmksxxlumquxxbmzdffdfyddzesopehlhapltdrsgjdf	2023-03-16 23:55:56.065168	\N	41
 \.
 
 
@@ -245881,7 +245407,7 @@ SELECT pg_catalog.setval('metadata.md_dbiref_dbiref_id_seq', 1, false);
 -- Name: md_dbversion_dbversion_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: postgres
 --
 
-SELECT pg_catalog.setval('metadata.md_dbversion_dbversion_id_seq', 202, true);
+SELECT pg_catalog.setval('metadata.md_dbversion_dbversion_id_seq', 263, true);
 
 
 --
@@ -245937,7 +245463,7 @@ SELECT pg_catalog.setval('metadata.md_json_json_id_seq', 1, false);
 -- Name: md_metadata_metadata_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: postgres
 --
 
-SELECT pg_catalog.setval('metadata.md_metadata_metadata_id_seq', 215, true);
+SELECT pg_catalog.setval('metadata.md_metadata_metadata_id_seq', 276, true);
 
 
 --
@@ -246326,6 +245852,13 @@ SELECT pg_catalog.setval('phenome.project_md_image_project_md_image_id_seq', 1, 
 
 
 --
+-- Name: project_owner_project_owner_id_seq; Type: SEQUENCE SET; Schema: phenome; Owner: postgres
+--
+
+SELECT pg_catalog.setval('phenome.project_owner_project_owner_id_seq', 1, false);
+
+
+--
 -- Name: pub_curator_pub_curator_id_seq; Type: SEQUENCE SET; Schema: phenome; Owner: postgres
 --
 
@@ -246637,7 +246170,7 @@ SELECT pg_catalog.setval('public.contact_relationship_contact_relationship_id_se
 -- Name: cv_cv_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cv_cv_id_seq', 74, true);
+SELECT pg_catalog.setval('public.cv_cv_id_seq', 76, true);
 
 
 --
@@ -246651,7 +246184,7 @@ SELECT pg_catalog.setval('public.cvprop_cvprop_id_seq', 6, true);
 -- Name: cvterm_cvterm_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cvterm_cvterm_id_seq', 79057, true);
+SELECT pg_catalog.setval('public.cvterm_cvterm_id_seq', 79122, true);
 
 
 --
@@ -246728,7 +246261,7 @@ SELECT pg_catalog.setval('public.db_db_id_seq', 312, true);
 -- Name: dbxref_dbxref_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.dbxref_dbxref_id_seq', 214216, true);
+SELECT pg_catalog.setval('public.dbxref_dbxref_id_seq', 214281, true);
 
 
 --
@@ -246879,6 +246412,13 @@ SELECT pg_catalog.setval('public.featureprop_featureprop_id_seq', 1, false);
 
 
 --
+-- Name: featureprop_json_featureprop_json_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.featureprop_json_featureprop_json_id_seq', 1, false);
+
+
+--
 -- Name: featureprop_pub_featureprop_pub_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
@@ -246987,7 +246527,7 @@ SELECT pg_catalog.setval('public.materialized_view_materialized_view_id_seq', 1,
 -- Name: matviews_mv_id_seq; Type: SEQUENCE SET; Schema: public; Owner: web_usr
 --
 
-SELECT pg_catalog.setval('public.matviews_mv_id_seq', 148, true);
+SELECT pg_catalog.setval('public.matviews_mv_id_seq', 266, true);
 
 
 --
@@ -247092,7 +246632,7 @@ SELECT pg_catalog.setval('public.nd_geolocationprop_nd_geolocationprop_id_seq', 
 -- Name: nd_protocol_nd_protocol_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.nd_protocol_nd_protocol_id_seq', 1, true);
+SELECT pg_catalog.setval('public.nd_protocol_nd_protocol_id_seq', 2, true);
 
 
 --
@@ -247106,7 +246646,7 @@ SELECT pg_catalog.setval('public.nd_protocol_reagent_nd_protocol_reagent_id_seq'
 -- Name: nd_protocolprop_nd_protocolprop_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.nd_protocolprop_nd_protocolprop_id_seq', 1, false);
+SELECT pg_catalog.setval('public.nd_protocolprop_nd_protocolprop_id_seq', 1, true);
 
 
 --
@@ -248349,6 +247889,20 @@ SELECT pg_catalog.setval('sgn_people.sp_login_old_sp_login_id_seq', 1, false);
 
 
 --
+-- Name: sp_order_sp_order_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
+--
+
+SELECT pg_catalog.setval('sgn_people.sp_order_sp_order_id_seq', 1, false);
+
+
+--
+-- Name: sp_orderprop_sp_orderprop_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
+--
+
+SELECT pg_catalog.setval('sgn_people.sp_orderprop_sp_orderprop_id_seq', 1, false);
+
+
+--
 -- Name: sp_organisms_organism_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
@@ -248429,7 +247983,14 @@ SELECT pg_catalog.setval('sgn_people.sp_project_sp_project_id_seq', 1, false);
 -- Name: sp_roles_sp_role_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
-SELECT pg_catalog.setval('sgn_people.sp_roles_sp_role_id_seq', 7, true);
+SELECT pg_catalog.setval('sgn_people.sp_roles_sp_role_id_seq', 8, true);
+
+
+--
+-- Name: sp_token_sp_token_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
+--
+
+SELECT pg_catalog.setval('sgn_people.sp_token_sp_token_id_seq', 1, true);
 
 
 --
@@ -248501,30 +248062,6 @@ SELECT pg_catalog.setval('tomato_gff.fgroup_gid_seq', 1, false);
 
 SELECT pg_catalog.setval('tomato_gff.ftype_ftypeid_seq', 1, false);
 
-
---
--- Name: cvterm cvterm_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.cvterm
-    ADD CONSTRAINT cvterm_pkey PRIMARY KEY (cvterm_id);
-
-
---
--- Name: trial_types; Type: MATERIALIZED VIEW; Schema: public; Owner: web_usr
---
-
-CREATE MATERIALIZED VIEW public.trial_types AS
- SELECT cvterm.cvterm_id AS trial_type_id,
-    cvterm.name AS trial_type_name
-   FROM (public.cvterm
-     JOIN public.cv USING (cv_id))
-  WHERE ((cv.name)::text = 'project_type'::text)
-  GROUP BY cvterm.cvterm_id
-  WITH NO DATA;
-
-
-ALTER TABLE public.trial_types OWNER TO web_usr;
 
 --
 -- Name: annotation annotation_pkey; Type: CONSTRAINT; Schema: annotation; Owner: postgres
@@ -250087,6 +249624,14 @@ ALTER TABLE ONLY phenome.project_md_image
 
 
 --
+-- Name: project_owner project_owner_pkey; Type: CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.project_owner
+    ADD CONSTRAINT project_owner_pkey PRIMARY KEY (project_owner_id);
+
+
+--
 -- Name: pub_curator pub_curator_pkey; Type: CONSTRAINT; Schema: phenome; Owner: postgres
 --
 
@@ -250615,6 +250160,14 @@ ALTER TABLE ONLY public.cvterm_dbxref
 
 
 --
+-- Name: cvterm cvterm_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cvterm
+    ADD CONSTRAINT cvterm_pkey PRIMARY KEY (cvterm_id);
+
+
+--
 -- Name: cvterm_relationship cvterm_relationship_c1; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -251015,6 +250568,14 @@ ALTER TABLE ONLY public.featureprop
 
 
 --
+-- Name: featureprop_json featureprop_json_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.featureprop_json
+    ADD CONSTRAINT featureprop_json_pkey PRIMARY KEY (featureprop_json_id);
+
+
+--
 -- Name: featureprop featureprop_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -251180,6 +250741,14 @@ ALTER TABLE ONLY public.materialized_view
 
 ALTER TABLE ONLY public.matviews
     ADD CONSTRAINT matviews_pkey PRIMARY KEY (mv_id);
+
+
+--
+-- Name: matviews mv_name_c1; Type: CONSTRAINT; Schema: public; Owner: web_usr
+--
+
+ALTER TABLE ONLY public.matviews
+    ADD CONSTRAINT mv_name_c1 UNIQUE (mv_name);
 
 
 --
@@ -253455,6 +253024,22 @@ ALTER TABLE ONLY sgn_people.sp_login_old
 
 
 --
+-- Name: sp_order sp_order_pkey; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_order
+    ADD CONSTRAINT sp_order_pkey PRIMARY KEY (sp_order_id);
+
+
+--
+-- Name: sp_orderprop sp_orderprop_pkey; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_orderprop
+    ADD CONSTRAINT sp_orderprop_pkey PRIMARY KEY (sp_orderprop_id);
+
+
+--
 -- Name: sp_organisms sp_organisms_pkey; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
 --
 
@@ -253548,6 +253133,14 @@ ALTER TABLE ONLY sgn_people.sp_project
 
 ALTER TABLE ONLY sgn_people.sp_roles
     ADD CONSTRAINT sp_roles_pkey PRIMARY KEY (sp_role_id);
+
+
+--
+-- Name: sp_token sp_token_pkey; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_token
+    ADD CONSTRAINT sp_token_pkey PRIMARY KEY (sp_token_id);
 
 
 --
@@ -254680,118 +254273,6 @@ CREATE INDEX updated_by_idx2 ON physical.overgo_version USING btree (updated_by,
 
 
 --
--- Name: accession_id_geno_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX accession_id_geno_idx ON public.materialized_genoview USING btree (accession_id) WITH (fillfactor='100');
-
-
---
--- Name: accession_id_pheno_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX accession_id_pheno_idx ON public.materialized_phenoview USING btree (accession_id) WITH (fillfactor='100');
-
-
---
--- Name: accessions_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessions_idx ON public.accessions USING btree (accession_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxbreeding_programs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxbreeding_programs_idx ON public.accessionsxbreeding_programs USING btree (accession_id, breeding_program_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxgenotyping_projects_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxgenotyping_projects_idx ON public.accessionsxgenotyping_projects USING btree (accession_id, genotyping_project_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxgenotyping_protocols_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxgenotyping_protocols_idx ON public.accessionsxgenotyping_protocols USING btree (accession_id, genotyping_protocol_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxlocations_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxlocations_idx ON public.accessionsxlocations USING btree (accession_id, location_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxplants_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxplants_idx ON public.accessionsxplants USING btree (accession_id, plant_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxplots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxplots_idx ON public.accessionsxplots USING btree (accession_id, plot_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxseedlots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxseedlots_idx ON public.accessionsxseedlots USING btree (accession_id, seedlot_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxtrait_components_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxtrait_components_idx ON public.accessionsxtrait_components USING btree (accession_id, trait_component_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxtraits_idx ON public.accessionsxtraits USING btree (accession_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxtrial_designs_idx ON public.accessionsxtrial_designs USING btree (accession_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxtrial_types_idx ON public.accessionsxtrial_types USING btree (accession_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxtrials_idx ON public.accessionsxtrials USING btree (accession_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: accessionsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX accessionsxyears_idx ON public.accessionsxyears USING btree (accession_id, year_id) WITH (fillfactor='100');
-
-
---
 -- Name: analysisfeature_idx1; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -254950,104 +254431,6 @@ CREATE INDEX ara_signalp_locus ON public.ara_signalp USING btree (locus);
 --
 
 CREATE INDEX ara_targetp_locus ON public.ara_targetp USING btree (locus);
-
-
---
--- Name: breeding_program_id_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX breeding_program_id_idx ON public.materialized_phenoview USING btree (breeding_program_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programs_idx ON public.breeding_programs USING btree (breeding_program_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxgenotyping_projects_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxgenotyping_projects_idx ON public.breeding_programsxgenotyping_projects USING btree (breeding_program_id, genotyping_project_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxgenotyping_protocols_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxgenotyping_protocols_idx ON public.breeding_programsxgenotyping_protocols USING btree (breeding_program_id, genotyping_protocol_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxlocations_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxlocations_idx ON public.breeding_programsxlocations USING btree (breeding_program_id, location_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxplants_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxplants_idx ON public.breeding_programsxplants USING btree (breeding_program_id, plant_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxplots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxplots_idx ON public.breeding_programsxplots USING btree (breeding_program_id, plot_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxseedlots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxseedlots_idx ON public.breeding_programsxseedlots USING btree (breeding_program_id, seedlot_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxtrait_components_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxtrait_components_idx ON public.breeding_programsxtrait_components USING btree (breeding_program_id, trait_component_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxtraits_idx ON public.breeding_programsxtraits USING btree (breeding_program_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxtrial_designs_idx ON public.breeding_programsxtrial_designs USING btree (breeding_program_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxtrial_types_idx ON public.breeding_programsxtrial_types USING btree (breeding_program_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxtrials_idx ON public.breeding_programsxtrials USING btree (breeding_program_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: breeding_programsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX breeding_programsxyears_idx ON public.breeding_programsxyears USING btree (breeding_program_id, year_id) WITH (fillfactor='100');
 
 
 --
@@ -255599,6 +254982,41 @@ CREATE INDEX featureprop_pub_idx2 ON public.featureprop_pub USING btree (pub_id)
 
 
 --
+-- Name: feaureprop_json_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX feaureprop_json_idx1 ON public.featureprop_json USING btree (feature_id);
+
+
+--
+-- Name: feaureprop_json_idx2; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX feaureprop_json_idx2 ON public.featureprop_json USING btree (type_id);
+
+
+--
+-- Name: feaureprop_json_idx3; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX feaureprop_json_idx3 ON public.featureprop_json USING btree (nd_protocol_id);
+
+
+--
+-- Name: feaureprop_json_idx4; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX feaureprop_json_idx4 ON public.featureprop_json USING btree (start_pos);
+
+
+--
+-- Name: feaureprop_json_idx5; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX feaureprop_json_idx5 ON public.featureprop_json USING btree (end_pos);
+
+
+--
 -- Name: fpc_band_fpc_fingerprint_id_idx1; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -255641,13 +255059,6 @@ CREATE INDEX fpc_fingerprint_gel_name_idx1 ON public.fpc_fingerprint USING btree
 
 
 --
--- Name: genotype_id_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX genotype_id_idx ON public.materialized_genoview USING btree (genotype_id) WITH (fillfactor='100');
-
-
---
 -- Name: genotype_idx1; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -255676,153 +255087,6 @@ CREATE INDEX genotypeprop_idx2 ON public.genotypeprop USING btree (type_id);
 
 
 --
--- Name: genotyping_projects_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_projects_idx ON public.genotyping_projects USING btree (genotyping_project_id, genotyping_project_name) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_projectsxaccessions_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_projectsxaccessions_idx ON public.genotyping_projectsxaccessions USING btree (genotyping_project_id, accession_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_projectsxbreeding_programs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_projectsxbreeding_programs_idx ON public.genotyping_projectsxbreeding_programs USING btree (genotyping_project_id, breeding_program_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_projectsxgenotyping_protocols_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_projectsxgenotyping_protocols_idx ON public.genotyping_projectsxgenotyping_protocols USING btree (genotyping_project_id, genotyping_protocol_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_projectsxlocations_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_projectsxlocations_idx ON public.genotyping_projectsxlocations USING btree (genotyping_project_id, location_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_projectsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_projectsxtraits_idx ON public.genotyping_projectsxtraits USING btree (genotyping_project_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_projectsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_projectsxtrials_idx ON public.genotyping_projectsxtrials USING btree (genotyping_project_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_projectsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_projectsxyears_idx ON public.genotyping_projectsxyears USING btree (genotyping_project_id, year_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocol_id_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX genotyping_protocol_id_idx ON public.materialized_genoview USING btree (genotyping_protocol_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocols_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocols_idx ON public.genotyping_protocols USING btree (genotyping_protocol_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxgenotyping_projects_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxgenotyping_projects_idx ON public.genotyping_protocolsxgenotyping_projects USING btree (genotyping_protocol_id, genotyping_project_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxlocations_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxlocations_idx ON public.genotyping_protocolsxlocations USING btree (genotyping_protocol_id, location_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxplants_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxplants_idx ON public.genotyping_protocolsxplants USING btree (genotyping_protocol_id, plant_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxplots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxplots_idx ON public.genotyping_protocolsxplots USING btree (genotyping_protocol_id, plot_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxseedlots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxseedlots_idx ON public.genotyping_protocolsxseedlots USING btree (genotyping_protocol_id, seedlot_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxtrait_components_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxtrait_components_idx ON public.genotyping_protocolsxtrait_components USING btree (genotyping_protocol_id, trait_component_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxtraits_idx ON public.genotyping_protocolsxtraits USING btree (genotyping_protocol_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxtrial_designs_idx ON public.genotyping_protocolsxtrial_designs USING btree (genotyping_protocol_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxtrial_types_idx ON public.genotyping_protocolsxtrial_types USING btree (genotyping_protocol_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxtrials_idx ON public.genotyping_protocolsxtrials USING btree (genotyping_protocol_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: genotyping_protocolsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX genotyping_protocolsxyears_idx ON public.genotyping_protocolsxyears USING btree (genotyping_protocol_id, year_id) WITH (fillfactor='100');
-
-
---
 -- Name: itag_loading_log_key; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -255830,87 +255094,80 @@ CREATE INDEX itag_loading_log_key ON public.itag_loading_log USING btree (search
 
 
 --
--- Name: location_id_idx; Type: INDEX; Schema: public; Owner: web_usr
+-- Name: materialized_markerview_idx1; Type: INDEX; Schema: public; Owner: web_usr
 --
 
-CREATE INDEX location_id_idx ON public.materialized_phenoview USING btree (location_id) WITH (fillfactor='100');
-
-
---
--- Name: locations_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX locations_idx ON public.locations USING btree (location_id) WITH (fillfactor='100');
+CREATE INDEX materialized_markerview_idx1 ON public.materialized_markerview USING btree (nd_protocol_id);
 
 
 --
--- Name: locationsxgenotyping_projects_idx; Type: INDEX; Schema: public; Owner: web_usr
+-- Name: materialized_markerview_idx10; Type: INDEX; Schema: public; Owner: web_usr
 --
 
-CREATE UNIQUE INDEX locationsxgenotyping_projects_idx ON public.locationsxgenotyping_projects USING btree (location_id, genotyping_project_id) WITH (fillfactor='100');
-
-
---
--- Name: locationsxplants_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX locationsxplants_idx ON public.locationsxplants USING btree (location_id, plant_id) WITH (fillfactor='100');
+CREATE INDEX materialized_markerview_idx10 ON public.materialized_markerview USING gin (marker_name public.gin_trgm_ops);
 
 
 --
--- Name: locationsxplots_idx; Type: INDEX; Schema: public; Owner: web_usr
+-- Name: materialized_markerview_idx11; Type: INDEX; Schema: public; Owner: web_usr
 --
 
-CREATE UNIQUE INDEX locationsxplots_idx ON public.locationsxplots USING btree (location_id, plot_id) WITH (fillfactor='100');
-
-
---
--- Name: locationsxseedlots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX locationsxseedlots_idx ON public.locationsxseedlots USING btree (location_id, seedlot_id) WITH (fillfactor='100');
+CREATE INDEX materialized_markerview_idx11 ON public.materialized_markerview USING gin (variant_name public.gin_trgm_ops);
 
 
 --
--- Name: locationsxtrait_components_idx; Type: INDEX; Schema: public; Owner: web_usr
+-- Name: materialized_markerview_idx2; Type: INDEX; Schema: public; Owner: web_usr
 --
 
-CREATE UNIQUE INDEX locationsxtrait_components_idx ON public.locationsxtrait_components USING btree (location_id, trait_component_id) WITH (fillfactor='100');
-
-
---
--- Name: locationsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX locationsxtraits_idx ON public.locationsxtraits USING btree (location_id, trait_id) WITH (fillfactor='100');
+CREATE INDEX materialized_markerview_idx2 ON public.materialized_markerview USING btree (species_name);
 
 
 --
--- Name: locationsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
+-- Name: materialized_markerview_idx3; Type: INDEX; Schema: public; Owner: web_usr
 --
 
-CREATE UNIQUE INDEX locationsxtrial_designs_idx ON public.locationsxtrial_designs USING btree (location_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: locationsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX locationsxtrial_types_idx ON public.locationsxtrial_types USING btree (location_id, trial_type_id) WITH (fillfactor='100');
+CREATE INDEX materialized_markerview_idx3 ON public.materialized_markerview USING btree (reference_genome_name);
 
 
 --
--- Name: locationsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
+-- Name: materialized_markerview_idx4; Type: INDEX; Schema: public; Owner: web_usr
 --
 
-CREATE UNIQUE INDEX locationsxtrials_idx ON public.locationsxtrials USING btree (location_id, trial_id) WITH (fillfactor='100');
+CREATE INDEX materialized_markerview_idx4 ON public.materialized_markerview USING btree (marker_name);
 
 
 --
--- Name: locationsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
+-- Name: materialized_markerview_idx5; Type: INDEX; Schema: public; Owner: web_usr
 --
 
-CREATE UNIQUE INDEX locationsxyears_idx ON public.locationsxyears USING btree (location_id, year_id) WITH (fillfactor='100');
+CREATE INDEX materialized_markerview_idx5 ON public.materialized_markerview USING btree (upper(marker_name));
+
+
+--
+-- Name: materialized_markerview_idx6; Type: INDEX; Schema: public; Owner: web_usr
+--
+
+CREATE INDEX materialized_markerview_idx6 ON public.materialized_markerview USING btree (chrom);
+
+
+--
+-- Name: materialized_markerview_idx7; Type: INDEX; Schema: public; Owner: web_usr
+--
+
+CREATE INDEX materialized_markerview_idx7 ON public.materialized_markerview USING btree (pos);
+
+
+--
+-- Name: materialized_markerview_idx8; Type: INDEX; Schema: public; Owner: web_usr
+--
+
+CREATE INDEX materialized_markerview_idx8 ON public.materialized_markerview USING btree (variant_name);
+
+
+--
+-- Name: materialized_markerview_idx9; Type: INDEX; Schema: public; Owner: web_usr
+--
+
+CREATE INDEX materialized_markerview_idx9 ON public.materialized_markerview USING btree (upper(variant_name));
 
 
 --
@@ -256278,125 +255535,6 @@ CREATE INDEX phylotree_pub_idx2 ON public.phylotree_pub USING btree (pub_id);
 
 
 --
--- Name: plants_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plants_idx ON public.plants USING btree (plant_id) WITH (fillfactor='100');
-
-
---
--- Name: plantsxplots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plantsxplots_idx ON public.plantsxplots USING btree (plant_id, plot_id) WITH (fillfactor='100');
-
-
---
--- Name: plantsxseedlots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plantsxseedlots_idx ON public.plantsxseedlots USING btree (plant_id, seedlot_id) WITH (fillfactor='100');
-
-
---
--- Name: plantsxtrait_components_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plantsxtrait_components_idx ON public.plantsxtrait_components USING btree (plant_id, trait_component_id) WITH (fillfactor='100');
-
-
---
--- Name: plantsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plantsxtraits_idx ON public.plantsxtraits USING btree (plant_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: plantsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plantsxtrial_designs_idx ON public.plantsxtrial_designs USING btree (plant_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: plantsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plantsxtrial_types_idx ON public.plantsxtrial_types USING btree (plant_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: plantsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plantsxtrials_idx ON public.plantsxtrials USING btree (plant_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: plantsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plantsxyears_idx ON public.plantsxyears USING btree (plant_id, year_id) WITH (fillfactor='100');
-
-
---
--- Name: plots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plots_idx ON public.plots USING btree (plot_id) WITH (fillfactor='100');
-
-
---
--- Name: plotsxseedlots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plotsxseedlots_idx ON public.plotsxseedlots USING btree (plot_id, seedlot_id) WITH (fillfactor='100');
-
-
---
--- Name: plotsxtrait_components_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plotsxtrait_components_idx ON public.plotsxtrait_components USING btree (plot_id, trait_component_id) WITH (fillfactor='100');
-
-
---
--- Name: plotsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plotsxtraits_idx ON public.plotsxtraits USING btree (plot_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: plotsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plotsxtrial_designs_idx ON public.plotsxtrial_designs USING btree (plot_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: plotsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plotsxtrial_types_idx ON public.plotsxtrial_types USING btree (plot_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: plotsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plotsxtrials_idx ON public.plotsxtrials USING btree (plot_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: plotsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX plotsxyears_idx ON public.plotsxyears USING btree (plot_id, year_id) WITH (fillfactor='100');
-
-
---
 -- Name: project_contact_idx1; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -256408,6 +255546,13 @@ CREATE INDEX project_contact_idx1 ON public.project_contact USING btree (project
 --
 
 CREATE INDEX project_contact_idx2 ON public.project_contact USING btree (contact_id);
+
+
+--
+-- Name: project_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX project_idx1 ON public.project USING btree (type_id);
 
 
 --
@@ -256495,62 +255640,6 @@ CREATE INDEX pubprop_idx2 ON public.pubprop USING btree (type_id);
 
 
 --
--- Name: seedlot_id_pheno_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX seedlot_id_pheno_idx ON public.materialized_phenoview USING btree (seedlot_id) WITH (fillfactor='100');
-
-
---
--- Name: seedlots_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX seedlots_idx ON public.seedlots USING btree (seedlot_id) WITH (fillfactor='100');
-
-
---
--- Name: seedlotsxtrait_components_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX seedlotsxtrait_components_idx ON public.seedlotsxtrait_components USING btree (seedlot_id, trait_component_id) WITH (fillfactor='100');
-
-
---
--- Name: seedlotsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX seedlotsxtraits_idx ON public.seedlotsxtraits USING btree (seedlot_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: seedlotsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX seedlotsxtrial_designs_idx ON public.seedlotsxtrial_designs USING btree (seedlot_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: seedlotsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX seedlotsxtrial_types_idx ON public.seedlotsxtrial_types USING btree (seedlot_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: seedlotsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX seedlotsxtrials_idx ON public.seedlotsxtrials USING btree (seedlot_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: seedlotsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX seedlotsxyears_idx ON public.seedlotsxyears USING btree (seedlot_id, year_id) WITH (fillfactor='100');
-
-
---
 -- Name: stock_cvterm_idx1; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -256625,13 +255714,6 @@ CREATE INDEX stock_genotype_idx1 ON public.stock_genotype USING btree (stock_id)
 --
 
 CREATE INDEX stock_genotype_idx2 ON public.stock_genotype USING btree (genotype_id);
-
-
---
--- Name: stock_id_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX stock_id_idx ON public.materialized_phenoview USING btree (stock_id) WITH (fillfactor='100');
 
 
 --
@@ -256866,160 +255948,6 @@ CREATE INDEX tmp_gff_load_cache_idx3 ON public.tmp_gff_load_cache USING btree (u
 
 
 --
--- Name: trait_components_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trait_components_idx ON public.trait_components USING btree (trait_component_id) WITH (fillfactor='100');
-
-
---
--- Name: trait_componentsxtraits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trait_componentsxtraits_idx ON public.trait_componentsxtraits USING btree (trait_component_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: trait_componentsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trait_componentsxtrial_designs_idx ON public.trait_componentsxtrial_designs USING btree (trait_component_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: trait_componentsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trait_componentsxtrial_types_idx ON public.trait_componentsxtrial_types USING btree (trait_component_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: trait_componentsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trait_componentsxtrials_idx ON public.trait_componentsxtrials USING btree (trait_component_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: trait_componentsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trait_componentsxyears_idx ON public.trait_componentsxyears USING btree (trait_component_id, year_id) WITH (fillfactor='100');
-
-
---
--- Name: traits_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX traits_idx ON public.traits USING btree (trait_id) WITH (fillfactor='100');
-
-
---
--- Name: traitsxtrial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX traitsxtrial_designs_idx ON public.traitsxtrial_designs USING btree (trait_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: traitsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX traitsxtrial_types_idx ON public.traitsxtrial_types USING btree (trait_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: traitsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX traitsxtrials_idx ON public.traitsxtrials USING btree (trait_id, trial_id) WITH (fillfactor='100');
-
-
---
--- Name: traitsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX traitsxyears_idx ON public.traitsxyears USING btree (trait_id, year_id) WITH (fillfactor='100');
-
-
---
--- Name: trial_designs_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trial_designs_idx ON public.trial_designs USING btree (trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: trial_designsxtrial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trial_designsxtrial_types_idx ON public.trial_designsxtrial_types USING btree (trial_design_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: trial_designsxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trial_designsxtrials_idx ON public.trial_designsxtrials USING btree (trial_id, trial_design_id) WITH (fillfactor='100');
-
-
---
--- Name: trial_designsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trial_designsxyears_idx ON public.trial_designsxyears USING btree (trial_design_id, year_id) WITH (fillfactor='100');
-
-
---
--- Name: trial_id_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX trial_id_idx ON public.materialized_phenoview USING btree (trial_id) WITH (fillfactor='100');
-
-
---
--- Name: trial_types_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trial_types_idx ON public.trial_types USING btree (trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: trial_typesxtrials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trial_typesxtrials_idx ON public.trial_typesxtrials USING btree (trial_id, trial_type_id) WITH (fillfactor='100');
-
-
---
--- Name: trial_typesxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trial_typesxyears_idx ON public.trial_typesxyears USING btree (trial_type_id, year_id) WITH (fillfactor='100');
-
-
---
--- Name: trials_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trials_idx ON public.trials USING btree (trial_id) WITH (fillfactor='100');
-
-
---
--- Name: trialsxgenotyping_projects_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trialsxgenotyping_projects_idx ON public.trialsxgenotyping_projects USING btree (trial_id, genotyping_project_id) WITH (fillfactor='100');
-
-
---
--- Name: trialsxyears_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX trialsxyears_idx ON public.trialsxyears USING btree (trial_id, year_id) WITH (fillfactor='100');
-
-
---
 -- Name: unigene_relations_superceded_by; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -257038,20 +255966,6 @@ CREATE UNIQUE INDEX unq_geno_idx ON public.materialized_genoview USING btree (ac
 --
 
 CREATE UNIQUE INDEX unq_pheno_idx ON public.materialized_phenoview USING btree (stock_id, phenotype_id, trait_id) WITH (fillfactor='100');
-
-
---
--- Name: year_id_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE INDEX year_id_idx ON public.materialized_phenoview USING btree (year_id) WITH (fillfactor='100');
-
-
---
--- Name: years_idx; Type: INDEX; Schema: public; Owner: web_usr
---
-
-CREATE UNIQUE INDEX years_idx ON public.years USING btree (year_id) WITH (fillfactor='100');
 
 
 --
@@ -257955,6 +256869,19 @@ CREATE INDEX ftype_fsource_idx ON tomato_gff.ftype USING btree (fsource);
 --
 
 CREATE UNIQUE INDEX ftype_ftype_idx ON tomato_gff.ftype USING btree (fmethod, fsource);
+
+
+--
+-- Name: trial_types _RETURN; Type: RULE; Schema: public; Owner: web_usr
+--
+
+CREATE OR REPLACE VIEW public.trial_types AS
+ SELECT cvterm.cvterm_id AS trial_type_id,
+    cvterm.name AS trial_type_name
+   FROM (public.cvterm
+     JOIN public.cv USING (cv_id))
+  WHERE ((cv.name)::text = 'project_type'::text)
+  GROUP BY cvterm.cvterm_id;
 
 
 --
@@ -259618,7 +258545,7 @@ ALTER TABLE ONLY metadata.md_groups
 --
 
 ALTER TABLE ONLY metadata.md_image_cvterm
-    ADD CONSTRAINT md_image_cvterm_cvterm_id_fkey FOREIGN KEY (cvterm_id) REFERENCES public.cvterm(cvterm_id);
+    ADD CONSTRAINT md_image_cvterm_cvterm_id_fkey FOREIGN KEY (cvterm_id) REFERENCES public.cvterm(cvterm_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -259626,7 +258553,7 @@ ALTER TABLE ONLY metadata.md_image_cvterm
 --
 
 ALTER TABLE ONLY metadata.md_image_cvterm
-    ADD CONSTRAINT md_image_cvterm_image_id_fkey FOREIGN KEY (image_id) REFERENCES metadata.md_image(image_id);
+    ADD CONSTRAINT md_image_cvterm_image_id_fkey FOREIGN KEY (image_id) REFERENCES metadata.md_image(image_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -259634,7 +258561,7 @@ ALTER TABLE ONLY metadata.md_image_cvterm
 --
 
 ALTER TABLE ONLY metadata.md_image_cvterm
-    ADD CONSTRAINT md_image_cvterm_sp_person_id_fkey FOREIGN KEY (sp_person_id) REFERENCES sgn_people.sp_person(sp_person_id);
+    ADD CONSTRAINT md_image_cvterm_sp_person_id_fkey FOREIGN KEY (sp_person_id) REFERENCES sgn_people.sp_person(sp_person_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260650,7 +259577,7 @@ ALTER TABLE ONLY phenome.locus
 --
 
 ALTER TABLE ONLY phenome.locus_owner
-    ADD CONSTRAINT locus_owner_granted_by_fkey FOREIGN KEY (granted_by) REFERENCES sgn_people.sp_person(sp_person_id);
+    ADD CONSTRAINT locus_owner_granted_by_fkey FOREIGN KEY (granted_by) REFERENCES sgn_people.sp_person(sp_person_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260658,7 +259585,7 @@ ALTER TABLE ONLY phenome.locus_owner
 --
 
 ALTER TABLE ONLY phenome.locus_owner
-    ADD CONSTRAINT locus_owner_locus_id_fkey FOREIGN KEY (locus_id) REFERENCES phenome.locus(locus_id) ON DELETE CASCADE;
+    ADD CONSTRAINT locus_owner_locus_id_fkey FOREIGN KEY (locus_id) REFERENCES phenome.locus(locus_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260666,7 +259593,7 @@ ALTER TABLE ONLY phenome.locus_owner
 --
 
 ALTER TABLE ONLY phenome.locus_owner
-    ADD CONSTRAINT locus_owner_sp_person_id_fkey FOREIGN KEY (sp_person_id) REFERENCES sgn_people.sp_person(sp_person_id);
+    ADD CONSTRAINT locus_owner_sp_person_id_fkey FOREIGN KEY (sp_person_id) REFERENCES sgn_people.sp_person(sp_person_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260822,11 +259749,19 @@ ALTER TABLE ONLY phenome.locusgroup
 
 
 --
+-- Name: nd_experiment_md_files nd_experiment_md_files_file_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.nd_experiment_md_files
+    ADD CONSTRAINT nd_experiment_md_files_file_id_fkey FOREIGN KEY (file_id) REFERENCES metadata.md_files(file_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
 -- Name: nd_experiment_md_files nd_experiment_md_files_nd_experiment_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
 --
 
 ALTER TABLE ONLY phenome.nd_experiment_md_files
-    ADD CONSTRAINT nd_experiment_md_files_nd_experiment_id_fkey FOREIGN KEY (nd_experiment_id) REFERENCES public.nd_experiment(nd_experiment_id);
+    ADD CONSTRAINT nd_experiment_md_files_nd_experiment_id_fkey FOREIGN KEY (nd_experiment_id) REFERENCES public.nd_experiment(nd_experiment_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260834,7 +259769,7 @@ ALTER TABLE ONLY phenome.nd_experiment_md_files
 --
 
 ALTER TABLE ONLY phenome.nd_experiment_md_images
-    ADD CONSTRAINT nd_experiment_md_images_image_id_fkey FOREIGN KEY (image_id) REFERENCES metadata.md_image(image_id);
+    ADD CONSTRAINT nd_experiment_md_images_image_id_fkey FOREIGN KEY (image_id) REFERENCES metadata.md_image(image_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260842,7 +259777,7 @@ ALTER TABLE ONLY phenome.nd_experiment_md_images
 --
 
 ALTER TABLE ONLY phenome.nd_experiment_md_images
-    ADD CONSTRAINT nd_experiment_md_images_nd_experiment_id_fkey FOREIGN KEY (nd_experiment_id) REFERENCES public.nd_experiment(nd_experiment_id);
+    ADD CONSTRAINT nd_experiment_md_images_nd_experiment_id_fkey FOREIGN KEY (nd_experiment_id) REFERENCES public.nd_experiment(nd_experiment_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260850,7 +259785,7 @@ ALTER TABLE ONLY phenome.nd_experiment_md_images
 --
 
 ALTER TABLE ONLY phenome.nd_experiment_md_json
-    ADD CONSTRAINT nd_experiment_md_json_json_id_fkey FOREIGN KEY (json_id) REFERENCES metadata.md_json(json_id);
+    ADD CONSTRAINT nd_experiment_md_json_json_id_fkey FOREIGN KEY (json_id) REFERENCES metadata.md_json(json_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260858,7 +259793,7 @@ ALTER TABLE ONLY phenome.nd_experiment_md_json
 --
 
 ALTER TABLE ONLY phenome.nd_experiment_md_json
-    ADD CONSTRAINT nd_experiment_md_json_nd_experiment_id_fkey FOREIGN KEY (nd_experiment_id) REFERENCES public.nd_experiment(nd_experiment_id);
+    ADD CONSTRAINT nd_experiment_md_json_nd_experiment_id_fkey FOREIGN KEY (nd_experiment_id) REFERENCES public.nd_experiment(nd_experiment_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261010,7 +259945,7 @@ ALTER TABLE ONLY phenome.population
 --
 
 ALTER TABLE ONLY phenome.project_md_image
-    ADD CONSTRAINT project_md_image_image_id_fkey FOREIGN KEY (image_id) REFERENCES metadata.md_image(image_id);
+    ADD CONSTRAINT project_md_image_image_id_fkey FOREIGN KEY (image_id) REFERENCES metadata.md_image(image_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261018,7 +259953,7 @@ ALTER TABLE ONLY phenome.project_md_image
 --
 
 ALTER TABLE ONLY phenome.project_md_image
-    ADD CONSTRAINT project_md_image_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.project(project_id);
+    ADD CONSTRAINT project_md_image_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.project(project_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261026,7 +259961,23 @@ ALTER TABLE ONLY phenome.project_md_image
 --
 
 ALTER TABLE ONLY phenome.project_md_image
-    ADD CONSTRAINT project_md_image_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id);
+    ADD CONSTRAINT project_md_image_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: project_owner project_owner_project_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.project_owner
+    ADD CONSTRAINT project_owner_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.project(project_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: project_owner project_owner_sp_person_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.project_owner
+    ADD CONSTRAINT project_owner_sp_person_id_fkey FOREIGN KEY (sp_person_id) REFERENCES sgn_people.sp_person(sp_person_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261106,7 +260057,7 @@ ALTER TABLE ONLY phenome.stock_allele
 --
 
 ALTER TABLE ONLY phenome.stock_image
-    ADD CONSTRAINT stock_image_image_id_fkey FOREIGN KEY (image_id) REFERENCES metadata.md_image(image_id);
+    ADD CONSTRAINT stock_image_image_id_fkey FOREIGN KEY (image_id) REFERENCES metadata.md_image(image_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261114,7 +260065,7 @@ ALTER TABLE ONLY phenome.stock_image
 --
 
 ALTER TABLE ONLY phenome.stock_image
-    ADD CONSTRAINT stock_image_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id);
+    ADD CONSTRAINT stock_image_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261122,7 +260073,7 @@ ALTER TABLE ONLY phenome.stock_image
 --
 
 ALTER TABLE ONLY phenome.stock_image
-    ADD CONSTRAINT stock_image_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id);
+    ADD CONSTRAINT stock_image_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261130,7 +260081,7 @@ ALTER TABLE ONLY phenome.stock_image
 --
 
 ALTER TABLE ONLY phenome.stock_owner
-    ADD CONSTRAINT stock_owner_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id);
+    ADD CONSTRAINT stock_owner_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261138,7 +260089,7 @@ ALTER TABLE ONLY phenome.stock_owner
 --
 
 ALTER TABLE ONLY phenome.stock_owner
-    ADD CONSTRAINT stock_owner_sp_person_id_fkey FOREIGN KEY (sp_person_id) REFERENCES sgn_people.sp_person(sp_person_id);
+    ADD CONSTRAINT stock_owner_sp_person_id_fkey FOREIGN KEY (sp_person_id) REFERENCES sgn_people.sp_person(sp_person_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261146,7 +260097,7 @@ ALTER TABLE ONLY phenome.stock_owner
 --
 
 ALTER TABLE ONLY phenome.stock_owner
-    ADD CONSTRAINT stock_owner_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id);
+    ADD CONSTRAINT stock_owner_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -261931,6 +260882,30 @@ ALTER TABLE ONLY public.featureloc
 
 ALTER TABLE ONLY public.featureprop
     ADD CONSTRAINT featureprop_feature_id_fkey FOREIGN KEY (feature_id) REFERENCES public.feature(feature_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: featureprop_json featureprop_json_feature_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.featureprop_json
+    ADD CONSTRAINT featureprop_json_feature_id_fkey FOREIGN KEY (feature_id) REFERENCES public.feature(feature_id);
+
+
+--
+-- Name: featureprop_json featureprop_json_nd_protocol_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.featureprop_json
+    ADD CONSTRAINT featureprop_json_nd_protocol_id_fkey FOREIGN KEY (nd_protocol_id) REFERENCES public.nd_protocol(nd_protocol_id);
+
+
+--
+-- Name: featureprop_json featureprop_json_type_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.featureprop_json
+    ADD CONSTRAINT featureprop_json_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id);
 
 
 --
@@ -262915,6 +261890,14 @@ ALTER TABLE ONLY public.project_relationship
 
 ALTER TABLE ONLY public.project_relationship
     ADD CONSTRAINT project_relationship_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id) ON DELETE RESTRICT;
+
+
+--
+-- Name: project project_type_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project
+    ADD CONSTRAINT project_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id) ON DELETE SET NULL;
 
 
 --
@@ -264702,6 +263685,38 @@ ALTER TABLE ONLY sgn_people.sp_group_member
 
 
 --
+-- Name: sp_order sp_order_order_from_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_order
+    ADD CONSTRAINT sp_order_order_from_id_fkey FOREIGN KEY (order_from_id) REFERENCES sgn_people.sp_person(sp_person_id);
+
+
+--
+-- Name: sp_order sp_order_order_to_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_order
+    ADD CONSTRAINT sp_order_order_to_id_fkey FOREIGN KEY (order_to_id) REFERENCES sgn_people.sp_person(sp_person_id);
+
+
+--
+-- Name: sp_orderprop sp_orderprop_sp_order_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_orderprop
+    ADD CONSTRAINT sp_orderprop_sp_order_id_fkey FOREIGN KEY (sp_order_id) REFERENCES sgn_people.sp_order(sp_order_id);
+
+
+--
+-- Name: sp_orderprop sp_orderprop_type_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_orderprop
+    ADD CONSTRAINT sp_orderprop_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id);
+
+
+--
 -- Name: sp_person_roles sp_person_roles_sp_person_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
 --
 
@@ -264747,6 +263762,14 @@ ALTER TABLE ONLY sgn_people.sp_project_il_mapping_clone_log
 
 ALTER TABLE ONLY sgn_people.sp_project_person
     ADD CONSTRAINT sp_project_person_sp_project_id_fkey FOREIGN KEY (sp_project_id) REFERENCES sgn_people.sp_project(sp_project_id);
+
+
+--
+-- Name: sp_token sp_token_sp_person_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.sp_token
+    ADD CONSTRAINT sp_token_sp_person_id_fkey FOREIGN KEY (sp_person_id) REFERENCES sgn_people.sp_person(sp_person_id);
 
 
 --
@@ -267008,6 +266031,20 @@ GRANT USAGE ON SEQUENCE phenome.project_md_image_project_md_image_id_seq TO web_
 
 
 --
+-- Name: TABLE project_owner; Type: ACL; Schema: phenome; Owner: postgres
+--
+
+GRANT ALL ON TABLE phenome.project_owner TO web_usr;
+
+
+--
+-- Name: SEQUENCE project_owner_project_owner_id_seq; Type: ACL; Schema: phenome; Owner: postgres
+--
+
+GRANT USAGE ON SEQUENCE phenome.project_owner_project_owner_id_seq TO web_usr;
+
+
+--
 -- Name: TABLE pub_curator; Type: ACL; Schema: phenome; Owner: postgres
 --
 
@@ -267492,13 +266529,6 @@ GRANT ALL ON TABLE public.stock TO web_usr;
 
 
 --
--- Name: TABLE nd_experiment; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.nd_experiment TO web_usr;
-
-
---
 -- Name: TABLE nd_experiment_phenotype; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -267517,13 +266547,6 @@ GRANT ALL ON TABLE public.nd_experiment_project TO web_usr;
 --
 
 GRANT ALL ON TABLE public.nd_experiment_stock TO web_usr;
-
-
---
--- Name: TABLE nd_geolocation; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.nd_geolocation TO web_usr;
 
 
 --
@@ -267559,6 +266582,13 @@ GRANT ALL ON TABLE public.projectprop TO web_usr;
 --
 
 GRANT ALL ON TABLE public.stock_relationship TO web_usr;
+
+
+--
+-- Name: TABLE genotype; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.genotype TO web_usr;
 
 
 --
@@ -267804,6 +266834,13 @@ GRANT ALL ON TABLE public.blastwatch_results TO web_usr;
 --
 
 GRANT ALL ON SEQUENCE public.blastwatch_results_blastwatch_results_id_seq TO web_usr;
+
+
+--
+-- Name: TABLE nd_experiment; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.nd_experiment TO web_usr;
 
 
 --
@@ -268290,6 +267327,20 @@ GRANT SELECT,USAGE ON SEQUENCE public.featureprop_featureprop_id_seq TO web_usr;
 
 
 --
+-- Name: TABLE featureprop_json; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.featureprop_json TO web_usr;
+
+
+--
+-- Name: SEQUENCE featureprop_json_featureprop_json_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT USAGE ON SEQUENCE public.featureprop_json_featureprop_json_id_seq TO web_usr;
+
+
+--
 -- Name: TABLE featureprop_pub; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -268430,13 +267481,6 @@ GRANT SELECT,USAGE ON SEQUENCE public.fpc_series_fpc_series_id_seq TO web_usr;
 
 
 --
--- Name: TABLE genotype; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.genotype TO web_usr;
-
-
---
 -- Name: SEQUENCE genotype_genotype_id_seq; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -268504,6 +267548,13 @@ GRANT ALL ON TABLE public.itag_loading_log TO web_usr;
 --
 
 GRANT ALL ON SEQUENCE public.itag_loading_log_id_seq TO web_usr;
+
+
+--
+-- Name: TABLE nd_geolocation; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.nd_geolocation TO web_usr;
 
 
 --
@@ -271186,6 +270237,34 @@ GRANT ALL ON SEQUENCE sgn_people.sp_login_old_sp_login_id_seq TO web_usr;
 
 
 --
+-- Name: TABLE sp_order; Type: ACL; Schema: sgn_people; Owner: postgres
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sgn_people.sp_order TO web_usr;
+
+
+--
+-- Name: SEQUENCE sp_order_sp_order_id_seq; Type: ACL; Schema: sgn_people; Owner: postgres
+--
+
+GRANT USAGE ON SEQUENCE sgn_people.sp_order_sp_order_id_seq TO web_usr;
+
+
+--
+-- Name: TABLE sp_orderprop; Type: ACL; Schema: sgn_people; Owner: postgres
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sgn_people.sp_orderprop TO web_usr;
+
+
+--
+-- Name: SEQUENCE sp_orderprop_sp_orderprop_id_seq; Type: ACL; Schema: sgn_people; Owner: postgres
+--
+
+GRANT USAGE ON SEQUENCE sgn_people.sp_orderprop_sp_orderprop_id_seq TO web_usr;
+
+
+--
 -- Name: TABLE sp_organisms; Type: ACL; Schema: sgn_people; Owner: postgres
 --
 
@@ -271355,6 +270434,20 @@ GRANT ALL ON SEQUENCE sgn_people.sp_roles_sp_role_id_seq TO web_usr;
 
 
 --
+-- Name: TABLE sp_token; Type: ACL; Schema: sgn_people; Owner: postgres
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sgn_people.sp_token TO web_usr;
+
+
+--
+-- Name: SEQUENCE sp_token_sp_token_id_seq; Type: ACL; Schema: sgn_people; Owner: postgres
+--
+
+GRANT USAGE ON SEQUENCE sgn_people.sp_token_sp_token_id_seq TO web_usr;
+
+
+--
 -- Name: TABLE user_map; Type: ACL; Schema: sgn_people; Owner: postgres
 --
 
@@ -271488,27 +270581,6 @@ GRANT SELECT ON TABLE tomato_gff.ftype TO web_usr;
 
 
 --
--- Name: accessions; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessions;
-
-
---
--- Name: materialized_phenoview; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.materialized_phenoview;
-
-
---
--- Name: accessionsxbreeding_programs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxbreeding_programs;
-
-
---
 -- Name: materialized_genoview; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
 --
 
@@ -271516,395 +270588,10 @@ REFRESH MATERIALIZED VIEW public.materialized_genoview;
 
 
 --
--- Name: accessionsxgenotyping_projects; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
+-- Name: materialized_markerview; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
 --
 
-REFRESH MATERIALIZED VIEW public.accessionsxgenotyping_projects;
-
-
---
--- Name: accessionsxgenotyping_protocols; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxgenotyping_protocols;
-
-
---
--- Name: accessionsxlocations; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxlocations;
-
-
---
--- Name: accessionsxplants; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxplants;
-
-
---
--- Name: accessionsxplots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxplots;
-
-
---
--- Name: accessionsxseedlots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxseedlots;
-
-
---
--- Name: accessionsxtrait_components; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxtrait_components;
-
-
---
--- Name: accessionsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxtraits;
-
-
---
--- Name: accessionsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxtrial_designs;
-
-
---
--- Name: accessionsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxtrial_types;
-
-
---
--- Name: accessionsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxtrials;
-
-
---
--- Name: accessionsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.accessionsxyears;
-
-
---
--- Name: breeding_programs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programs;
-
-
---
--- Name: genotyping_projects; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_projects;
-
-
---
--- Name: breeding_programsxgenotyping_projects; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxgenotyping_projects;
-
-
---
--- Name: breeding_programsxgenotyping_protocols; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxgenotyping_protocols;
-
-
---
--- Name: breeding_programsxlocations; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxlocations;
-
-
---
--- Name: breeding_programsxplants; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxplants;
-
-
---
--- Name: breeding_programsxplots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxplots;
-
-
---
--- Name: breeding_programsxseedlots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxseedlots;
-
-
---
--- Name: breeding_programsxtrait_components; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxtrait_components;
-
-
---
--- Name: breeding_programsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxtraits;
-
-
---
--- Name: breeding_programsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxtrial_designs;
-
-
---
--- Name: breeding_programsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxtrial_types;
-
-
---
--- Name: breeding_programsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxtrials;
-
-
---
--- Name: breeding_programsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.breeding_programsxyears;
-
-
---
--- Name: genotyping_projectsxaccessions; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxaccessions;
-
-
---
--- Name: genotyping_projectsxbreeding_programs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxbreeding_programs;
-
-
---
--- Name: genotyping_projectsxgenotyping_protocols; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxgenotyping_protocols;
-
-
---
--- Name: genotyping_projectsxlocations; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxlocations;
-
-
---
--- Name: genotyping_projectsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxtraits;
-
-
---
--- Name: genotyping_projectsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxtrials;
-
-
---
--- Name: genotyping_projectsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_projectsxyears;
-
-
---
--- Name: genotyping_protocols; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocols;
-
-
---
--- Name: genotyping_protocolsxgenotyping_projects; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxgenotyping_projects;
-
-
---
--- Name: genotyping_protocolsxlocations; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxlocations;
-
-
---
--- Name: genotyping_protocolsxplants; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxplants;
-
-
---
--- Name: genotyping_protocolsxplots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxplots;
-
-
---
--- Name: genotyping_protocolsxseedlots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxseedlots;
-
-
---
--- Name: genotyping_protocolsxtrait_components; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxtrait_components;
-
-
---
--- Name: genotyping_protocolsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxtraits;
-
-
---
--- Name: genotyping_protocolsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxtrial_designs;
-
-
---
--- Name: genotyping_protocolsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxtrial_types;
-
-
---
--- Name: genotyping_protocolsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxtrials;
-
-
---
--- Name: genotyping_protocolsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.genotyping_protocolsxyears;
-
-
---
--- Name: locations; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locations;
-
-
---
--- Name: locationsxgenotyping_projects; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxgenotyping_projects;
-
-
---
--- Name: locationsxplants; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxplants;
-
-
---
--- Name: locationsxplots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxplots;
-
-
---
--- Name: locationsxseedlots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxseedlots;
-
-
---
--- Name: locationsxtrait_components; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxtrait_components;
-
-
---
--- Name: locationsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxtraits;
-
-
---
--- Name: locationsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxtrial_designs;
-
-
---
--- Name: locationsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxtrial_types;
-
-
---
--- Name: locationsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxtrials;
-
-
---
--- Name: locationsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.locationsxyears;
+REFRESH MATERIALIZED VIEW public.materialized_markerview;
 
 
 --
@@ -271915,332 +270602,17 @@ REFRESH MATERIALIZED VIEW public.materialized_phenotype_jsonb_table;
 
 
 --
+-- Name: materialized_phenoview; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
+--
+
+REFRESH MATERIALIZED VIEW public.materialized_phenoview;
+
+
+--
 -- Name: materialized_stockprop; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
 --
 
 REFRESH MATERIALIZED VIEW public.materialized_stockprop;
-
-
---
--- Name: plants; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plants;
-
-
---
--- Name: plantsxplots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plantsxplots;
-
-
---
--- Name: plantsxseedlots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plantsxseedlots;
-
-
---
--- Name: plantsxtrait_components; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plantsxtrait_components;
-
-
---
--- Name: plantsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plantsxtraits;
-
-
---
--- Name: plantsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plantsxtrial_designs;
-
-
---
--- Name: plantsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plantsxtrial_types;
-
-
---
--- Name: plantsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plantsxtrials;
-
-
---
--- Name: plantsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plantsxyears;
-
-
---
--- Name: plots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plots;
-
-
---
--- Name: plotsxseedlots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plotsxseedlots;
-
-
---
--- Name: plotsxtrait_components; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plotsxtrait_components;
-
-
---
--- Name: plotsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plotsxtraits;
-
-
---
--- Name: plotsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plotsxtrial_designs;
-
-
---
--- Name: plotsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plotsxtrial_types;
-
-
---
--- Name: plotsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plotsxtrials;
-
-
---
--- Name: plotsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.plotsxyears;
-
-
---
--- Name: seedlots; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.seedlots;
-
-
---
--- Name: seedlotsxtrait_components; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.seedlotsxtrait_components;
-
-
---
--- Name: seedlotsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.seedlotsxtraits;
-
-
---
--- Name: seedlotsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.seedlotsxtrial_designs;
-
-
---
--- Name: seedlotsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.seedlotsxtrial_types;
-
-
---
--- Name: seedlotsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.seedlotsxtrials;
-
-
---
--- Name: seedlotsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.seedlotsxyears;
-
-
---
--- Name: trait_components; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trait_components;
-
-
---
--- Name: traits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.traits;
-
-
---
--- Name: trait_componentsxtraits; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trait_componentsxtraits;
-
-
---
--- Name: trait_componentsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trait_componentsxtrial_designs;
-
-
---
--- Name: trait_componentsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trait_componentsxtrial_types;
-
-
---
--- Name: trait_componentsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trait_componentsxtrials;
-
-
---
--- Name: trait_componentsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trait_componentsxyears;
-
-
---
--- Name: traitsxtrial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.traitsxtrial_designs;
-
-
---
--- Name: traitsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.traitsxtrial_types;
-
-
---
--- Name: traitsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.traitsxtrials;
-
-
---
--- Name: traitsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.traitsxyears;
-
-
---
--- Name: trial_designs; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trial_designs;
-
-
---
--- Name: trial_designsxtrial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trial_designsxtrial_types;
-
-
---
--- Name: trial_designsxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trial_designsxtrials;
-
-
---
--- Name: trial_designsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trial_designsxyears;
-
-
---
--- Name: trial_types; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trial_types;
-
-
---
--- Name: trial_typesxtrials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trial_typesxtrials;
-
-
---
--- Name: trial_typesxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trial_typesxyears;
-
-
---
--- Name: trials; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trials;
-
-
---
--- Name: trialsxgenotyping_projects; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trialsxgenotyping_projects;
-
-
---
--- Name: trialsxyears; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.trialsxyears;
-
-
---
--- Name: years; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: web_usr
---
-
-REFRESH MATERIALIZED VIEW public.years;
 
 
 --

@@ -60,6 +60,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Free up space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          
       - name: Login to Docker Hub
         uses: docker/login-action@v1
         with:
@@ -119,7 +126,7 @@ jobs:
       - name: Checkout sgn branch
         working-directory: ./breedbase_dockerfile/cxgn/sgn
         run: |
-          git checkout -b ${{ steps.extract_branch.outputs.branch }} origin/${{ steps.extract_branch.outputs.branch }}
+          git checkout -B ${{ steps.extract_branch.outputs.branch }} origin/${{ steps.extract_branch.outputs.branch }}
 
       - name: Debug sgn branch
         working-directory: ./breedbase_dockerfile/cxgn/sgn
