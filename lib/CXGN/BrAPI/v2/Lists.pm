@@ -13,6 +13,8 @@ extends 'CXGN::BrAPI::v2::Common';
 sub search {
 	my $self = shift;
 	my $params = shift;
+	my $c = shift;
+	my $brapi_require_login = $c->config->{brapi_lists_require_login};
 
 	my $page_obj = CXGN::Page->new();
     my $hostname = $page_obj->get_hostname();
@@ -25,8 +27,7 @@ sub search {
     my $reference_ids_arrayref = $params->{externalReferenceId} || $params->{externalReferenceID} || ($params->{externalReferenceIds} || $params->{externalReferenceIDs} || ());
     my $reference_sources_arrayref = $params->{externalReferenceSource} || ($params->{externalReferenceSources} || ());
 	my $list_owner_array_refs = $params->{listOwnerPersonDbIds};
-	my $user_id = shift || $list_owner_array_refs->[0];
-	my $brapi_require_login = shift;
+	my $user_id = $params->{user_id} || $list_owner_array_refs->[0];
 
 	my $page_size = $self->page_size;
 	my $page = $self->page;

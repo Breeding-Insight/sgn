@@ -1731,10 +1731,9 @@ sub lists_GET {
 	my $brapi_module = $brapi->brapi_wrapper('Lists');
 	my $brapi_package_result;
 	if($c->config->{brapi_lists_require_login}) {
-		$brapi_package_result = $brapi_module->search($clean_inputs, $user_id, 1);
-	} else {
-		$brapi_package_result = $brapi_module->search($clean_inputs, undef, 0);
+		$clean_inputs->{user_id} = $user_id;
 	}
+	$brapi_package_result = $brapi_module->search($clean_inputs, $c);
 	_standard_response_construction($c, $brapi_package_result);
 }
 
@@ -1820,7 +1819,12 @@ sub list_search_save : Chained('brapi') PathPart('search/lists') Args(0) : Actio
 sub list_search_save_POST {
     my $self = shift;
     my $c = shift;
-    save_results($self,$c,$c->stash->{clean_inputs},'Lists');
+	my ($auth,$user_id) = _authenticate_user($c, $c->config->{brapi_lists_require_login});
+	my $clean_inputs = $c->stash->{clean_inputs};
+	if($c->config->{brapi_lists_require_login}) {
+		$clean_inputs->{user_id} = $user_id;
+	}
+	save_results($self,$c,$clean_inputs,'Lists');
 }
 
 sub list_search_retrieve  : Chained('brapi') PathPart('search/lists') Args(1) {
