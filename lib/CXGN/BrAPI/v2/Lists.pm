@@ -270,6 +270,7 @@ sub store {
 	my $self = shift;
 	my $data = shift;
 	my $user_id = shift;
+	my $c = shift;
 	if (!$user_id){
         return CXGN::BrAPI::JSONResponse->return_error($self->status, sprintf('You must be logged in to add a seedlot!'));
     }
@@ -370,7 +371,8 @@ sub store {
 
 	my $params;
 	$params->{listDbIds} = \@new_lists_ids;
-	return $self->search($params);
+	$params->{user_id} = $user_id;
+	return $self->search($params, $c);
 }
 
 sub update {

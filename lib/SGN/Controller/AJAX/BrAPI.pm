@@ -1749,7 +1749,7 @@ sub lists_POST {
 	}
 	my $brapi = $self->brapi_module;
 	my $brapi_module = $brapi->brapi_wrapper('Lists');
-	my $brapi_package_result = $brapi_module->store(\@all_lists,$user_id);
+	my $brapi_package_result = $brapi_module->store(\@all_lists,$user_id, $c);
 	_standard_response_construction($c, $brapi_package_result);
 }
 
