@@ -89,7 +89,7 @@ jobs:
     if: false #disabled for now, as testing script is broken
     runs-on: ubuntu-latest
     container:
-      image: breedbase/breedbase:v0.80
+      image: breedbase/breedbase:v0.82
       env:
         HOME: /root
         MODE: 'TESTING'

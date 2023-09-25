@@ -3,7 +3,7 @@
 --
 
 -- Dumped from database version 12.7 (Debian 12.7-1.pgdg100+1)
--- Dumped by pg_dump version 12.10 (Debian 12.10-1.pgdg90+1)
+-- Dumped by pg_dump version 12.15 (Debian 12.15-1.pgdg110+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -10552,7 +10552,7 @@ ALTER TABLE public.phenotype OWNER TO postgres;
 CREATE TABLE public.project (
     project_id integer NOT NULL,
     name character varying(255) NOT NULL,
-    description character varying(255) NOT NULL,
+    description text NOT NULL,
     create_date timestamp without time zone DEFAULT now(),
     type_id bigint
 );
@@ -10865,10 +10865,10 @@ UNION
    FROM ((((((((public.stock accession
      JOIN public.stock_relationship ON (((accession.stock_id = stock_relationship.object_id) AND (stock_relationship.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = ANY ((ARRAY['tissue_sample_of'::character varying, 'plant_of'::character varying, 'plot_of'::character varying])::text[])))))))
+          WHERE ((cvterm.name)::text = ANY (ARRAY[('tissue_sample_of'::character varying)::text, ('plant_of'::character varying)::text, ('plot_of'::character varying)::text])))))))
      JOIN public.stock ON (((stock_relationship.subject_id = stock.stock_id) AND (stock.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = ANY ((ARRAY['tissue_sample'::character varying, 'plant'::character varying, 'plot'::character varying])::text[])))))))
+          WHERE ((cvterm.name)::text = ANY (ARRAY[('tissue_sample'::character varying)::text, ('plant'::character varying)::text, ('plot'::character varying)::text])))))))
      JOIN public.cvterm stock_type ON ((stock_type.cvterm_id = stock.type_id)))
      JOIN public.nd_experiment_stock ON ((stock.stock_id = nd_experiment_stock.stock_id)))
      JOIN public.nd_experiment_protocol ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_protocol.nd_experiment_id)))
@@ -15186,6 +15186,16 @@ CREATE MATERIALIZED VIEW public.materialized_stockprop AS
     crosstab.dna_person,
     crosstab.tissue_type,
     crosstab.seedlot_quality,
+    crosstab."SelectionMarker",
+    crosstab."CloningOrganism",
+    crosstab."CassetteName",
+    crosstab."Strain",
+    crosstab."InherentMarker",
+    crosstab."Backbone",
+    crosstab."VectorType",
+    crosstab."Gene",
+    crosstab."Promotors",
+    crosstab."Terminators",
     crosstab.ncbi_taxonomy_id
    FROM sgn.crosstab('SELECT stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id, jsonb_object_agg(stockprop.value, ''RANK'' || stockprop.rank) FROM public.stockprop JOIN public.stock USING(stock_id) JOIN public.cvterm as stock_cvterm ON (stock_cvterm.cvterm_id=stock.type_id) GROUP BY (stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id) ORDER by stockprop.stock_id ASC'::text, 'SELECT type_id FROM (VALUES
     (''76460''),
@@ -15240,7 +15250,17 @@ CREATE MATERIALIZED VIEW public.materialized_stockprop AS
     (''77611''),
     (''77613''),
     (''78169''),
-    (''77614'')) AS t (type_id);'::text) crosstab(stock_id integer, uniquename text, stock_type_id integer, stock_type_name text, organism_id integer, block json, col_number jsonb, igd_synonym jsonb, "is a control" jsonb, location_code jsonb, organization jsonb, plant_index_number jsonb, subplot_index_number jsonb, tissue_sample_index_number jsonb, "plot number" jsonb, plot_geo_json jsonb, range jsonb, replicate jsonb, row_number jsonb, stock_synonym jsonb, "T1" jsonb, "T2" jsonb, transgenic jsonb, variety jsonb, notes jsonb, state jsonb, "accession number" jsonb, "PUI" jsonb, donor jsonb, "donor institute" jsonb, "donor PUI" jsonb, "seed source" jsonb, "institute code" jsonb, "institute name" jsonb, "biological status of accession code" jsonb, "country of origin" jsonb, "type of germplasm storage code" jsonb, "entry number" jsonb, "acquisition date" jsonb, current_count jsonb, current_weight_gram jsonb, crossing_metadata_jsonb jsonb, ploidy_level jsonb, genome_structure jsonb, introgression_parent jsonb, introgression_backcross_parent jsonb, introgression_map_version jsonb, introgression_chromosome jsonb, introgression_start_position_bp jsonb, introgression_end_position_bp jsonb, is_blank jsonb, concentration jsonb, volume jsonb, extraction jsonb, dna_person jsonb, tissue_type jsonb, seedlot_quality jsonb, ncbi_taxonomy_id jsonb)
+    (''78284''),
+    (''78285''),
+    (''78286''),
+    (''78288''),
+    (''78287''),
+    (''78289''),
+    (''78293''),
+    (''78290''),
+    (''78291''),
+    (''78292''),
+    (''77614'')) AS t (type_id);'::text) crosstab(stock_id integer, uniquename text, stock_type_id integer, stock_type_name text, organism_id integer, block json, col_number jsonb, igd_synonym jsonb, "is a control" jsonb, location_code jsonb, organization jsonb, plant_index_number jsonb, subplot_index_number jsonb, tissue_sample_index_number jsonb, "plot number" jsonb, plot_geo_json jsonb, range jsonb, replicate jsonb, row_number jsonb, stock_synonym jsonb, "T1" jsonb, "T2" jsonb, transgenic jsonb, variety jsonb, notes jsonb, state jsonb, "accession number" jsonb, "PUI" jsonb, donor jsonb, "donor institute" jsonb, "donor PUI" jsonb, "seed source" jsonb, "institute code" jsonb, "institute name" jsonb, "biological status of accession code" jsonb, "country of origin" jsonb, "type of germplasm storage code" jsonb, "entry number" jsonb, "acquisition date" jsonb, current_count jsonb, current_weight_gram jsonb, crossing_metadata_jsonb jsonb, ploidy_level jsonb, genome_structure jsonb, introgression_parent jsonb, introgression_backcross_parent jsonb, introgression_map_version jsonb, introgression_chromosome jsonb, introgression_start_position_bp jsonb, introgression_end_position_bp jsonb, is_blank jsonb, concentration jsonb, volume jsonb, extraction jsonb, dna_person jsonb, tissue_type jsonb, seedlot_quality jsonb, "SelectionMarker" jsonb, "CloningOrganism" jsonb, "CassetteName" jsonb, "Strain" jsonb, "InherentMarker" jsonb, "Backbone" jsonb, "VectorType" jsonb, "Gene" jsonb, "Promotors" jsonb, "Terminators" jsonb, ncbi_taxonomy_id jsonb)
   WITH NO DATA;
 
 
@@ -23576,7 +23596,9 @@ CREATE TABLE sgn_people.list (
     description text,
     owner integer,
     type_id bigint,
-    is_public boolean DEFAULT false NOT NULL
+    is_public boolean DEFAULT false NOT NULL,
+    "timestamp" character varying,
+    modify_timestamp character varying
 );
 
 
@@ -29225,6 +29247,21 @@ COPY metadata.md_dbversion (dbversion_id, patch_name, patch_description, metadat
 245	AddFileMetadataJsonCvterm	This patch adds the 'file_metadata_json' project_property cvterm\n	256
 246	FixOutOfSyncNdGeolocations	This patch updates nd_experiment.nd_geolocation_ids that are out of sync with the location specified in linked projectprop.values\n	257
 247	AddProjectTypeId	Add type_id foreign key to the project table as added to the Chado 1.4 release\nhas '+prereq' => (\n    default => sub {\n        [''],\n    },\n  );\n	258
+248	AddTrialStatusCvterm	This patch adds the 'trial_status_json' project_property cvterm\n	259
+249	AlterDescriptionToText	Alters project table description column from varchar(255) to text\nhas '+prereq' => (\n    default => sub {\n        [''],\n    },\n  );\n	260
+250	GenotypeDosageChange	This patch changes calculated dosage from REF to ALT\n	261
+251	AddTimestampFields	Add timestamp fields to sgn_people.list	262
+252	AddSensoryTrialType	Description of this patch goes here\n	263
+253	AddTrialSoilDataCvterm	This patch adds the 'soil_data_json' project_property cvterm\n	264
+254	AddFacilityIdentifierCvterm	This patch adds the 'facility_identifier stock_property cvterm\n	265
+255	AddGenotypingProjectCvterms	Description of this patch goes here\n	266
+256	AddGenomicPredictionStatCvterms	Description of this patch goes here\n	267
+257	AddGenotypingProjectRelatedCvterms	This patch adds the 'folder_for_genotyping_projects' and 'genotyping_project_type' projectprop cvterms\n	268
+258	AddTargetNumbersJsonCvterm	This patch adds the 'target_numbers_json' project_property cvterm\n	269
+259	AddVectorStockProps	This patch will find_or_create a cvterm for vectors\n	270
+260	AddVectorStockPropsToMatviewStockprop	 This patch adds required stock prop types for seedlot quality.	271
+261	AddListAdditionalInfoCvterm	This patch adds the 'list_additional_info stock_property cvterm\n	272
+262	AddPhenotypeExternalReferencesCvterm	This patch adds phenotype_property cvterm for storing external references data for phenotype.\n	273
 \.
 
 
@@ -29546,6 +29583,21 @@ COPY metadata.md_metadata (metadata_id, create_date, create_person_id, modified_
 256	2022-03-09 20:17:25.846525+00	41	\N	\N	\N	\N	0	\N	\N
 257	2022-03-09 20:17:27.300732+00	41	\N	\N	\N	\N	0	\N	\N
 258	2022-03-09 20:17:27.980606+00	41	\N	\N	\N	\N	0	\N	\N
+259	2023-06-30 14:43:04.21707+00	41	\N	\N	\N	\N	0	\N	\N
+260	2023-06-30 14:43:04.451821+00	41	\N	\N	\N	\N	0	\N	\N
+261	2023-06-30 14:43:05.757752+00	41	\N	\N	\N	\N	0	\N	\N
+262	2023-06-30 14:43:05.993801+00	41	\N	\N	\N	\N	0	\N	\N
+263	2023-06-30 14:43:06.324401+00	41	\N	\N	\N	\N	0	\N	\N
+264	2023-06-30 14:43:06.677565+00	41	\N	\N	\N	\N	0	\N	\N
+265	2023-06-30 14:43:07.035888+00	41	\N	\N	\N	\N	0	\N	\N
+266	2023-06-30 14:43:07.39564+00	41	\N	\N	\N	\N	0	\N	\N
+267	2023-06-30 14:43:07.756665+00	41	\N	\N	\N	\N	0	\N	\N
+268	2023-06-30 14:43:08.578488+00	41	\N	\N	\N	\N	0	\N	\N
+269	2023-06-30 14:43:08.930679+00	41	\N	\N	\N	\N	0	\N	\N
+270	2023-06-30 14:43:09.285796+00	41	\N	\N	\N	\N	0	\N	\N
+271	2023-06-30 14:43:09.847818+00	41	\N	\N	\N	\N	0	\N	\N
+272	2023-06-30 14:43:10.302698+00	41	\N	\N	\N	\N	0	\N	\N
+273	2023-06-30 14:43:10.657386+00	41	\N	\N	\N	\N	0	\N	\N
 \.
 
 
@@ -42204,6 +42256,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77229	59	tryptophan	An alpha-amino acid that is alanine bearing an indol-3-yl substituent at position 3.	210818	0	0
 77333	61	hours	Number of hours.	212494	0	0
 77334	61	cu mi	Cubic mile.	212495	0	0
+77584	36	grafted_accession	\N	212745	0	0
 77230	59	fumaric acid	A butenedioic acid in which the C=C double bond has E geometry. It is an intermediate metabolite in the citric acid cycle.	210830	0	0
 77231	59	D-fructose 6-phosphate	A ketohexose monophosphate that is D-fructose having a phospahte substituent at position 6. It is an important intermediate in the carbohydrate metabolism.	210856	0	0
 77232	59	ribulose 5-phosphate	A ribulose phosphate in which the phosphate group is attached at position 5.	210858	0	0
@@ -42536,7 +42589,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77580	46	current_count	\N	212741	0	0
 77582	37	female_plot_of	\N	212743	0	0
 77583	37	male_plot_of	\N	212744	0	0
-77584	36	grafted_accession	\N	212745	0	0
 77585	35	grafting_experiment	\N	212746	0	0
 77586	47	crossing_trial	\N	212747	0	0
 77587	47	grafting_trial	\N	212748	0	0
@@ -42701,6 +42753,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77745	66	observation_unit_polygon_fourier_transform_hpf40_green_denoised_stitched_image_channel_1	\N	212904	0	0
 77746	66	observation_unit_polygon_fourier_transform_hpf20_red_denoised_stitched_image_channel_1	\N	212905	0	0
 77747	66	observation_unit_polygon_fourier_transform_hpf30_red_denoised_stitched_image_channel_1	\N	212906	0	0
+77916	66	calculate_phenotypes_orb_drone_imagery_vari	\N	213075	0	0
 77748	66	observation_unit_polygon_fourier_transform_hpf40_red_denoised_stitched_image_channel_1	\N	212907	0	0
 77749	66	observation_unit_polygon_fourier_transform_hpf20_rededge_denoised_stitched_image_channel_1	\N	212908	0	0
 77750	66	observation_unit_polygon_fourier_transform_hpf30_rededge_denoised_stitched_image_channel_1	\N	212909	0	0
@@ -42869,7 +42922,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77912	66	calculate_phenotypes_sift_drone_imagery_ndvi	\N	213071	0	0
 77913	66	calculate_phenotypes_sift_drone_imagery_ndre	\N	213072	0	0
 77914	66	calculate_phenotypes_orb_drone_imagery	\N	213073	0	0
-77916	66	calculate_phenotypes_orb_drone_imagery_vari	\N	213075	0	0
 77917	66	calculate_phenotypes_orb_drone_imagery_ndvi	\N	213076	0	0
 77918	66	calculate_phenotypes_orb_drone_imagery_ndre	\N	213077	0	0
 77919	66	calculate_phenotypes_surf_drone_imagery	\N	213078	0	0
@@ -42991,6 +43043,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78034	66	calculate_fourier_transform_hpf40_bgr_denoised_background_removed_vari_mask_original_channel_3	\N	213193	0	0
 78035	66	calculate_fourier_transform_hpf20_nrn_denoised_background_removed_ndvi_mask_original_channel_1	\N	213194	0	0
 78036	66	calculate_fourier_transform_hpf30_nrn_denoised_background_removed_ndvi_mask_original_channel_1	\N	213195	0	0
+78238	47	misc_trial	\N	213397	0	0
 78037	66	calculate_fourier_transform_hpf40_nrn_denoised_background_removed_ndvi_mask_original_channel_1	\N	213196	0	0
 78038	66	calculate_fourier_transform_hpf20_nrn_denoised_background_removed_ndvi_mask_original_channel_2	\N	213197	0	0
 78039	66	calculate_fourier_transform_hpf30_nrn_denoised_background_removed_ndvi_mask_original_channel_2	\N	213198	0	0
@@ -43130,6 +43183,8 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78174	68	Multivariate linear mixed model genetic BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using Sommer R	\N	213333	0	0
 78175	68	Multivariate linear mixed model genetic BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on growing degree days computed using Sommer R	\N	213334	0	0
 78176	68	Univariate linear mixed model spatial BLUPs using genetic relationship matrix and separable Ar1xAr1 row and column effect computed using ASReml	\N	213335	0	0
+78236	46	cross_additional_info	\N	213395	0	0
+78237	67	gblup_model_rrblup	\N	213396	0	0
 78177	68	Multivariate linear mixed model permanent environment BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using Sommer R	\N	213336	0	0
 78178	68	Multivariate linear mixed model genetic BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using BLUPf90	\N	213337	0	0
 78179	68	Multivariate linear mixed model permanent environment BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on growing degree days computed using BLUPf90	\N	213338	0	0
@@ -43189,9 +43244,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78233	46	cross_identifier	\N	213392	0	0
 78234	46	cross_transaction_json	\N	213393	0	0
 78235	51	lab_id	\N	213394	0	0
-78236	46	cross_additional_info	\N	213395	0	0
-78237	67	gblup_model_rrblup	\N	213396	0	0
-78238	47	misc_trial	\N	213397	0	0
 78239	67	sequence_metadata_protocol	\N	213398	0	0
 78240	56	sequence_metadata_protocol_properties	\N	213399	0	0
 78241	69	Gene Annotation	Provides sequence features (gene, mRNA, UTR, exon, CDS) and annotations based on alignments of biological evidence.	213400	0	0
@@ -43223,6 +43275,32 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78267	38	project_entry_number_map	\N	213426	0	0
 78268	46	family_type	\N	213427	0	0
 78269	38	file_metadata_json	\N	213428	0	0
+78270	38	trial_status_json	\N	213429	0	0
+78271	47	Sensory Trial	\N	213430	0	0
+78272	38	soil_data_json	\N	213431	0	0
+78273	46	facility_identifier	\N	213432	0	0
+78274	52	genotyping_project_and_plate_relationship	\N	213433	0	0
+78275	47	genotyping_project	\N	213434	0	0
+78276	68	Adjusted means from BLUPs using Sommer R	\N	213435	0	0
+78277	68	Phenotypic BLUPs using Sommer R	\N	213436	0	0
+78278	68	GEBVs using GBLUP from rrblup R package	\N	213437	0	0
+78279	68	Phenotypic BLUEs using Sommer R	\N	213438	0	0
+78280	68	Adjusted means from BLUEs using Sommer R	\N	213439	0	0
+78281	38	folder_for_genotyping_projects	\N	213440	0	0
+78282	38	genotyping_project_type	\N	213441	0	0
+78283	38	target_numbers_json	\N	213442	0	0
+78284	46	SelectionMarker	\N	213443	0	0
+78285	46	CloningOrganism	\N	213444	0	0
+78286	46	CassetteName	\N	213445	0	0
+78287	46	InherentMarker	\N	213446	0	0
+78288	46	Strain	\N	213447	0	0
+78289	46	Backbone	\N	213448	0	0
+78290	46	Gene	\N	213449	0	0
+78291	46	Promotors	\N	213450	0	0
+78292	46	Terminators	\N	213451	0	0
+78293	46	VectorType	\N	213452	0	0
+78294	45	list_additional_info	\N	213453	0	0
+78295	65	phenotype_external_references	\N	213454	0	0
 \.
 
 
@@ -65893,6 +65971,11 @@ COPY public.cvterm_relationship (cvterm_relationship_id, type_id, subject_id, ob
 111026	76849	77557	77547
 111031	76849	77558	77547
 111036	76849	77559	77547
+111079	10	78277	78156
+111080	10	78279	78156
+111081	10	78280	78156
+111082	10	78278	78156
+111083	10	78276	78156
 \.
 
 
@@ -131622,6 +131705,7 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 212893	2	autocreated:observation_unit_polygon_fourier_transform_hpf20_bgr_denoised_stitched_image_channel_3		\N
 212894	2	autocreated:observation_unit_polygon_fourier_transform_hpf30_bgr_denoised_stitched_image_channel_3		\N
 212895	2	autocreated:observation_unit_polygon_fourier_transform_hpf40_bgr_denoised_stitched_image_channel_3		\N
+213431	2	autocreated:soil_data_json		\N
 212896	2	autocreated:observation_unit_polygon_fourier_transform_hpf20_bw_denoised_stitched_image_channel_1		\N
 212897	2	autocreated:observation_unit_polygon_fourier_transform_hpf30_bw_denoised_stitched_image_channel_1		\N
 212898	2	autocreated:observation_unit_polygon_fourier_transform_hpf40_bw_denoised_stitched_image_channel_1		\N
@@ -131908,6 +131992,7 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 213179	2	autocreated:calculate_fourier_transform_hpf20_bgr_denoised_background_removed_tgi_mask_original_channel_2		\N
 213180	2	autocreated:calculate_fourier_transform_hpf30_bgr_denoised_background_removed_tgi_mask_original_channel_2		\N
 213181	2	autocreated:calculate_fourier_transform_hpf40_bgr_denoised_background_removed_tgi_mask_original_channel_2		\N
+213432	2	autocreated:facility_identifier		\N
 213182	2	autocreated:calculate_fourier_transform_hpf20_bgr_denoised_background_removed_tgi_mask_original_channel_3		\N
 213183	2	autocreated:calculate_fourier_transform_hpf30_bgr_denoised_background_removed_tgi_mask_original_channel_3		\N
 213184	2	autocreated:calculate_fourier_transform_hpf40_bgr_denoised_background_removed_tgi_mask_original_channel_3		\N
@@ -132155,6 +132240,30 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 213426	2	autocreated:project_entry_number_map		\N
 213427	2	autocreated:family_type		\N
 213428	2	autocreated:file_metadata_json		\N
+213429	2	autocreated:trial_status_json		\N
+213430	2	autocreated:Sensory Trial		\N
+213433	2	autocreated:genotyping_project_and_plate_relationship		\N
+213434	2	autocreated:genotyping_project		\N
+213435	306	0000039		\N
+213436	306	0000040		\N
+213437	306	0000038		\N
+213438	306	0000042		\N
+213439	306	0000041		\N
+213440	2	autocreated:folder_for_genotyping_projects		\N
+213441	2	autocreated:genotyping_project_type		\N
+213442	2	autocreated:target_numbers_json		\N
+213443	2	autocreated:SelectionMarker		\N
+213444	2	autocreated:CloningOrganism		\N
+213445	2	autocreated:CassetteName		\N
+213446	2	autocreated:InherentMarker		\N
+213447	2	autocreated:Strain		\N
+213448	2	autocreated:Backbone		\N
+213449	2	autocreated:Gene		\N
+213450	2	autocreated:Promotors		\N
+213451	2	autocreated:Terminators		\N
+213452	2	autocreated:VectorType		\N
+213453	2	autocreated:list_additional_info		\N
+213454	2	autocreated:phenotype_external_references		\N
 \.
 
 
@@ -179725,22 +179834,22 @@ COPY sgn_people.forum_topic (forum_topic_id, person_id, topic_name, parent_topic
 -- Data for Name: list; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
 --
 
-COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, type_id, is_public) FROM stdin;
-3	f	\N	test_stocks	\N	41	76451	f
-4	f	\N	test_list	\N	40	76451	f
-5	f	\N	accessions_for_solgs_tests	\N	41	76451	f
-6	f	\N	accessions_for_trial2	\N	41	76451	f
-7	f	\N	selection_acc	\N	41	\N	f
-808	f	\N	johndoe_1_public	\N	40	\N	t
-809	f	\N	janedoe_1_public	\N	41	\N	t
-810	f	\N	johndoe_1_private	\N	40	\N	f
-811	f	\N	janedoe_1_private	\N	41	\N	f
-8	f	\N	trial2 NaCRRI plots	\N	40	76450	f
-9	f	\N	trial2 NaCRRI clones	\N	40	76451	f
-10	f	\N	Trials list	\N	40	76453	f
-11	f	\N	accessions2add	\N	40	76451	f
-12	f	\N	desynonymize_test_list	\N	41	76451	f
-13	f	\N	traits	\N	41	76455	f
+COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, type_id, is_public, "timestamp", modify_timestamp) FROM stdin;
+3	f	\N	test_stocks	\N	41	76451	f	\N	\N
+4	f	\N	test_list	\N	40	76451	f	\N	\N
+5	f	\N	accessions_for_solgs_tests	\N	41	76451	f	\N	\N
+6	f	\N	accessions_for_trial2	\N	41	76451	f	\N	\N
+7	f	\N	selection_acc	\N	41	\N	f	\N	\N
+808	f	\N	johndoe_1_public	\N	40	\N	t	\N	\N
+809	f	\N	janedoe_1_public	\N	41	\N	t	\N	\N
+810	f	\N	johndoe_1_private	\N	40	\N	f	\N	\N
+811	f	\N	janedoe_1_private	\N	41	\N	f	\N	\N
+8	f	\N	trial2 NaCRRI plots	\N	40	76450	f	\N	\N
+9	f	\N	trial2 NaCRRI clones	\N	40	76451	f	\N	\N
+10	f	\N	Trials list	\N	40	76453	f	\N	\N
+11	f	\N	accessions2add	\N	40	76451	f	\N	\N
+12	f	\N	desynonymize_test_list	\N	41	76451	f	\N	\N
+13	f	\N	traits	\N	41	76455	f	\N	\N
 \.
 
 
@@ -182078,7 +182187,7 @@ SELECT pg_catalog.setval('metadata.md_dbiref_dbiref_id_seq', 1, false);
 -- Name: md_dbversion_dbversion_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: postgres
 --
 
-SELECT pg_catalog.setval('metadata.md_dbversion_dbversion_id_seq', 247, true);
+SELECT pg_catalog.setval('metadata.md_dbversion_dbversion_id_seq', 262, true);
 
 
 --
@@ -182134,7 +182243,7 @@ SELECT pg_catalog.setval('metadata.md_json_json_id_seq', 1, false);
 -- Name: md_metadata_metadata_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: postgres
 --
 
-SELECT pg_catalog.setval('metadata.md_metadata_metadata_id_seq', 258, true);
+SELECT pg_catalog.setval('metadata.md_metadata_metadata_id_seq', 273, true);
 
 
 --
@@ -182855,7 +182964,7 @@ SELECT pg_catalog.setval('public.cvprop_cvprop_id_seq', 6, true);
 -- Name: cvterm_cvterm_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cvterm_cvterm_id_seq', 78269, true);
+SELECT pg_catalog.setval('public.cvterm_cvterm_id_seq', 78295, true);
 
 
 --
@@ -182869,7 +182978,7 @@ SELECT pg_catalog.setval('public.cvterm_dbxref_cvterm_dbxref_id_seq', 125383, tr
 -- Name: cvterm_relationship_cvterm_relationship_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cvterm_relationship_cvterm_relationship_id_seq', 111078, true);
+SELECT pg_catalog.setval('public.cvterm_relationship_cvterm_relationship_id_seq', 111083, true);
 
 
 --
@@ -182932,7 +183041,7 @@ SELECT pg_catalog.setval('public.db_db_id_seq', 306, true);
 -- Name: dbxref_dbxref_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.dbxref_dbxref_id_seq', 213428, true);
+SELECT pg_catalog.setval('public.dbxref_dbxref_id_seq', 213454, true);
 
 
 --
