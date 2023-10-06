@@ -24,8 +24,12 @@ sub date_to_iso_timestamp {
 
 sub db_time_to_iso_utc {
     my $db_time = shift;
-    my $new_time = $db_time =~ s/ /T/r;
-    return $new_time."Z";
+    if ($db_time) {
+        my $new_time = $db_time =~ s/ /T/r;
+        return $new_time."Z";
+    }
+
+    return $db_time;
 }
 
 1;
