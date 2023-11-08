@@ -1725,11 +1725,15 @@ sub lists : Chained('brapi') PathPart('lists') Args(0) : ActionClass('REST') { }
 sub lists_GET {
 	my $self = shift;
 	my $c = shift;
-	my ($auth,$user_id) = _authenticate_user($c);
+	my ($auth,$user_id) = _authenticate_user($c, $c->config->{brapi_lists_require_login});
 	my $clean_inputs = $c->stash->{clean_inputs};
 	my $brapi = $self->brapi_module;
 	my $brapi_module = $brapi->brapi_wrapper('Lists');
-	my $brapi_package_result = $brapi_module->search($clean_inputs);
+	my $brapi_package_result;
+	if($c->config->{brapi_lists_require_login}) {
+		$clean_inputs->{user_id} = $user_id;
+	}
+	$brapi_package_result = $brapi_module->search($clean_inputs, $c);
 	_standard_response_construction($c, $brapi_package_result);
 }
 
@@ -1745,7 +1749,7 @@ sub lists_POST {
 	}
 	my $brapi = $self->brapi_module;
 	my $brapi_module = $brapi->brapi_wrapper('Lists');
-	my $brapi_package_result = $brapi_module->store(\@all_lists,$user_id);
+	my $brapi_package_result = $brapi_module->store(\@all_lists,$user_id, $c);
 	_standard_response_construction($c, $brapi_package_result);
 }
 
@@ -1815,7 +1819,12 @@ sub list_search_save : Chained('brapi') PathPart('search/lists') Args(0) : Actio
 sub list_search_save_POST {
     my $self = shift;
     my $c = shift;
-    save_results($self,$c,$c->stash->{clean_inputs},'Lists');
+	my ($auth,$user_id) = _authenticate_user($c, $c->config->{brapi_lists_require_login});
+	my $clean_inputs = $c->stash->{clean_inputs};
+	if($c->config->{brapi_lists_require_login}) {
+		$clean_inputs->{user_id} = $user_id;
+	}
+	save_results($self,$c,$clean_inputs,'Lists');
 }
 
 sub list_search_retrieve  : Chained('brapi') PathPart('search/lists') Args(1) {
@@ -2964,7 +2973,7 @@ sub traits_list_GET {
 	my $brapi_package_result = $brapi_module->list({
         trait_ids => $clean_inputs->{traitDbIds},
         names => $clean_inputs->{names}
-    });
+    }, $c);
 	_standard_response_construction($c, $brapi_package_result);
 }
 
@@ -2988,7 +2997,7 @@ sub trait_detail_GET {
 	my $brapi = $self->brapi_module;
 	my $brapi_module = $brapi->brapi_wrapper('Traits');
 	my $brapi_package_result = $brapi_module->detail(
-		$c->stash->{trait_id}
+		$c->stash->{trait_id}, $c
 	);
 	_standard_response_construction($c, $brapi_package_result);
 }
@@ -3287,7 +3296,6 @@ sub locations_list_POST {
 	my $self = shift;
 	my $c = shift;
 	my ($auth,$user_id) = _authenticate_user($c);
-	my $user_id = undef;
 	my $clean_inputs = $c->stash->{clean_inputs};
 	my $data = $clean_inputs;
 	my @all_locations;
@@ -3975,6 +3983,7 @@ sub observations_POST {
 		observations => \@all_observations,
         user_id => $user_id,
         user_type => $user_type,
+        overwrite => 0,
     },$c);
 
 	my $status = $brapi_package_result->{status};
@@ -4033,6 +4042,7 @@ sub observations_detail_PUT {
 		observations => \@all_observations,
         user_id => $user_id,
         user_type => $user_type,
+        overwrite => 1,
     },$c);
 
 

@@ -95,7 +95,7 @@ sub search {
             limit=>$limit,
             offset=>$offset,
             # Order by plot_number, account for non-numeric plot numbers
-            order_by=>'NULLIF(regexp_replace(plot_number, \'\D\', \'\', \'g\'), \'\')::numeric',
+            order_by=> ($c && $c->config->{brapi_ou_order_plot_num}) ? 'NULLIF(regexp_replace(plot_number, \'\D\', \'\', \'g\'), \'\')::numeric' : undef,
             observation_unit_names_list=>$observation_unit_names_list,
             xref_id_list=>$reference_ids_arrayref,
             xref_source_list=>$reference_sources_arrayref
@@ -297,7 +297,7 @@ sub search {
             id => qq|$obs_unit->{observationunit_stock_id}|
         });
         my $external_references = $references->search();
-        my @formatted_external_references = %{$external_references} ? values %{$external_references} : undef;
+        my @formatted_external_references = %{$external_references} ? values %{$external_references} : [];
 
         my @plot_image_ids;
 			eval {
@@ -405,6 +405,9 @@ sub observationunits_update {
 
     foreach my $params (@$data) {
         my $observation_unit_db_id = $params->{observationUnitDbId} ? $params->{observationUnitDbId} : undef;
+        print "assign observation unit dbid\n";
+        print "$observation_unit_db_id";
+        print"\n";
         my $data_level = $params->{observationUnitLevelName}->[0] || 'all';
         my $years_arrayref = $params->{seasonDbId} ? $params->{seasonDbId} : undef;
         my $location_ids_arrayref = $params->{locationDbId} ? $params->{locationDbId} : undef;
@@ -577,7 +580,7 @@ sub observationunits_update {
         if ($observationUnit_x_ref){
             my $references = CXGN::BrAPI::v2::ExternalReferences->new({
                 bcs_schema => $self->bcs_schema,
-                table_name => 'Stock::StockDbxref',
+                table_name => 'stock',
                 table_id_key => 'stock_id',
                 external_references => $observationUnit_x_ref,
                 id => $observation_unit_db_id
@@ -591,7 +594,7 @@ sub observationunits_update {
     my @observation_unit_db_ids;
     foreach my $params (@$data) { push @observation_unit_db_ids, $params->{observationUnitDbId}; }
     my $search_params = {observationUnitDbIds => \@observation_unit_db_ids };
-    $self->search($search_params, $c);
+    return $self->search($search_params, $c);
 }
 
 sub _get_existing_germplasm {

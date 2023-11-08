@@ -3,22 +3,23 @@
 
 =head1 NAME
 
-AddNdGeolocationDbXref.pm
+ AddVectorStockProps2.pm
 
 =head1 SYNOPSIS
 
-mx-run AddNdGeolocationDbXref [options] -H hostname -D dbname -u username [-F]
+mx-run AddVectorStockProps2 [options] -H hostname -D dbname -u username [-F]
 
 this is a subclass of L<CXGN::Metadata::Dbpatch>
 see the perldoc of parent class for more details.
 
 =head1 DESCRIPTION
 
-This patch creates a nd_geolocation_dbxref table to allow projects to store external references for brapi
+This is a test dummy patch.
+This subclass uses L<Moose>. The parent class uses L<MooseX::Runnable>
 
 =head1 AUTHOR
 
-Chris Tucker
+ Mirella Flores <mrf252@cornell.edu>
 
 =head1 COPYRIGHT & LICENSE
 
@@ -30,18 +31,22 @@ it under the same terms as Perl itself.
 =cut
 
 
-package AddNdGeolocationDbXref;
+package AddVectorStockProps2;
 
 use Moose;
-use Try::Tiny;
 use Bio::Chado::Schema;
-
+use Try::Tiny;
 extends 'CXGN::Metadata::Dbpatch';
 
 
 has '+description' => ( default => <<'' );
-This patch creates a nd_geolocation_dbxref table to allow projects to store external references for brapi
+This patch will find_or_create a cvterm for vectors
 
+has '+prereq' => (
+    default => sub {
+        [],
+    },
+  );
 
 sub patch {
     my $self=shift;
@@ -51,28 +56,28 @@ sub patch {
     print STDOUT "\nChecking if this db_patch was executed before or if previous db_patches have been executed.\n";
 
     print STDOUT "\nExecuting the SQL commands.\n";
+
     my $schema = Bio::Chado::Schema->connect( sub { $self->dbh->clone } );
 
     my $coderef = sub {
-        $self->dbh->do(<<EOSQL);
 
- --do your SQL here
-CREATE TABLE IF NOT EXISTS public.nd_geolocation_dbxref (
-	nd_geolocation_dbxref_id int4,
-	nd_geolocation_id int4,
-	dbxref_id int4,
-	is_current bool
-);
-EOSQL
-
-        return 1;
+        my $vector_stockprop_PlantAntibioticResistantMarker_cvterm = $schema->resultset("Cv::Cvterm")->create_with({
+            name => 'PlantAntibioticResistantMarker', 
+            cv   => 'stock_property',
+        });
+        my $vector_stockprop_BacterialResistantMarker_cvterm = $schema->resultset("Cv::Cvterm")->create_with({
+            name => 'BacterialResistantMarker',
+            cv   => 'stock_property',
+        });
     };
 
     try {
         $schema->txn_do($coderef);
+    
     } catch {
         die "Load failed! " . $_ .  "\n" ;
     };
+
     print "You're done!\n";
 }
 

@@ -13,6 +13,8 @@ extends 'CXGN::BrAPI::v2::Common';
 sub search {
 	my $self = shift;
 	my $params = shift;
+	my $c = shift;
+	my $brapi_require_login = $c->config->{brapi_lists_require_login};
 
 	my $page_obj = CXGN::Page->new();
     my $hostname = $page_obj->get_hostname();
@@ -25,7 +27,7 @@ sub search {
     my $reference_ids_arrayref = $params->{externalReferenceId} || $params->{externalReferenceID} || ($params->{externalReferenceIds} || $params->{externalReferenceIDs} || ());
     my $reference_sources_arrayref = $params->{externalReferenceSource} || ($params->{externalReferenceSources} || ());
 	my $list_owner_array_refs = $params->{listOwnerPersonDbIds};
-	my $user_id = $list_owner_array_refs->[0];
+	my $user_id = $params->{user_id} || $list_owner_array_refs->[0];
 
 	my $page_size = $self->page_size;
 	my $page = $self->page;
@@ -46,7 +48,16 @@ sub search {
 		}
 	}
 
-	$lists = CXGN::List::all_lists($self->bcs_schema()->storage->dbh(),$user_id,$list_type);
+	if($brapi_require_login) {
+		if ($user_id) {
+			$lists = CXGN::List::available_lists($self->bcs_schema()->storage->dbh(), $user_id, $list_type);
+		}
+		else {
+			$lists = CXGN::List::available_public_lists($self->bcs_schema()->storage->dbh(), $list_type);
+		}
+	} else {
+		$lists = CXGN::List::all_lists($self->bcs_schema()->storage->dbh(),$user_id,$list_type);
+	}
 
 	my @list_ids;
 	for (@$lists) {
@@ -259,6 +270,7 @@ sub store {
 	my $self = shift;
 	my $data = shift;
 	my $user_id = shift;
+	my $c = shift;
 	if (!$user_id){
         return CXGN::BrAPI::JSONResponse->return_error($self->status, sprintf('You must be logged in to add a seedlot!'));
     }
@@ -359,7 +371,8 @@ sub store {
 
 	my $params;
 	$params->{listDbIds} = \@new_lists_ids;
-	return $self->search($params);
+	$params->{user_id} = $user_id;
+	return $self->search($params, $c);
 }
 
 sub update {
