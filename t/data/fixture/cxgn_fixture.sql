@@ -3,7 +3,7 @@
 --
 
 -- Dumped from database version 12.7 (Debian 12.7-1.pgdg100+1)
--- Dumped by pg_dump version 12.15 (Debian 12.15-1.pgdg110+1)
+-- Dumped by pg_dump version 12.16 (Debian 12.16-1.pgdg110+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -15197,7 +15197,7 @@ CREATE MATERIALIZED VIEW public.materialized_stockprop AS
     crosstab."Promotors",
     crosstab."Terminators",
     crosstab.ncbi_taxonomy_id
-   FROM sgn.crosstab('SELECT stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id, jsonb_object_agg(stockprop.value, ''RANK'' || stockprop.rank) FROM public.stockprop JOIN public.stock USING(stock_id) JOIN public.cvterm as stock_cvterm ON (stock_cvterm.cvterm_id=stock.type_id) GROUP BY (stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id) ORDER by stockprop.stock_id ASC'::text, 'SELECT type_id FROM (VALUES
+   FROM sgn.crosstab('SELECT stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id, jsonb_object_agg(stockprop.value, stockprop.rank) FROM public.stockprop JOIN public.stock USING(stock_id) JOIN public.cvterm as stock_cvterm ON (stock_cvterm.cvterm_id=stock.type_id) GROUP BY (stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id) ORDER by stockprop.stock_id ASC'::text, 'SELECT type_id FROM (VALUES
     (''76460''),
     (''76517''),
     (''76518''),
@@ -15731,6 +15731,42 @@ ALTER TABLE public.nd_experimentprop_nd_experimentprop_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.nd_experimentprop_nd_experimentprop_id_seq OWNED BY public.nd_experimentprop.nd_experimentprop_id;
+
+
+--
+-- Name: nd_geolocation_dbxref; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.nd_geolocation_dbxref (
+    nd_geolocation_dbxref_id integer NOT NULL,
+    nd_geolocation_id integer NOT NULL,
+    dbxref_id integer,
+    is_current boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE public.nd_geolocation_dbxref OWNER TO postgres;
+
+--
+-- Name: nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq OWNER TO postgres;
+
+--
+-- Name: nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq OWNED BY public.nd_geolocation_dbxref.nd_geolocation_dbxref_id;
 
 
 --
@@ -17283,6 +17319,42 @@ ALTER TABLE public.project_contact_project_contact_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.project_contact_project_contact_id_seq OWNED BY public.project_contact.project_contact_id;
+
+
+--
+-- Name: project_dbxref; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.project_dbxref (
+    project_dbxref_id integer NOT NULL,
+    project_id integer NOT NULL,
+    dbxref_id integer NOT NULL,
+    is_current boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE public.project_dbxref OWNER TO postgres;
+
+--
+-- Name: project_dbxref_project_dbxref_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.project_dbxref_project_dbxref_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.project_dbxref_project_dbxref_id_seq OWNER TO postgres;
+
+--
+-- Name: project_dbxref_project_dbxref_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.project_dbxref_project_dbxref_id_seq OWNED BY public.project_dbxref.project_dbxref_id;
 
 
 --
@@ -23597,12 +23669,48 @@ CREATE TABLE sgn_people.list (
     owner integer,
     type_id bigint,
     is_public boolean DEFAULT false NOT NULL,
-    "timestamp" character varying,
-    modify_timestamp character varying
+    create_date timestamp without time zone DEFAULT now(),
+    modified_date timestamp without time zone DEFAULT now()
 );
 
 
 ALTER TABLE sgn_people.list OWNER TO postgres;
+
+--
+-- Name: list_dbxref; Type: TABLE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE TABLE sgn_people.list_dbxref (
+    list_dbxref_id integer NOT NULL,
+    list_id integer NOT NULL,
+    dbxref_id integer NOT NULL,
+    is_current boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE sgn_people.list_dbxref OWNER TO postgres;
+
+--
+-- Name: list_dbxref_list_dbxref_id_seq; Type: SEQUENCE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE SEQUENCE sgn_people.list_dbxref_list_dbxref_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE sgn_people.list_dbxref_list_dbxref_id_seq OWNER TO postgres;
+
+--
+-- Name: list_dbxref_list_dbxref_id_seq; Type: SEQUENCE OWNED BY; Schema: sgn_people; Owner: postgres
+--
+
+ALTER SEQUENCE sgn_people.list_dbxref_list_dbxref_id_seq OWNED BY sgn_people.list_dbxref.list_dbxref_id;
+
 
 --
 -- Name: list_item; Type: TABLE; Schema: sgn_people; Owner: postgres
@@ -24342,7 +24450,7 @@ ALTER SEQUENCE sgn_people.sp_project_sp_project_id_seq OWNED BY sgn_people.sp_pr
 
 CREATE TABLE sgn_people.sp_roles (
     sp_role_id integer NOT NULL,
-    name character varying(20)
+    name character varying(255)
 );
 
 
@@ -26749,6 +26857,13 @@ ALTER TABLE ONLY public.nd_geolocation ALTER COLUMN nd_geolocation_id SET DEFAUL
 
 
 --
+-- Name: nd_geolocation_dbxref nd_geolocation_dbxref_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.nd_geolocation_dbxref ALTER COLUMN nd_geolocation_dbxref_id SET DEFAULT nextval('public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq'::regclass);
+
+
+--
 -- Name: nd_geolocationprop nd_geolocationprop_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -26949,6 +27064,13 @@ ALTER TABLE ONLY public.project ALTER COLUMN project_id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.project_contact ALTER COLUMN project_contact_id SET DEFAULT nextval('public.project_contact_project_contact_id_seq'::regclass);
+
+
+--
+-- Name: project_dbxref project_dbxref_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref ALTER COLUMN project_dbxref_id SET DEFAULT nextval('public.project_dbxref_project_dbxref_id_seq'::regclass);
 
 
 --
@@ -27971,6 +28093,13 @@ ALTER TABLE ONLY sgn_people.forum_topic ALTER COLUMN forum_topic_id SET DEFAULT 
 --
 
 ALTER TABLE ONLY sgn_people.list ALTER COLUMN list_id SET DEFAULT nextval('sgn_people.list_list_id_seq'::regclass);
+
+
+--
+-- Name: list_dbxref list_dbxref_id; Type: DEFAULT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref ALTER COLUMN list_dbxref_id SET DEFAULT nextval('sgn_people.list_dbxref_list_dbxref_id_seq'::regclass);
 
 
 --
@@ -29262,6 +29391,25 @@ COPY metadata.md_dbversion (dbversion_id, patch_name, patch_description, metadat
 260	AddVectorStockPropsToMatviewStockprop	 This patch adds required stock prop types for seedlot quality.	271
 261	AddListAdditionalInfoCvterm	This patch adds the 'list_additional_info stock_property cvterm\n	272
 262	AddPhenotypeExternalReferencesCvterm	This patch adds phenotype_property cvterm for storing external references data for phenotype.\n	273
+263	AddCascadeDeleteToStockAlleleTable	Adds cascade delete to stock_allele linking table\n	274
+264	AddPHGGenotypingCvterms	This patch adds the 'vcf_phg_genotyping' and 'phg genotyping'  genotype_property cvterms.\n	275
+265	AddVectorStockProps2	This patch will find_or_create a cvterm for vectors\n	276
+266	AddVectorStockPropsToMatviewStockprop2	 This patch adds required stock prop types for vectors.	277
+267	MakeRankNumberStockPropViews	 This patch changes the rank from being stored as a string to being stored as a number.	278
+268	AddTransplantingDateCvterm	Description of this patch goes here\n	279
+269	AddTraitCvterms	This patch will add system cvterms required for storing BrAPI variable data\n	280
+270	AddNdGeolocationDbXref	This patch creates a nd_geolocation_dbxref table to allow projects to store external references for brapi\n	281
+271	AddProjectDbXref	This patch creates a project_dbxref table to allow projects to store external references for brapi\n	282
+272	AddCvtermAdditionalInfo	This patch adds a system cvterm that is used to store additional info for cvterms.\n	283
+273	UpdateProjectDbxrefTablePermissions	This patch adds all permissions for web_usr to the project_dbxref table\n	284
+274	UpdateProjectDbxrefIdSeqPermissions	This patch adds permissions for web_usr for project_dbxref_id_seq\n	285
+275	AddListCreateDate	This patch add create date to list objects\n	286
+276	AddListDbXref	This patch creates a list_dbxref table to allow lists to store external references for brapi\n	287
+277	AddTraitAttributeAndEntityCvterms	This patch will add system cvterms required for storing BrAPI trait entity and attribute data.\n	288
+278	IncreaseCharLimitSgnPeopleSPRoles	This patch will increase the character limit to 255 for the name field of the sgn_people.sp_roles table.\n	289
+279	AlterListTimestampType	This patch modify create/modified date to be timestamp types in the database\n	290
+280	AddPhenotypeStderr	This patch adds phenotype_property cvterm for storing phenotype standard error.\n	291
+281	UpdateListTypeCvterms	This patch changes the cvterms name from genotyping_trials to genotyping_plates and adds crossing_experiments, genotyping_projects list types\n	292
 \.
 
 
@@ -29598,6 +29746,25 @@ COPY metadata.md_metadata (metadata_id, create_date, create_person_id, modified_
 271	2023-06-30 14:43:09.847818+00	41	\N	\N	\N	\N	0	\N	\N
 272	2023-06-30 14:43:10.302698+00	41	\N	\N	\N	\N	0	\N	\N
 273	2023-06-30 14:43:10.657386+00	41	\N	\N	\N	\N	0	\N	\N
+274	2023-10-12 02:25:17.45577+00	41	\N	\N	\N	\N	0	\N	\N
+275	2023-10-12 02:25:17.970584+00	41	\N	\N	\N	\N	0	\N	\N
+276	2023-10-12 02:25:18.523491+00	41	\N	\N	\N	\N	0	\N	\N
+277	2023-10-12 02:25:19.394231+00	41	\N	\N	\N	\N	0	\N	\N
+278	2023-10-12 02:25:20.400082+00	41	\N	\N	\N	\N	0	\N	\N
+279	2023-10-12 02:25:21.10823+00	41	\N	\N	\N	\N	0	\N	\N
+280	2023-10-12 02:25:21.687409+00	41	\N	\N	\N	\N	0	\N	\N
+281	2023-10-12 02:25:22.283202+00	41	\N	\N	\N	\N	0	\N	\N
+282	2023-10-12 02:25:22.844239+00	41	\N	\N	\N	\N	0	\N	\N
+283	2023-10-12 02:25:23.406806+00	41	\N	\N	\N	\N	0	\N	\N
+284	2023-10-12 02:25:23.976199+00	41	\N	\N	\N	\N	0	\N	\N
+285	2023-10-12 02:25:24.514473+00	41	\N	\N	\N	\N	0	\N	\N
+286	2023-10-12 02:25:25.052292+00	41	\N	\N	\N	\N	0	\N	\N
+287	2023-10-12 02:25:25.606742+00	41	\N	\N	\N	\N	0	\N	\N
+288	2023-10-12 02:25:26.193329+00	41	\N	\N	\N	\N	0	\N	\N
+289	2023-10-12 02:25:26.785689+00	41	\N	\N	\N	\N	0	\N	\N
+290	2023-10-12 02:25:27.319444+00	41	\N	\N	\N	\N	0	\N	\N
+291	2023-10-12 02:25:27.875339+00	41	\N	\N	\N	\N	0	\N	\N
+292	2023-10-12 02:25:28.760042+00	41	\N	\N	\N	\N	0	\N	\N
 \.
 
 
@@ -42635,7 +42802,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77627	51	number_of_seedlings_transplanted	\N	212786	0	0
 77628	47	Seed Multiplication	\N	212787	0	0
 77629	47	Screen House	\N	212788	0	0
-77630	45	genotyping_trials	\N	212789	0	0
 77631	52	field_trial_from_field_trial	\N	212790	0	0
 77632	52	genotyping_trial_from_field_trial	\N	212791	0	0
 77633	52	crossing_trial_from_field_trial	\N	212792	0	0
@@ -43301,6 +43467,25 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78293	46	VectorType	\N	213452	0	0
 78294	45	list_additional_info	\N	213453	0	0
 78295	65	phenotype_external_references	\N	213454	0	0
+78296	42	vcf_phg_genotyping	\N	213455	0	0
+78297	42	phg genotyping	\N	213456	0	0
+78298	46	PlantAntibioticResistantMarker	\N	213457	0	0
+78299	46	BacterialResistantMarker	\N	213458	0	0
+78300	38	project_transplanting_date	\N	213459	0	0
+78301	48	trait_method_name	\N	213460	0	0
+78302	48	trait_method_description	\N	213461	0	0
+78303	48	trait_method_class	\N	213462	0	0
+78304	48	trait_method_formula	\N	213463	0	0
+78305	48	trait_decimal_places	\N	213464	0	0
+78306	48	trait_categories_label	\N	213465	0	0
+78307	48	trait_categories_value	\N	213466	0	0
+78308	48	cvterm_additional_info	\N	213467	0	0
+78309	48	trait_entity	\N	213468	0	0
+78310	48	trait_attribute	\N	213469	0	0
+78311	65	phenotype_stderr	\N	213470	0	0
+77630	45	genotyping_plates	\N	212789	0	0
+78312	45	crossing_experiments	\N	213471	0	0
+78313	45	genotyping_projects	\N	213472	0	0
 \.
 
 
@@ -132264,6 +132449,24 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 213452	2	autocreated:VectorType		\N
 213453	2	autocreated:list_additional_info		\N
 213454	2	autocreated:phenotype_external_references		\N
+213455	2	autocreated:vcf_phg_genotyping		\N
+213456	2	autocreated:phg genotyping		\N
+213457	2	autocreated:PlantAntibioticResistantMarker		\N
+213458	2	autocreated:BacterialResistantMarker		\N
+213459	2	autocreated:project_transplanting_date		\N
+213460	2	autocreated:trait_method_name		\N
+213461	2	autocreated:trait_method_description		\N
+213462	2	autocreated:trait_method_class		\N
+213463	2	autocreated:trait_method_formula		\N
+213464	2	autocreated:trait_decimal_places		\N
+213465	2	autocreated:trait_categories_label		\N
+213466	2	autocreated:trait_categories_value		\N
+213467	2	autocreated:cvterm_additional_info		\N
+213468	2	autocreated:trait_entity		\N
+213469	2	autocreated:trait_attribute		\N
+213470	2	autocreated:phenotype_stderr		\N
+213471	2	autocreated:crossing_experiments		\N
+213472	2	autocreated:genotyping_projects		\N
 \.
 
 
@@ -161008,6 +161211,14 @@ COPY public.nd_geolocation (nd_geolocation_id, description, latitude, longitude,
 
 
 --
+-- Data for Name: nd_geolocation_dbxref; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.nd_geolocation_dbxref (nd_geolocation_dbxref_id, nd_geolocation_id, dbxref_id, is_current) FROM stdin;
+\.
+
+
+--
 -- Data for Name: nd_geolocationprop; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -164789,6 +165000,14 @@ COPY public.project (project_id, name, description, create_date, type_id) FROM s
 --
 
 COPY public.project_contact (project_contact_id, project_id, contact_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: project_dbxref; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.project_dbxref (project_dbxref_id, project_id, dbxref_id, is_current) FROM stdin;
 \.
 
 
@@ -179834,22 +180053,30 @@ COPY sgn_people.forum_topic (forum_topic_id, person_id, topic_name, parent_topic
 -- Data for Name: list; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
 --
 
-COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, type_id, is_public, "timestamp", modify_timestamp) FROM stdin;
-3	f	\N	test_stocks	\N	41	76451	f	\N	\N
-4	f	\N	test_list	\N	40	76451	f	\N	\N
-5	f	\N	accessions_for_solgs_tests	\N	41	76451	f	\N	\N
-6	f	\N	accessions_for_trial2	\N	41	76451	f	\N	\N
-7	f	\N	selection_acc	\N	41	\N	f	\N	\N
-808	f	\N	johndoe_1_public	\N	40	\N	t	\N	\N
-809	f	\N	janedoe_1_public	\N	41	\N	t	\N	\N
-810	f	\N	johndoe_1_private	\N	40	\N	f	\N	\N
-811	f	\N	janedoe_1_private	\N	41	\N	f	\N	\N
-8	f	\N	trial2 NaCRRI plots	\N	40	76450	f	\N	\N
-9	f	\N	trial2 NaCRRI clones	\N	40	76451	f	\N	\N
-10	f	\N	Trials list	\N	40	76453	f	\N	\N
-11	f	\N	accessions2add	\N	40	76451	f	\N	\N
-12	f	\N	desynonymize_test_list	\N	41	76451	f	\N	\N
-13	f	\N	traits	\N	41	76455	f	\N	\N
+COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, type_id, is_public, create_date, modified_date) FROM stdin;
+3	f	\N	test_stocks	\N	41	76451	f	2023-10-12 02:25:25.069359	\N
+4	f	\N	test_list	\N	40	76451	f	2023-10-12 02:25:25.069359	\N
+5	f	\N	accessions_for_solgs_tests	\N	41	76451	f	2023-10-12 02:25:25.069359	\N
+6	f	\N	accessions_for_trial2	\N	41	76451	f	2023-10-12 02:25:25.069359	\N
+7	f	\N	selection_acc	\N	41	\N	f	2023-10-12 02:25:25.069359	\N
+808	f	\N	johndoe_1_public	\N	40	\N	t	2023-10-12 02:25:25.069359	\N
+809	f	\N	janedoe_1_public	\N	41	\N	t	2023-10-12 02:25:25.069359	\N
+810	f	\N	johndoe_1_private	\N	40	\N	f	2023-10-12 02:25:25.069359	\N
+811	f	\N	janedoe_1_private	\N	41	\N	f	2023-10-12 02:25:25.069359	\N
+8	f	\N	trial2 NaCRRI plots	\N	40	76450	f	2023-10-12 02:25:25.069359	\N
+9	f	\N	trial2 NaCRRI clones	\N	40	76451	f	2023-10-12 02:25:25.069359	\N
+10	f	\N	Trials list	\N	40	76453	f	2023-10-12 02:25:25.069359	\N
+11	f	\N	accessions2add	\N	40	76451	f	2023-10-12 02:25:25.069359	\N
+12	f	\N	desynonymize_test_list	\N	41	76451	f	2023-10-12 02:25:25.069359	\N
+13	f	\N	traits	\N	41	76455	f	2023-10-12 02:25:25.069359	\N
+\.
+
+
+--
+-- Data for Name: list_dbxref; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
+--
+
+COPY sgn_people.list_dbxref (list_dbxref_id, list_id, dbxref_id, is_current) FROM stdin;
 \.
 
 
@@ -181231,6 +181458,7 @@ COPY sgn_people.sp_clone_il_mapping_segment_log (sp_clone_il_mapping_segment_log
 --
 
 COPY sgn_people.sp_dataset (sp_dataset_id, sp_person_id, name, description, dataset, is_live, is_public) FROM stdin;
+1	41	outliers_test_dataset	\N	{"outliers": ["739147", "739255", "738528", "738171", "738456", "737235", "738768", "739327", "739395", "739907", "738279", "737337", "737811", "738522", "737142", "738765", "739339", "739819", "737340", "737328", "739267", "738819", "737208", "738882", "740195", "737886", "737637", "737556", "738612", "738402", "737229", "737460", "737736", "739163", "737583", "737655", "738459", "737241", "737832"], "categories": {"traits": [70741, 70666, 70773, 70668], "trials": [139, 141]}, "category_order": ["trials", "traits"], "outlier_cutoffs": ["0", "14.899999999999999"]}	\N	\N
 \.
 
 
@@ -181390,6 +181618,7 @@ COPY sgn_people.sp_roles (sp_role_id, name) FROM stdin;
 --
 
 COPY sgn_people.sp_token (sp_token_id, cookie_string, last_access_time, source_ip_address, sp_person_id) FROM stdin;
+1	yvcqiqkhwtkqzzhxutkpfixdgvygpyfgwpwkovfyfuulyqstecuxfciafqndofnygraqdxg	2023-10-12 02:27:13.147402	\N	41
 \.
 
 
@@ -182187,7 +182416,7 @@ SELECT pg_catalog.setval('metadata.md_dbiref_dbiref_id_seq', 1, false);
 -- Name: md_dbversion_dbversion_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: postgres
 --
 
-SELECT pg_catalog.setval('metadata.md_dbversion_dbversion_id_seq', 262, true);
+SELECT pg_catalog.setval('metadata.md_dbversion_dbversion_id_seq', 281, true);
 
 
 --
@@ -182243,7 +182472,7 @@ SELECT pg_catalog.setval('metadata.md_json_json_id_seq', 1, false);
 -- Name: md_metadata_metadata_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: postgres
 --
 
-SELECT pg_catalog.setval('metadata.md_metadata_metadata_id_seq', 273, true);
+SELECT pg_catalog.setval('metadata.md_metadata_metadata_id_seq', 292, true);
 
 
 --
@@ -182964,7 +183193,7 @@ SELECT pg_catalog.setval('public.cvprop_cvprop_id_seq', 6, true);
 -- Name: cvterm_cvterm_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cvterm_cvterm_id_seq', 78295, true);
+SELECT pg_catalog.setval('public.cvterm_cvterm_id_seq', 78313, true);
 
 
 --
@@ -183041,7 +183270,7 @@ SELECT pg_catalog.setval('public.db_db_id_seq', 306, true);
 -- Name: dbxref_dbxref_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.dbxref_dbxref_id_seq', 213454, true);
+SELECT pg_catalog.setval('public.dbxref_dbxref_id_seq', 213472, true);
 
 
 --
@@ -183395,6 +183624,13 @@ SELECT pg_catalog.setval('public.nd_experimentprop_nd_experimentprop_id_seq', 70
 
 
 --
+-- Name: nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq', 1, false);
+
+
+--
 -- Name: nd_geolocation_nd_geolocation_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
@@ -183595,6 +183831,13 @@ SELECT pg_catalog.setval('public.phylotree_pub_phylotree_pub_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('public.project_contact_project_contact_id_seq', 1, false);
+
+
+--
+-- Name: project_dbxref_project_dbxref_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.project_dbxref_project_dbxref_id_seq', 1, false);
 
 
 --
@@ -184627,6 +184870,13 @@ SELECT pg_catalog.setval('sgn_people.forum_topic_forum_topic_id_seq', 4, true);
 
 
 --
+-- Name: list_dbxref_list_dbxref_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
+--
+
+SELECT pg_catalog.setval('sgn_people.list_dbxref_list_dbxref_id_seq', 1, false);
+
+
+--
 -- Name: list_item_list_item_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
@@ -184651,7 +184901,7 @@ SELECT pg_catalog.setval('sgn_people.sp_clone_il_mapping_segment_l_sp_clone_il_m
 -- Name: sp_dataset_sp_dataset_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
-SELECT pg_catalog.setval('sgn_people.sp_dataset_sp_dataset_id_seq', 1, false);
+SELECT pg_catalog.setval('sgn_people.sp_dataset_sp_dataset_id_seq', 1, true);
 
 
 --
@@ -184770,7 +185020,7 @@ SELECT pg_catalog.setval('sgn_people.sp_roles_sp_role_id_seq', 7, true);
 -- Name: sp_token_sp_token_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
-SELECT pg_catalog.setval('sgn_people.sp_token_sp_token_id_seq', 1, false);
+SELECT pg_catalog.setval('sgn_people.sp_token_sp_token_id_seq', 1, true);
 
 
 --
@@ -187668,6 +187918,14 @@ ALTER TABLE ONLY public.nd_experimentprop
 
 
 --
+-- Name: nd_geolocation_dbxref nd_geolocation_dbxref_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.nd_geolocation_dbxref
+    ADD CONSTRAINT nd_geolocation_dbxref_pkey PRIMARY KEY (nd_geolocation_dbxref_id);
+
+
+--
 -- Name: nd_geolocation nd_geolocation_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -188097,6 +188355,22 @@ ALTER TABLE ONLY public.project_contact
 
 ALTER TABLE ONLY public.project_contact
     ADD CONSTRAINT project_contact_pkey PRIMARY KEY (project_contact_id);
+
+
+--
+-- Name: project_dbxref project_dbxref_c1; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref
+    ADD CONSTRAINT project_dbxref_c1 UNIQUE (project_id, dbxref_id);
+
+
+--
+-- Name: project_dbxref project_dbxref_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref
+    ADD CONSTRAINT project_dbxref_pkey PRIMARY KEY (project_dbxref_id);
 
 
 --
@@ -189753,6 +190027,30 @@ ALTER TABLE ONLY sgn_people.forum_post
 
 ALTER TABLE ONLY sgn_people.forum_topic
     ADD CONSTRAINT forum_topic_pkey PRIMARY KEY (forum_topic_id);
+
+
+--
+-- Name: list_dbxref list_dbxref_c1; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref
+    ADD CONSTRAINT list_dbxref_c1 UNIQUE (list_id, dbxref_id);
+
+
+--
+-- Name: list_dbxref list_dbxref_pkey; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref
+    ADD CONSTRAINT list_dbxref_pkey PRIMARY KEY (list_dbxref_id);
+
+
+--
+-- Name: list list_id_unique; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list
+    ADD CONSTRAINT list_id_unique UNIQUE (list_id);
 
 
 --
@@ -192329,6 +192627,20 @@ CREATE INDEX project_contact_idx2 ON public.project_contact USING btree (contact
 
 
 --
+-- Name: project_dbxref_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX project_dbxref_idx1 ON public.project_dbxref USING btree (project_id);
+
+
+--
+-- Name: project_dbxref_idx2; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX project_dbxref_idx2 ON public.project_dbxref USING btree (dbxref_id);
+
+
+--
 -- Name: project_idx1; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -193488,6 +193800,20 @@ CREATE INDEX bac_status_idx ON sgn_people.bac_status USING btree (bac_id, status
 --
 
 CREATE INDEX country_idx ON sgn_people.sp_person USING btree (country);
+
+
+--
+-- Name: list_dbxref_idx1; Type: INDEX; Schema: sgn_people; Owner: postgres
+--
+
+CREATE INDEX list_dbxref_idx1 ON sgn_people.list_dbxref USING btree (list_id);
+
+
+--
+-- Name: list_dbxref_idx2; Type: INDEX; Schema: sgn_people; Owner: postgres
+--
+
+CREATE INDEX list_dbxref_idx2 ON sgn_people.list_dbxref USING btree (dbxref_id);
 
 
 --
@@ -196805,15 +197131,7 @@ ALTER TABLE ONLY phenome.registry
 --
 
 ALTER TABLE ONLY phenome.stock_allele
-    ADD CONSTRAINT stock_allele_allele_id_fkey FOREIGN KEY (allele_id) REFERENCES phenome.allele(allele_id);
-
-
---
--- Name: stock_allele stock_allele_metadata_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
---
-
-ALTER TABLE ONLY phenome.stock_allele
-    ADD CONSTRAINT stock_allele_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id);
+    ADD CONSTRAINT stock_allele_allele_id_fkey FOREIGN KEY (allele_id) REFERENCES phenome.allele(allele_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -196821,7 +197139,7 @@ ALTER TABLE ONLY phenome.stock_allele
 --
 
 ALTER TABLE ONLY phenome.stock_allele
-    ADD CONSTRAINT stock_allele_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id);
+    ADD CONSTRAINT stock_allele_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -196838,6 +197156,14 @@ ALTER TABLE ONLY phenome.stock_image
 
 ALTER TABLE ONLY phenome.stock_image
     ADD CONSTRAINT stock_image_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id);
+
+
+--
+-- Name: stock_allele stock_image_metadata_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.stock_allele
+    ADD CONSTRAINT stock_image_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -197705,6 +198031,22 @@ ALTER TABLE ONLY public.featureprop
 
 
 --
+-- Name: project_dbxref fkey_dbxref_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref
+    ADD CONSTRAINT fkey_dbxref_id FOREIGN KEY (dbxref_id) REFERENCES public.dbxref(dbxref_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: project_dbxref fkey_project_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref
+    ADD CONSTRAINT fkey_project_id FOREIGN KEY (project_id) REFERENCES public.project(project_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
 -- Name: fpc_band fpc_band_fpc_fingerprint_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -197998,6 +198340,22 @@ ALTER TABLE ONLY public.nd_experimentprop
 
 ALTER TABLE ONLY public.nd_experimentprop
     ADD CONSTRAINT nd_experimentprop_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: nd_geolocation_dbxref nd_geolocation_dbxref_dbxref_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.nd_geolocation_dbxref
+    ADD CONSTRAINT nd_geolocation_dbxref_dbxref_id_fkey FOREIGN KEY (dbxref_id) REFERENCES public.dbxref(dbxref_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: nd_geolocation_dbxref nd_geolocation_dbxref_nd_geolocation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.nd_geolocation_dbxref
+    ADD CONSTRAINT nd_geolocation_dbxref_nd_geolocation_id_fkey FOREIGN KEY (nd_geolocation_id) REFERENCES public.nd_geolocation(nd_geolocation_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -200318,6 +200676,22 @@ ALTER TABLE ONLY sgn_people.clone_verification_log
 
 ALTER TABLE ONLY sgn_people.forum_post
     ADD CONSTRAINT forum_topic_id_fk FOREIGN KEY (forum_topic_id) REFERENCES sgn_people.forum_topic(forum_topic_id);
+
+
+--
+-- Name: list_dbxref list_dbxref_dbxref_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref
+    ADD CONSTRAINT list_dbxref_dbxref_id_fkey FOREIGN KEY (dbxref_id) REFERENCES public.dbxref(dbxref_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: list_dbxref list_dbxref_list_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref
+    ADD CONSTRAINT list_dbxref_list_id_fkey FOREIGN KEY (list_id) REFERENCES sgn_people.list(list_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -204866,6 +205240,20 @@ GRANT ALL ON TABLE public.project_contact TO web_usr;
 --
 
 GRANT SELECT,USAGE ON SEQUENCE public.project_contact_project_contact_id_seq TO web_usr;
+
+
+--
+-- Name: TABLE project_dbxref; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.project_dbxref TO web_usr;
+
+
+--
+-- Name: SEQUENCE project_dbxref_project_dbxref_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.project_dbxref_project_dbxref_id_seq TO web_usr;
 
 
 --
