@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.7 (Debian 12.7-1.pgdg100+1)
--- Dumped by pg_dump version 12.14 (Debian 12.14-1.pgdg110+1)
+-- Dumped from database version 12.3 (Debian 12.3-1.pgdg100+1)
+-- Dumped by pg_dump version 12.16 (Debian 12.16-1.pgdg110+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -9209,6 +9209,41 @@ ALTER SEQUENCE phenome.stock_allele_stock_allele_id_seq OWNED BY phenome.stock_a
 
 
 --
+-- Name: stock_file; Type: TABLE; Schema: phenome; Owner: postgres
+--
+
+CREATE TABLE phenome.stock_file (
+    stock_file_id integer NOT NULL,
+    stock_id integer NOT NULL,
+    file_id integer NOT NULL
+);
+
+
+ALTER TABLE phenome.stock_file OWNER TO postgres;
+
+--
+-- Name: stock_file_stock_file_id_seq; Type: SEQUENCE; Schema: phenome; Owner: postgres
+--
+
+CREATE SEQUENCE phenome.stock_file_stock_file_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE phenome.stock_file_stock_file_id_seq OWNER TO postgres;
+
+--
+-- Name: stock_file_stock_file_id_seq; Type: SEQUENCE OWNED BY; Schema: phenome; Owner: postgres
+--
+
+ALTER SEQUENCE phenome.stock_file_stock_file_id_seq OWNED BY phenome.stock_file.stock_file_id;
+
+
+--
 -- Name: stock_image; Type: TABLE; Schema: phenome; Owner: postgres
 --
 
@@ -10692,7 +10727,7 @@ CREATE MATERIALIZED VIEW public.materialized_phenoview AS
           WHERE ((cvterm.name)::text = 'seedlot'::text))))))
      LEFT JOIN public.nd_experiment_stock ON (((stock.stock_id = nd_experiment_stock.stock_id) AND (nd_experiment_stock.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = ANY ((ARRAY['phenotyping_experiment'::character varying, 'field_layout'::character varying, 'analysis_experiment'::character varying])::text[])))))))
+          WHERE ((cvterm.name)::text = ANY (ARRAY[('phenotyping_experiment'::character varying)::text, ('field_layout'::character varying)::text, ('analysis_experiment'::character varying)::text])))))))
      LEFT JOIN public.nd_experiment_project ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_project.nd_experiment_id)))
      FULL JOIN public.project trial ON ((nd_experiment_project.project_id = trial.project_id)))
      LEFT JOIN public.project_relationship ON (((trial.project_id = project_relationship.subject_project_id) AND (project_relationship.type_id = ( SELECT cvterm.cvterm_id
@@ -10865,10 +10900,10 @@ UNION
    FROM ((((((((public.stock accession
      JOIN public.stock_relationship ON (((accession.stock_id = stock_relationship.object_id) AND (stock_relationship.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = ANY ((ARRAY['tissue_sample_of'::character varying, 'plant_of'::character varying, 'plot_of'::character varying])::text[])))))))
+          WHERE ((cvterm.name)::text = ANY (ARRAY[('tissue_sample_of'::character varying)::text, ('plant_of'::character varying)::text, ('plot_of'::character varying)::text])))))))
      JOIN public.stock ON (((stock_relationship.subject_id = stock.stock_id) AND (stock.type_id IN ( SELECT cvterm.cvterm_id
            FROM public.cvterm
-          WHERE ((cvterm.name)::text = ANY ((ARRAY['tissue_sample'::character varying, 'plant'::character varying, 'plot'::character varying])::text[])))))))
+          WHERE ((cvterm.name)::text = ANY (ARRAY[('tissue_sample'::character varying)::text, ('plant'::character varying)::text, ('plot'::character varying)::text])))))))
      JOIN public.cvterm stock_type ON ((stock_type.cvterm_id = stock.type_id)))
      JOIN public.nd_experiment_stock ON ((stock.stock_id = nd_experiment_stock.stock_id)))
      JOIN public.nd_experiment_protocol ON ((nd_experiment_stock.nd_experiment_id = nd_experiment_protocol.nd_experiment_id)))
@@ -15197,7 +15232,7 @@ CREATE MATERIALIZED VIEW public.materialized_stockprop AS
     crosstab."Promotors",
     crosstab."Terminators",
     crosstab.ncbi_taxonomy_id
-   FROM sgn.crosstab('SELECT stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id, jsonb_object_agg(stockprop.value, ''RANK'' || stockprop.rank) FROM public.stockprop JOIN public.stock USING(stock_id) JOIN public.cvterm as stock_cvterm ON (stock_cvterm.cvterm_id=stock.type_id) GROUP BY (stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id) ORDER by stockprop.stock_id ASC'::text, 'SELECT type_id FROM (VALUES
+   FROM sgn.crosstab('SELECT stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id, jsonb_object_agg(stockprop.value, stockprop.rank) FROM public.stockprop JOIN public.stock USING(stock_id) JOIN public.cvterm as stock_cvterm ON (stock_cvterm.cvterm_id=stock.type_id) GROUP BY (stockprop.stock_id, stock.uniquename, stock.type_id, stock_cvterm.name, stock.organism_id, stockprop.type_id) ORDER by stockprop.stock_id ASC'::text, 'SELECT type_id FROM (VALUES
     (''76460''),
     (''76517''),
     (''76518''),
@@ -15250,16 +15285,16 @@ CREATE MATERIALIZED VIEW public.materialized_stockprop AS
     (''77611''),
     (''77613''),
     (''79003''),
-    (''79111''),
-    (''79112''),
     (''79113''),
-    (''79115''),
     (''79114''),
-    (''79116''),
-    (''79120''),
+    (''79115''),
     (''79117''),
+    (''79116''),
     (''79118''),
+    (''79122''),
     (''79119''),
+    (''79120''),
+    (''79121''),
     (''77614'')) AS t (type_id);'::text) crosstab(stock_id integer, uniquename text, stock_type_id integer, stock_type_name text, organism_id integer, block json, col_number jsonb, igd_synonym jsonb, "is a control" jsonb, location_code jsonb, organization jsonb, plant_index_number jsonb, subplot_index_number jsonb, tissue_sample_index_number jsonb, "plot number" jsonb, plot_geo_json jsonb, range jsonb, replicate jsonb, row_number jsonb, stock_synonym jsonb, "T1" jsonb, "T2" jsonb, transgenic jsonb, variety jsonb, notes jsonb, state jsonb, "accession number" jsonb, "PUI" jsonb, donor jsonb, "donor institute" jsonb, "donor PUI" jsonb, "seed source" jsonb, "institute code" jsonb, "institute name" jsonb, "biological status of accession code" jsonb, "country of origin" jsonb, "type of germplasm storage code" jsonb, "entry number" jsonb, "acquisition date" jsonb, current_count jsonb, current_weight_gram jsonb, crossing_metadata_jsonb jsonb, ploidy_level jsonb, genome_structure jsonb, introgression_parent jsonb, introgression_backcross_parent jsonb, introgression_map_version jsonb, introgression_chromosome jsonb, introgression_start_position_bp jsonb, introgression_end_position_bp jsonb, is_blank jsonb, concentration jsonb, volume jsonb, extraction jsonb, dna_person jsonb, tissue_type jsonb, seedlot_quality jsonb, "SelectionMarker" jsonb, "CloningOrganism" jsonb, "CassetteName" jsonb, "Strain" jsonb, "InherentMarker" jsonb, "Backbone" jsonb, "VectorType" jsonb, "Gene" jsonb, "Promotors" jsonb, "Terminators" jsonb, ncbi_taxonomy_id jsonb)
   WITH NO DATA;
 
@@ -15731,6 +15766,42 @@ ALTER TABLE public.nd_experimentprop_nd_experimentprop_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.nd_experimentprop_nd_experimentprop_id_seq OWNED BY public.nd_experimentprop.nd_experimentprop_id;
+
+
+--
+-- Name: nd_geolocation_dbxref; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.nd_geolocation_dbxref (
+    nd_geolocation_dbxref_id integer NOT NULL,
+    nd_geolocation_id integer NOT NULL,
+    dbxref_id integer,
+    is_current boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE public.nd_geolocation_dbxref OWNER TO postgres;
+
+--
+-- Name: nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq OWNER TO postgres;
+
+--
+-- Name: nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq OWNED BY public.nd_geolocation_dbxref.nd_geolocation_dbxref_id;
 
 
 --
@@ -17283,6 +17354,42 @@ ALTER TABLE public.project_contact_project_contact_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.project_contact_project_contact_id_seq OWNED BY public.project_contact.project_contact_id;
+
+
+--
+-- Name: project_dbxref; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.project_dbxref (
+    project_dbxref_id integer NOT NULL,
+    project_id integer NOT NULL,
+    dbxref_id integer NOT NULL,
+    is_current boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE public.project_dbxref OWNER TO postgres;
+
+--
+-- Name: project_dbxref_project_dbxref_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.project_dbxref_project_dbxref_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.project_dbxref_project_dbxref_id_seq OWNER TO postgres;
+
+--
+-- Name: project_dbxref_project_dbxref_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.project_dbxref_project_dbxref_id_seq OWNED BY public.project_dbxref.project_dbxref_id;
 
 
 --
@@ -23597,12 +23704,48 @@ CREATE TABLE sgn_people.list (
     owner integer,
     type_id bigint,
     is_public boolean DEFAULT false NOT NULL,
-    "timestamp" character varying,
-    modify_timestamp character varying
+    create_date timestamp without time zone DEFAULT now(),
+    modified_date timestamp without time zone DEFAULT now()
 );
 
 
 ALTER TABLE sgn_people.list OWNER TO postgres;
+
+--
+-- Name: list_dbxref; Type: TABLE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE TABLE sgn_people.list_dbxref (
+    list_dbxref_id integer NOT NULL,
+    list_id integer NOT NULL,
+    dbxref_id integer NOT NULL,
+    is_current boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE sgn_people.list_dbxref OWNER TO postgres;
+
+--
+-- Name: list_dbxref_list_dbxref_id_seq; Type: SEQUENCE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE SEQUENCE sgn_people.list_dbxref_list_dbxref_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE sgn_people.list_dbxref_list_dbxref_id_seq OWNER TO postgres;
+
+--
+-- Name: list_dbxref_list_dbxref_id_seq; Type: SEQUENCE OWNED BY; Schema: sgn_people; Owner: postgres
+--
+
+ALTER SEQUENCE sgn_people.list_dbxref_list_dbxref_id_seq OWNED BY sgn_people.list_dbxref.list_dbxref_id;
+
 
 --
 -- Name: list_item; Type: TABLE; Schema: sgn_people; Owner: postgres
@@ -23657,6 +23800,43 @@ ALTER TABLE sgn_people.list_list_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE sgn_people.list_list_id_seq OWNED BY sgn_people.list.list_id;
+
+
+--
+-- Name: listprop; Type: TABLE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE TABLE sgn_people.listprop (
+    listprop_id integer NOT NULL,
+    list_id integer,
+    type_id integer,
+    value text,
+    rank integer DEFAULT 0 NOT NULL
+);
+
+
+ALTER TABLE sgn_people.listprop OWNER TO postgres;
+
+--
+-- Name: listprop_listprop_id_seq; Type: SEQUENCE; Schema: sgn_people; Owner: postgres
+--
+
+CREATE SEQUENCE sgn_people.listprop_listprop_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE sgn_people.listprop_listprop_id_seq OWNER TO postgres;
+
+--
+-- Name: listprop_listprop_id_seq; Type: SEQUENCE OWNED BY; Schema: sgn_people; Owner: postgres
+--
+
+ALTER SEQUENCE sgn_people.listprop_listprop_id_seq OWNED BY sgn_people.listprop.listprop_id;
 
 
 --
@@ -24342,7 +24522,7 @@ ALTER SEQUENCE sgn_people.sp_project_sp_project_id_seq OWNED BY sgn_people.sp_pr
 
 CREATE TABLE sgn_people.sp_roles (
     sp_role_id integer NOT NULL,
-    name character varying(20)
+    name character varying(255)
 );
 
 
@@ -26021,6 +26201,13 @@ ALTER TABLE ONLY phenome.stock_allele ALTER COLUMN stock_allele_id SET DEFAULT n
 
 
 --
+-- Name: stock_file stock_file_id; Type: DEFAULT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.stock_file ALTER COLUMN stock_file_id SET DEFAULT nextval('phenome.stock_file_stock_file_id_seq'::regclass);
+
+
+--
 -- Name: stock_image stock_image_id; Type: DEFAULT; Schema: phenome; Owner: postgres
 --
 
@@ -26749,6 +26936,13 @@ ALTER TABLE ONLY public.nd_geolocation ALTER COLUMN nd_geolocation_id SET DEFAUL
 
 
 --
+-- Name: nd_geolocation_dbxref nd_geolocation_dbxref_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.nd_geolocation_dbxref ALTER COLUMN nd_geolocation_dbxref_id SET DEFAULT nextval('public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq'::regclass);
+
+
+--
 -- Name: nd_geolocationprop nd_geolocationprop_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -26949,6 +27143,13 @@ ALTER TABLE ONLY public.project ALTER COLUMN project_id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.project_contact ALTER COLUMN project_contact_id SET DEFAULT nextval('public.project_contact_project_contact_id_seq'::regclass);
+
+
+--
+-- Name: project_dbxref project_dbxref_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref ALTER COLUMN project_dbxref_id SET DEFAULT nextval('public.project_dbxref_project_dbxref_id_seq'::regclass);
 
 
 --
@@ -27974,10 +28175,24 @@ ALTER TABLE ONLY sgn_people.list ALTER COLUMN list_id SET DEFAULT nextval('sgn_p
 
 
 --
+-- Name: list_dbxref list_dbxref_id; Type: DEFAULT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref ALTER COLUMN list_dbxref_id SET DEFAULT nextval('sgn_people.list_dbxref_list_dbxref_id_seq'::regclass);
+
+
+--
 -- Name: list_item list_item_id; Type: DEFAULT; Schema: sgn_people; Owner: postgres
 --
 
 ALTER TABLE ONLY sgn_people.list_item ALTER COLUMN list_item_id SET DEFAULT nextval('sgn_people.list_item_list_item_id_seq'::regclass);
+
+
+--
+-- Name: listprop listprop_id; Type: DEFAULT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.listprop ALTER COLUMN listprop_id SET DEFAULT nextval('sgn_people.listprop_listprop_id_seq'::regclass);
 
 
 --
@@ -29258,11 +29473,34 @@ COPY metadata.md_dbversion (dbversion_id, patch_name, patch_description, metadat
 256	AddFacilityIdentifierCvterm	This patch adds the 'facility_identifier stock_property cvterm\n	269
 257	AddGenotypingProjectCvterms	Description of this patch goes here\n	270
 258	AddGenomicPredictionStatCvterms	Description of this patch goes here\n	271
-259	AddTargetNumbersJsonCvterm	This patch adds the 'target_numbers_json' project_property cvterm\n	272
-260	AddVectorStockProps	This patch will find_or_create a cvterm for vectors\n	273
-261	AddVectorStockPropsToMatviewStockprop	 This patch adds required stock prop types for seedlot quality.	274
-262	AddListAdditionalInfoCvterm	This patch adds the 'list_additional_info stock_property cvterm\n	275
-263	AddPhenotypeExternalReferencesCvterm	This patch adds phenotype_property cvterm for storing external references data for phenotype.\n	276
+259	AddGenotypingProjectRelatedCvterms	This patch adds the 'folder_for_genotyping_projects' and 'genotyping_project_type' projectprop cvterms\n	272
+260	AddTargetNumbersJsonCvterm	This patch adds the 'target_numbers_json' project_property cvterm\n	273
+261	AddVectorStockProps	This patch will find_or_create a cvterm for vectors\n	274
+262	AddVectorStockPropsToMatviewStockprop	 This patch adds required stock prop types for seedlot quality.	275
+263	AddListAdditionalInfoCvterm	This patch adds the 'list_additional_info stock_property cvterm\n	276
+264	AddPhenotypeExternalReferencesCvterm	This patch adds phenotype_property cvterm for storing external references data for phenotype.\n	277
+265	AddCascadeDeleteToStockAlleleTable	Adds cascade delete to stock_allele linking table\n	278
+266	AddPHGGenotypingCvterms	This patch adds the 'vcf_phg_genotyping' and 'phg genotyping'  genotype_property cvterms.\n	279
+267	AddVectorStockProps2	This patch will find_or_create a cvterm for vectors\n	280
+268	AddVectorStockPropsToMatviewStockprop2	 This patch adds required stock prop types for vectors.	281
+269	MakeRankNumberStockPropViews	 This patch changes the rank from being stored as a string to being stored as a number.	282
+270	AddTransplantingDateCvterm	Description of this patch goes here\n	283
+271	AddTraitCvterms	This patch will add system cvterms required for storing BrAPI variable data\n	284
+272	AddNdGeolocationDbXref	This patch creates a nd_geolocation_dbxref table to allow projects to store external references for brapi\n	285
+273	AddProjectDbXref	This patch creates a project_dbxref table to allow projects to store external references for brapi\n	286
+274	AddCvtermAdditionalInfo	This patch adds a system cvterm that is used to store additional info for cvterms.\n	287
+275	UpdateProjectDbxrefTablePermissions	This patch adds all permissions for web_usr to the project_dbxref table\n	288
+276	UpdateProjectDbxrefIdSeqPermissions	This patch adds permissions for web_usr for project_dbxref_id_seq\n	289
+277	AddListCreateDate	This patch add create date to list objects\n	290
+278	AddListDbXref	This patch creates a list_dbxref table to allow lists to store external references for brapi\n	291
+279	AddTraitAttributeAndEntityCvterms	This patch will add system cvterms required for storing BrAPI trait entity and attribute data.\n	292
+280	IncreaseCharLimitSgnPeopleSPRoles	This patch will increase the character limit to 255 for the name field of the sgn_people.sp_roles table.\n	293
+281	AlterListTimestampType	This patch modify create/modified date to be timestamp types in the database\n	294
+282	AddPhenotypeStderr	This patch adds phenotype_property cvterm for storing phenotype standard error.\n	295
+283	UpdateListTypeCvterms	This patch changes the cvterms name from genotyping_trials to genotyping_plates and adds crossing_experiments, genotyping_projects list types\n	296
+284	AddFilesStockLinkingTable	Adds the linking table between files and stock to Phenome\n	297
+285	AddCvtermForListprop	This patch creates cv term for  listprop table to allow\n	298
+286	AddListpropTable	This patch creates a listprop table to allow lists to store additional info for brapi\n	299
 \.
 
 
@@ -29328,280 +29566,303 @@ COPY metadata.md_json (json_id, json_type, json) FROM stdin;
 --
 
 COPY metadata.md_metadata (metadata_id, create_date, create_person_id, modified_date, modified_person_id, modification_note, previous_metadata_id, obsolete, obsolete_note, permission_id) FROM stdin;
-216	2023-03-16 23:54:13.240995+00	41	\N	\N	\N	\N	0	\N	\N
-219	2023-03-16 23:54:17.890869+00	41	\N	\N	\N	\N	0	\N	\N
-222	2023-03-16 23:54:22.40001+00	41	\N	\N	\N	\N	0	\N	\N
-225	2023-03-16 23:54:25.948304+00	41	\N	\N	\N	\N	0	\N	\N
-228	2023-03-16 23:54:29.112524+00	41	\N	\N	\N	\N	0	\N	\N
-231	2023-03-16 23:54:32.270246+00	41	\N	\N	\N	\N	0	\N	\N
-234	2023-03-16 23:54:35.860622+00	41	\N	\N	\N	\N	0	\N	\N
-237	2023-03-16 23:54:38.542045+00	41	\N	\N	\N	\N	0	\N	\N
-240	2023-03-16 23:54:41.884722+00	41	\N	\N	\N	\N	0	\N	\N
-243	2023-03-16 23:54:45.345668+00	41	\N	\N	\N	\N	0	\N	\N
-246	2023-03-16 23:54:49.101723+00	41	\N	\N	\N	\N	0	\N	\N
-249	2023-03-16 23:54:51.653193+00	41	\N	\N	\N	\N	0	\N	\N
-252	2023-03-16 23:54:54.883837+00	41	\N	\N	\N	\N	0	\N	\N
-255	2023-03-16 23:54:59.833435+00	41	\N	\N	\N	\N	0	\N	\N
-258	2023-03-16 23:55:04.77599+00	41	\N	\N	\N	\N	0	\N	\N
-261	2023-03-16 23:55:09.270928+00	41	\N	\N	\N	\N	0	\N	\N
-264	2023-03-16 23:55:18.572545+00	41	\N	\N	\N	\N	0	\N	\N
-267	2023-03-16 23:55:22.312522+00	41	\N	\N	\N	\N	0	\N	\N
-270	2023-03-16 23:55:25.832704+00	41	\N	\N	\N	\N	0	\N	\N
-273	2023-03-16 23:55:30.177299+00	41	\N	\N	\N	\N	0	\N	\N
-276	2023-03-16 23:55:34.746446+00	41	\N	\N	\N	\N	0	\N	\N
-217	2023-03-16 23:54:14.543178+00	41	\N	\N	\N	\N	0	\N	\N
-220	2023-03-16 23:54:18.670938+00	41	\N	\N	\N	\N	0	\N	\N
-223	2023-03-16 23:54:23.609743+00	41	\N	\N	\N	\N	0	\N	\N
-226	2023-03-16 23:54:27.165385+00	41	\N	\N	\N	\N	0	\N	\N
-229	2023-03-16 23:54:30.303194+00	41	\N	\N	\N	\N	0	\N	\N
-232	2023-03-16 23:54:33.494153+00	41	\N	\N	\N	\N	0	\N	\N
-235	2023-03-16 23:54:36.637964+00	41	\N	\N	\N	\N	0	\N	\N
-238	2023-03-16 23:54:39.212095+00	41	\N	\N	\N	\N	0	\N	\N
-241	2023-03-16 23:54:43.061082+00	41	\N	\N	\N	\N	0	\N	\N
-244	2023-03-16 23:54:46.476214+00	41	\N	\N	\N	\N	0	\N	\N
-247	2023-03-16 23:54:50.226733+00	41	\N	\N	\N	\N	0	\N	\N
-250	2023-03-16 23:54:52.458014+00	41	\N	\N	\N	\N	0	\N	\N
-253	2023-03-16 23:54:56.07527+00	41	\N	\N	\N	\N	0	\N	\N
-256	2023-03-16 23:55:01.731235+00	41	\N	\N	\N	\N	0	\N	\N
-259	2023-03-16 23:55:06.630811+00	41	\N	\N	\N	\N	0	\N	\N
-262	2023-03-16 23:55:10.422583+00	41	\N	\N	\N	\N	0	\N	\N
-265	2023-03-16 23:55:20.400031+00	41	\N	\N	\N	\N	0	\N	\N
-268	2023-03-16 23:55:23.485046+00	41	\N	\N	\N	\N	0	\N	\N
-271	2023-03-16 23:55:27.04597+00	41	\N	\N	\N	\N	0	\N	\N
-274	2023-03-16 23:55:32.15323+00	41	\N	\N	\N	\N	0	\N	\N
-17	2014-01-03 17:44:29.059282+00	41	\N	41	\N	\N	0	\N	\N
-18	2014-01-03 22:13:32.335503+00	41	\N	41	\N	\N	1	\N	\N
-29	2015-02-04 20:06:40.169408+00	41	\N	41	\N	\N	0	\N	\N
-30	2015-02-06 16:07:45.355755+00	41	\N	41	\N	\N	0	\N	\N
-31	2015-02-06 20:07:38.136354+00	41	\N	41	\N	\N	0	\N	\N
-1	2011-12-20 17:58:26.736933+00	41	\N	41	\N	\N	0	\N	\N
-2	2011-12-20 17:59:02.671505+00	41	\N	41	\N	\N	0	\N	\N
-3	2011-12-20 17:59:19.844545+00	41	\N	41	\N	\N	0	\N	\N
-4	2012-01-19 20:46:35.153106+00	41	\N	41	\N	\N	0	\N	\N
-5	2012-01-23 17:25:06.637079+00	41	\N	41	\N	\N	0	\N	\N
-6	2012-06-28 20:34:36.265863+00	41	\N	41	\N	\N	0	\N	\N
-7	2012-06-28 20:35:00.551065+00	41	\N	41	\N	\N	0	\N	\N
-8	2012-06-28 20:36:04.901638+00	41	\N	41	\N	\N	0	\N	\N
-9	2012-06-28 20:36:30.035938+00	41	\N	41	\N	\N	0	\N	\N
-12	2013-10-09 14:47:20.320423+00	41	\N	41	\N	\N	0	\N	\N
-13	2013-10-09 14:49:37.243178+00	41	\N	41	\N	\N	0	\N	\N
-14	2013-10-09 14:49:49.683672+00	41	\N	41	\N	\N	0	\N	\N
-15	2013-10-09 14:50:09.982246+00	41	\N	41	\N	\N	0	\N	\N
-16	2013-10-09 14:50:46.875676+00	41	\N	41	\N	\N	0	\N	\N
-19	2014-01-10 23:11:16.337745+00	41	\N	41	\N	\N	0	\N	\N
-20	2014-02-13 00:42:52.573584+00	41	\N	41	\N	\N	0	\N	\N
-21	2014-12-19 14:12:05.270521+00	41	\N	41	\N	\N	0	\N	\N
-22	2014-12-19 14:14:21.150006+00	41	\N	41	\N	\N	0	\N	\N
-23	2014-12-19 14:14:53.610443+00	41	\N	41	\N	\N	0	\N	\N
-24	2014-12-19 14:15:25.567852+00	41	\N	41	\N	\N	0	\N	\N
-25	2014-12-19 14:16:05.753633+00	41	\N	41	\N	\N	0	\N	\N
-26	2014-12-19 14:16:25.843792+00	41	\N	41	\N	\N	0	\N	\N
-27	2014-12-19 14:26:02.50047+00	41	\N	41	\N	\N	0	\N	\N
-28	2014-12-19 21:22:22.583344+00	41	\N	41	\N	\N	0	\N	\N
-32	2015-06-02 12:16:04.529974+00	41	\N	41	\N	\N	0	\N	\N
-33	2016-02-04 18:58:52.339025+00	41	\N	41	\N	\N	0	\N	\N
-34	2016-02-04 18:59:53.76135+00	41	\N	41	\N	\N	0	\N	\N
-35	2016-02-04 19:00:26.992463+00	41	\N	41	\N	\N	0	\N	\N
-36	2016-02-04 19:00:53.818881+00	41	\N	41	\N	\N	0	\N	\N
-37	2016-02-17 20:34:04.967354+00	41	\N	41	\N	\N	0	\N	\N
-38	2016-02-25 21:29:32.465167+00	41	\N	41	\N	\N	0	\N	\N
-39	2016-03-07 17:28:59.083711+00	41	\N	41	\N	\N	0	\N	\N
-40	2016-03-07 17:29:05.349106+00	41	\N	41	\N	\N	0	\N	\N
-41	2016-03-07 17:30:33.01634+00	41	\N	41	\N	\N	0	\N	\N
-42	2016-03-07 17:30:48.618187+00	41	\N	41	\N	\N	0	\N	\N
-43	2016-03-07 17:30:59.870503+00	41	\N	41	\N	\N	0	\N	\N
-44	2016-03-08 02:08:23.919972+00	41	\N	41	\N	\N	0	\N	\N
-45	2016-03-08 03:35:28.565872+00	41	\N	41	\N	\N	0	\N	\N
-46	2016-05-09 17:54:13.75916+00	41	\N	41	\N	\N	0	\N	\N
-47	2016-05-09 21:49:25.421545+00	41	\N	41	\N	\N	0	\N	\N
-48	2016-05-12 21:14:24.101559+00	41	\N	41	\N	\N	0	\N	\N
-49	2016-08-02 16:57:34.432201+00	41	\N	41	\N	\N	0	\N	\N
-50	2016-08-02 16:57:57.411613+00	41	\N	41	\N	\N	0	\N	\N
-51	2016-08-04 15:35:21.249132+00	41	\N	41	\N	\N	0	\N	\N
-52	2016-10-12 17:29:59.74206+00	41	\N	41	\N	\N	0	\N	\N
-53	2016-10-17 17:51:17.740278+00	41	\N	41	\N	\N	0	\N	\N
-54	2016-11-11 14:47:39.732402+00	41	\N	41	\N	\N	0	\N	\N
-55	2017-01-04 15:25:47.878796+00	41	\N	41	\N	\N	0	\N	\N
-56	2017-02-20 21:54:13.041208+00	41	\N	41	\N	\N	0	\N	\N
-57	2017-03-28 18:48:59.237899+00	41	\N	41	\N	\N	0	\N	\N
-58	2017-04-21 20:38:42.140825+00	41	\N	41	\N	\N	0	\N	\N
-59	2017-04-21 20:38:47.264129+00	41	\N	41	\N	\N	0	\N	\N
-60	2017-04-21 20:40:28.934828+00	41	\N	41	\N	\N	0	\N	\N
-61	2017-04-21 20:40:54.719142+00	41	\N	41	\N	\N	0	\N	\N
-62	2017-04-21 21:12:02.017627+00	41	\N	41	\N	\N	0	\N	\N
-63	2017-05-08 16:12:57.002519+00	41	\N	41	\N	\N	0	\N	\N
-64	2017-05-31 14:08:18.88001+00	41	\N	41	\N	\N	0	\N	\N
-65	2017-06-08 16:11:32.805234+00	41	\N	41	\N	\N	0	\N	\N
-66	2017-06-08 16:53:22.864556+00	41	\N	41	\N	\N	0	\N	\N
-67	2017-06-30 13:41:36.162383+00	41	\N	41	\N	\N	0	\N	\N
-68	2017-06-30 13:41:47.39034+00	41	\N	41	\N	\N	0	\N	\N
-69	2017-07-17 17:31:42.837473+00	41	\N	41	\N	\N	0	\N	\N
-70	2017-07-27 19:09:24.635054+00	41	\N	41	\N	\N	0	\N	\N
-71	2017-07-27 19:09:56.99407+00	41	\N	41	\N	\N	0	\N	\N
-72	2017-08-16 18:07:04.409576+00	41	\N	41	\N	\N	0	\N	\N
-73	2017-08-16 18:07:17.022312+00	41	\N	41	\N	\N	0	\N	\N
-74	2017-08-16 18:07:38.778388+00	41	\N	41	\N	\N	0	\N	\N
-75	2017-09-01 17:08:01.703879+00	41	\N	41	\N	\N	0	\N	\N
-76	2017-09-18 15:42:28.250977+00	41	\N	41	\N	\N	0	\N	\N
-77	2017-09-18 15:43:58.719398+00	41	\N	41	\N	\N	0	\N	\N
-78	2017-10-10 15:10:41.4496+00	41	\N	41	\N	\N	0	\N	\N
-79	2017-10-10 15:10:52.863376+00	41	\N	41	\N	\N	0	\N	\N
-80	2017-10-10 15:11:22.791118+00	41	\N	41	\N	\N	0	\N	\N
-81	2017-10-10 15:13:14.819036+00	41	\N	41	\N	\N	0	\N	\N
-82	2017-10-10 15:13:30.873535+00	41	\N	41	\N	\N	0	\N	\N
-83	2017-10-10 15:17:59.09749+00	41	\N	41	\N	\N	0	\N	\N
-84	2017-10-10 18:46:10.177605+00	41	\N	41	\N	\N	0	\N	\N
-85	2017-10-28 09:27:19.914912+00	41	\N	41	\N	\N	0	\N	\N
-86	2017-10-28 09:27:31.016472+00	41	\N	41	\N	\N	0	\N	\N
-87	2018-03-15 18:22:23.716655+00	41	\N	41	\N	\N	0	\N	\N
-88	2018-03-15 18:22:38.694441+00	41	\N	41	\N	\N	0	\N	\N
-89	2018-03-15 18:22:50.086659+00	41	\N	41	\N	\N	0	\N	\N
-90	2018-03-15 18:23:18.356881+00	41	\N	41	\N	\N	0	\N	\N
-91	2018-03-15 18:23:27.198638+00	41	\N	41	\N	\N	0	\N	\N
-92	2018-03-15 18:23:42.849766+00	41	\N	41	\N	\N	0	\N	\N
-93	2018-03-15 18:23:53.182309+00	41	\N	41	\N	\N	0	\N	\N
-94	2018-03-15 18:24:08.119533+00	41	\N	41	\N	\N	0	\N	\N
-95	2018-03-15 18:24:20.893402+00	41	\N	41	\N	\N	0	\N	\N
-96	2018-03-15 18:24:30.449553+00	41	\N	41	\N	\N	0	\N	\N
-97	2018-03-15 18:24:48.650789+00	41	\N	41	\N	\N	0	\N	\N
-98	2018-03-15 18:25:52.818933+00	41	\N	41	\N	\N	0	\N	\N
-99	2018-03-15 18:27:22.075265+00	41	\N	41	\N	\N	0	\N	\N
-100	2018-03-15 18:27:31.137628+00	41	\N	41	\N	\N	0	\N	\N
-101	2018-03-15 18:27:34.05858+00	41	\N	41	\N	\N	0	\N	\N
-102	2018-03-15 18:27:35.098042+00	41	\N	41	\N	\N	0	\N	\N
-103	2018-03-15 18:27:36.863938+00	41	\N	41	\N	\N	0	\N	\N
-104	2018-03-15 18:27:44.327055+00	41	\N	41	\N	\N	0	\N	\N
-105	2018-03-15 18:27:47.338533+00	41	\N	41	\N	\N	0	\N	\N
-106	2018-03-15 18:27:50.954148+00	41	\N	41	\N	\N	0	\N	\N
-107	2018-03-15 18:27:54.330223+00	41	\N	41	\N	\N	0	\N	\N
-108	2018-03-15 18:28:04.11018+00	41	\N	41	\N	\N	0	\N	\N
-109	2018-03-15 18:28:07.980957+00	41	\N	41	\N	\N	0	\N	\N
-110	2018-03-15 18:28:09.301863+00	41	\N	41	\N	\N	0	\N	\N
-111	2018-03-15 18:28:10.524295+00	41	\N	41	\N	\N	0	\N	\N
-112	2018-03-15 18:28:12.704359+00	41	\N	41	\N	\N	0	\N	\N
-113	2018-03-15 18:28:14.967406+00	41	\N	41	\N	\N	0	\N	\N
-114	2018-03-15 18:28:17.296695+00	41	\N	41	\N	\N	0	\N	\N
-115	2018-03-15 18:28:19.55644+00	41	\N	41	\N	\N	0	\N	\N
-116	2018-03-15 18:33:22.456325+00	41	\N	41	\N	\N	0	\N	\N
-117	2018-03-15 18:34:21.334624+00	41	\N	41	\N	\N	0	\N	\N
-118	2018-03-15 18:35:12.538822+00	41	\N	41	\N	\N	0	\N	\N
-119	2018-03-15 18:36:00.770895+00	41	\N	41	\N	\N	0	\N	\N
-120	2018-03-15 18:36:49.307398+00	41	\N	41	\N	\N	0	\N	\N
-121	2018-03-15 18:39:49.100827+00	41	\N	41	\N	\N	0	\N	\N
-122	2018-03-15 18:40:54.965061+00	41	\N	41	\N	\N	0	\N	\N
-123	2018-03-15 18:41:46.412116+00	41	\N	41	\N	\N	0	\N	\N
-124	2018-03-15 18:42:55.118412+00	41	\N	41	\N	\N	0	\N	\N
-125	2018-03-15 18:43:42.52683+00	41	\N	41	\N	\N	0	\N	\N
-126	2018-03-15 18:44:43.779954+00	41	\N	41	\N	\N	0	\N	\N
-127	2018-03-15 18:46:05.081789+00	41	\N	41	\N	\N	0	\N	\N
-128	2018-03-15 18:47:06.79931+00	41	\N	41	\N	\N	0	\N	\N
-129	2018-03-15 18:47:49.912357+00	41	\N	41	\N	\N	0	\N	\N
-130	2018-03-15 18:48:31.490473+00	41	\N	41	\N	\N	0	\N	\N
-131	2018-03-15 18:49:17.403215+00	41	\N	41	\N	\N	0	\N	\N
-132	2018-03-15 18:50:01.866697+00	41	\N	41	\N	\N	0	\N	\N
-133	2018-03-15 18:52:01.920667+00	41	\N	41	\N	\N	0	\N	\N
-134	2018-03-15 18:56:21.786723+00	41	\N	41	\N	\N	0	\N	\N
-135	2018-03-15 18:57:23.524967+00	41	\N	41	\N	\N	0	\N	\N
-136	2018-03-15 18:59:13.473233+00	41	\N	41	\N	\N	0	\N	\N
-137	2018-08-07 19:33:30.680892+00	41	\N	41	\N	\N	0	\N	\N
-138	2018-08-07 19:33:32.459585+00	41	\N	41	\N	\N	0	\N	\N
-139	2018-08-07 19:33:34.412633+00	41	\N	41	\N	\N	0	\N	\N
-140	2018-08-07 19:33:36.167087+00	41	\N	41	\N	\N	0	\N	\N
-141	2018-08-07 19:33:37.222176+00	41	\N	41	\N	\N	0	\N	\N
-142	2018-08-07 19:33:38.900354+00	41	\N	41	\N	\N	0	\N	\N
-143	2018-08-07 19:33:41.547063+00	41	\N	41	\N	\N	0	\N	\N
-144	2018-08-07 19:33:44.11407+00	41	\N	41	\N	\N	0	\N	\N
-145	2018-08-07 19:33:45.851851+00	41	\N	41	\N	\N	0	\N	\N
-146	2018-08-07 19:33:47.617691+00	41	\N	41	\N	\N	0	\N	\N
-147	2018-08-07 19:33:50.103259+00	41	\N	41	\N	\N	0	\N	\N
-148	2018-08-07 19:33:52.612056+00	41	\N	41	\N	\N	0	\N	\N
-149	2018-08-07 19:33:55.128981+00	41	\N	41	\N	\N	0	\N	\N
-150	2018-08-19 22:28:38.254282+00	41	\N	41	\N	\N	0	\N	\N
-151	2018-08-19 22:28:41.219338+00	41	\N	41	\N	\N	0	\N	\N
-152	2018-10-17 19:34:10.537627+00	41	\N	41	\N	\N	0	\N	\N
-153	2018-10-17 19:34:11.840185+00	41	\N	41	\N	\N	0	\N	\N
-154	2018-10-17 19:34:13.089358+00	41	\N	41	\N	\N	0	\N	\N
-155	2018-10-17 19:34:15.04039+00	41	\N	41	\N	\N	0	\N	\N
-156	2018-10-17 19:34:17.251416+00	41	\N	41	\N	\N	0	\N	\N
-157	2018-10-17 19:34:19.268252+00	41	\N	41	\N	\N	0	\N	\N
-158	2019-04-03 19:07:52.723312+00	41	\N	41	\N	\N	0	\N	\N
-159	2019-04-03 19:07:53.774721+00	41	\N	41	\N	\N	0	\N	\N
-160	2019-04-03 19:07:55.444201+00	41	\N	41	\N	\N	0	\N	\N
-161	2019-04-03 19:07:57.201098+00	41	\N	41	\N	\N	0	\N	\N
-162	2019-04-03 19:07:58.878388+00	41	\N	41	\N	\N	0	\N	\N
-163	2019-06-05 21:33:52.895902+00	41	\N	41	\N	\N	0	\N	\N
-164	2019-06-05 21:33:54.076159+00	41	\N	41	\N	\N	0	\N	\N
-165	2019-08-06 16:35:16.339494+00	41	\N	41	\N	\N	0	\N	\N
-166	2019-08-06 16:35:17.89881+00	41	\N	41	\N	\N	0	\N	\N
-167	2019-08-06 16:35:19.280207+00	41	\N	41	\N	\N	0	\N	\N
-168	2019-08-06 16:35:21.282284+00	41	\N	41	\N	\N	0	\N	\N
-169	2019-08-06 16:35:22.148169+00	41	\N	41	\N	\N	0	\N	\N
-170	2019-08-07 22:56:34.894513+00	41	\N	41	\N	\N	0	\N	\N
-171	2020-01-22 20:12:16.928502+00	41	\N	41	\N	\N	0	\N	\N
-172	2020-01-22 20:12:29.485024+00	41	\N	41	\N	\N	0	\N	\N
-173	2020-01-22 20:12:31.038054+00	41	\N	41	\N	\N	0	\N	\N
-174	2020-01-22 20:12:33.972515+00	41	\N	41	\N	\N	0	\N	\N
-175	2020-01-22 20:12:36.71407+00	41	\N	41	\N	\N	0	\N	\N
-176	2020-01-22 20:12:39.453074+00	41	\N	41	\N	\N	0	\N	\N
-177	2020-01-22 20:12:42.868603+00	41	\N	41	\N	\N	0	\N	\N
-178	2020-01-22 20:12:45.743603+00	41	\N	41	\N	\N	0	\N	\N
-179	2020-01-22 20:12:48.129976+00	41	\N	41	\N	\N	0	\N	\N
-180	2020-02-21 19:26:14.344237+00	41	\N	41	\N	\N	0	\N	\N
-181	2020-02-21 19:26:16.286043+00	41	\N	41	\N	\N	0	\N	\N
-182	2020-02-21 19:26:18.454662+00	41	\N	41	\N	\N	0	\N	\N
-183	2020-04-09 13:28:49.143965+00	41	\N	41	\N	\N	0	\N	\N
-184	2020-04-09 13:28:50.799902+00	41	\N	41	\N	\N	0	\N	\N
-185	2020-04-09 13:28:54.790587+00	41	\N	41	\N	\N	0	\N	\N
-186	2020-04-09 13:28:58.773546+00	41	\N	41	\N	\N	0	\N	\N
-187	2020-04-09 13:29:01.086215+00	41	\N	41	\N	\N	0	\N	\N
-188	2020-04-09 13:29:14.372195+00	41	\N	41	\N	\N	0	\N	\N
-189	2020-04-09 14:43:29.697094+00	41	\N	41	\N	\N	0	\N	\N
-190	2020-04-09 14:43:29.697094+00	41	2020-04-09 14:43:29.697094+00	41	Bulk load of accession information	189	0	\N	\N
-191	2020-06-27 16:30:33.970546+00	41	\N	41	\N	\N	0	\N	\N
-192	2020-06-27 16:31:08.146366+00	41	\N	41	\N	\N	0	\N	\N
-193	2020-06-27 16:31:34.328798+00	41	\N	41	\N	\N	0	\N	\N
-194	2020-06-27 16:32:05.049948+00	41	\N	41	\N	\N	0	\N	\N
-195	2020-06-27 16:32:20.437788+00	41	\N	41	\N	\N	0	\N	\N
-196	2020-06-27 16:32:38.081425+00	41	\N	41	\N	\N	0	\N	\N
-197	2020-06-27 16:33:02.002609+00	41	\N	41	\N	\N	0	\N	\N
-198	2020-07-16 19:28:30.985547+00	41	\N	41	\N	\N	0	\N	\N
-199	2020-07-16 19:28:34.216065+00	41	\N	41	\N	\N	0	\N	\N
-200	2020-07-16 19:28:35.498009+00	41	\N	41	\N	\N	0	\N	\N
-201	2020-07-30 17:46:20.213307+00	41	\N	41	\N	\N	0	\N	\N
-202	2020-07-30 17:46:33.932416+00	41	\N	41	\N	\N	0	\N	\N
-203	2020-08-21 02:48:39.117945+00	41	\N	41	\N	\N	0	\N	\N
-204	2020-08-21 02:48:40.500789+00	41	\N	41	\N	\N	0	\N	\N
-205	2020-08-21 02:48:42.018041+00	41	\N	41	\N	\N	0	\N	\N
-206	2020-09-04 21:06:50.649866+00	41	\N	41	\N	\N	0	\N	\N
-207	2020-09-04 21:07:35.065837+00	41	\N	41	\N	\N	0	\N	\N
-208	2020-09-14 15:41:40.496852+00	41	\N	41	\N	\N	0	\N	\N
-209	2020-09-17 22:21:38.715859+00	41	\N	41	\N	\N	0	\N	\N
-210	2020-09-17 22:22:05.958752+00	41	\N	41	\N	\N	0	\N	\N
-211	2020-09-23 17:35:58.809559+00	41	\N	41	\N	\N	0	\N	\N
-212	2020-10-03 22:04:01.315147+00	41	\N	41	\N	\N	0	\N	\N
-213	2020-10-30 02:06:28.159077+00	41	\N	41	\N	\N	0	\N	\N
-214	2020-10-30 02:09:20.737725+00	41	\N	41	\N	\N	0	\N	\N
-215	2020-10-30 02:09:39.410676+00	41	\N	41	\N	\N	0	\N	\N
-218	2023-03-16 23:54:16.636187+00	41	\N	\N	\N	\N	0	\N	\N
-221	2023-03-16 23:54:21.201615+00	41	\N	\N	\N	\N	0	\N	\N
-224	2023-03-16 23:54:24.771882+00	41	\N	\N	\N	\N	0	\N	\N
-227	2023-03-16 23:54:28.343298+00	41	\N	\N	\N	\N	0	\N	\N
-230	2023-03-16 23:54:31.05921+00	41	\N	\N	\N	\N	0	\N	\N
-233	2023-03-16 23:54:34.64962+00	41	\N	\N	\N	\N	0	\N	\N
-236	2023-03-16 23:54:37.797284+00	41	\N	\N	\N	\N	0	\N	\N
-239	2023-03-16 23:54:40.703815+00	41	\N	\N	\N	\N	0	\N	\N
-242	2023-03-16 23:54:44.204444+00	41	\N	\N	\N	\N	0	\N	\N
-245	2023-03-16 23:54:48.374165+00	41	\N	\N	\N	\N	0	\N	\N
-248	2023-03-16 23:54:50.972127+00	41	\N	\N	\N	\N	0	\N	\N
-251	2023-03-16 23:54:53.579513+00	41	\N	\N	\N	\N	0	\N	\N
-254	2023-03-16 23:54:58.006512+00	41	\N	\N	\N	\N	0	\N	\N
-257	2023-03-16 23:55:02.984844+00	41	\N	\N	\N	\N	0	\N	\N
-260	2023-03-16 23:55:08.519442+00	41	\N	\N	\N	\N	0	\N	\N
-263	2023-03-16 23:55:11.14479+00	41	\N	\N	\N	\N	0	\N	\N
-266	2023-03-16 23:55:21.176608+00	41	\N	\N	\N	\N	0	\N	\N
-269	2023-03-16 23:55:24.671918+00	41	\N	\N	\N	\N	0	\N	\N
-272	2023-03-16 23:55:29.014802+00	41	\N	\N	\N	\N	0	\N	\N
-275	2023-03-16 23:55:33.559379+00	41	\N	\N	\N	\N	0	\N	\N
+8	2012-06-28 20:36:04.901638+00	43	\N	43	\N	\N	0	\N	\N
+9	2012-06-28 20:36:30.035938+00	43	\N	43	\N	\N	0	\N	\N
+12	2013-10-09 14:47:20.320423+00	43	\N	43	\N	\N	0	\N	\N
+13	2013-10-09 14:49:37.243178+00	43	\N	43	\N	\N	0	\N	\N
+14	2013-10-09 14:49:49.683672+00	43	\N	43	\N	\N	0	\N	\N
+15	2013-10-09 14:50:09.982246+00	43	\N	43	\N	\N	0	\N	\N
+16	2013-10-09 14:50:46.875676+00	43	\N	43	\N	\N	0	\N	\N
+19	2014-01-10 23:11:16.337745+00	43	\N	43	\N	\N	0	\N	\N
+20	2014-02-13 00:42:52.573584+00	43	\N	43	\N	\N	0	\N	\N
+21	2014-12-19 14:12:05.270521+00	43	\N	43	\N	\N	0	\N	\N
+22	2014-12-19 14:14:21.150006+00	43	\N	43	\N	\N	0	\N	\N
+23	2014-12-19 14:14:53.610443+00	43	\N	43	\N	\N	0	\N	\N
+24	2014-12-19 14:15:25.567852+00	43	\N	43	\N	\N	0	\N	\N
+25	2014-12-19 14:16:05.753633+00	43	\N	43	\N	\N	0	\N	\N
+26	2014-12-19 14:16:25.843792+00	43	\N	43	\N	\N	0	\N	\N
+27	2014-12-19 14:26:02.50047+00	43	\N	43	\N	\N	0	\N	\N
+28	2014-12-19 21:22:22.583344+00	43	\N	43	\N	\N	0	\N	\N
+32	2015-06-02 12:16:04.529974+00	43	\N	43	\N	\N	0	\N	\N
+33	2016-02-04 18:58:52.339025+00	43	\N	43	\N	\N	0	\N	\N
+34	2016-02-04 18:59:53.76135+00	43	\N	43	\N	\N	0	\N	\N
+35	2016-02-04 19:00:26.992463+00	43	\N	43	\N	\N	0	\N	\N
+36	2016-02-04 19:00:53.818881+00	43	\N	43	\N	\N	0	\N	\N
+37	2016-02-17 20:34:04.967354+00	43	\N	43	\N	\N	0	\N	\N
+38	2016-02-25 21:29:32.465167+00	43	\N	43	\N	\N	0	\N	\N
+39	2016-03-07 17:28:59.083711+00	43	\N	43	\N	\N	0	\N	\N
+40	2016-03-07 17:29:05.349106+00	43	\N	43	\N	\N	0	\N	\N
+41	2016-03-07 17:30:33.01634+00	43	\N	43	\N	\N	0	\N	\N
+42	2016-03-07 17:30:48.618187+00	43	\N	43	\N	\N	0	\N	\N
+43	2016-03-07 17:30:59.870503+00	43	\N	43	\N	\N	0	\N	\N
+44	2016-03-08 02:08:23.919972+00	43	\N	43	\N	\N	0	\N	\N
+45	2016-03-08 03:35:28.565872+00	43	\N	43	\N	\N	0	\N	\N
+46	2016-05-09 17:54:13.75916+00	43	\N	43	\N	\N	0	\N	\N
+47	2016-05-09 21:49:25.421545+00	43	\N	43	\N	\N	0	\N	\N
+48	2016-05-12 21:14:24.101559+00	43	\N	43	\N	\N	0	\N	\N
+49	2016-08-02 16:57:34.432201+00	43	\N	43	\N	\N	0	\N	\N
+50	2016-08-02 16:57:57.411613+00	43	\N	43	\N	\N	0	\N	\N
+51	2016-08-04 15:35:21.249132+00	43	\N	43	\N	\N	0	\N	\N
+52	2016-10-12 17:29:59.74206+00	43	\N	43	\N	\N	0	\N	\N
+53	2016-10-17 17:51:17.740278+00	43	\N	43	\N	\N	0	\N	\N
+54	2016-11-11 14:47:39.732402+00	43	\N	43	\N	\N	0	\N	\N
+55	2017-01-04 15:25:47.878796+00	43	\N	43	\N	\N	0	\N	\N
+56	2017-02-20 21:54:13.041208+00	43	\N	43	\N	\N	0	\N	\N
+57	2017-03-28 18:48:59.237899+00	43	\N	43	\N	\N	0	\N	\N
+58	2017-04-21 20:38:42.140825+00	43	\N	43	\N	\N	0	\N	\N
+59	2017-04-21 20:38:47.264129+00	43	\N	43	\N	\N	0	\N	\N
+60	2017-04-21 20:40:28.934828+00	43	\N	43	\N	\N	0	\N	\N
+61	2017-04-21 20:40:54.719142+00	43	\N	43	\N	\N	0	\N	\N
+62	2017-04-21 21:12:02.017627+00	43	\N	43	\N	\N	0	\N	\N
+63	2017-05-08 16:12:57.002519+00	43	\N	43	\N	\N	0	\N	\N
+64	2017-05-31 14:08:18.88001+00	43	\N	43	\N	\N	0	\N	\N
+65	2017-06-08 16:11:32.805234+00	43	\N	43	\N	\N	0	\N	\N
+66	2017-06-08 16:53:22.864556+00	43	\N	43	\N	\N	0	\N	\N
+67	2017-06-30 13:41:36.162383+00	43	\N	43	\N	\N	0	\N	\N
+68	2017-06-30 13:41:47.39034+00	43	\N	43	\N	\N	0	\N	\N
+69	2017-07-17 17:31:42.837473+00	43	\N	43	\N	\N	0	\N	\N
+70	2017-07-27 19:09:24.635054+00	43	\N	43	\N	\N	0	\N	\N
+71	2017-07-27 19:09:56.99407+00	43	\N	43	\N	\N	0	\N	\N
+72	2017-08-16 18:07:04.409576+00	43	\N	43	\N	\N	0	\N	\N
+73	2017-08-16 18:07:17.022312+00	43	\N	43	\N	\N	0	\N	\N
+74	2017-08-16 18:07:38.778388+00	43	\N	43	\N	\N	0	\N	\N
+75	2017-09-01 17:08:01.703879+00	43	\N	43	\N	\N	0	\N	\N
+76	2017-09-18 15:42:28.250977+00	43	\N	43	\N	\N	0	\N	\N
+77	2017-09-18 15:43:58.719398+00	43	\N	43	\N	\N	0	\N	\N
+78	2017-10-10 15:10:41.4496+00	43	\N	43	\N	\N	0	\N	\N
+79	2017-10-10 15:10:52.863376+00	43	\N	43	\N	\N	0	\N	\N
+80	2017-10-10 15:11:22.791118+00	43	\N	43	\N	\N	0	\N	\N
+81	2017-10-10 15:13:14.819036+00	43	\N	43	\N	\N	0	\N	\N
+82	2017-10-10 15:13:30.873535+00	43	\N	43	\N	\N	0	\N	\N
+83	2017-10-10 15:17:59.09749+00	43	\N	43	\N	\N	0	\N	\N
+84	2017-10-10 18:46:10.177605+00	43	\N	43	\N	\N	0	\N	\N
+85	2017-10-28 09:27:19.914912+00	43	\N	43	\N	\N	0	\N	\N
+86	2017-10-28 09:27:31.016472+00	43	\N	43	\N	\N	0	\N	\N
+87	2018-03-15 18:22:23.716655+00	43	\N	43	\N	\N	0	\N	\N
+88	2018-03-15 18:22:38.694441+00	43	\N	43	\N	\N	0	\N	\N
+89	2018-03-15 18:22:50.086659+00	43	\N	43	\N	\N	0	\N	\N
+90	2018-03-15 18:23:18.356881+00	43	\N	43	\N	\N	0	\N	\N
+91	2018-03-15 18:23:27.198638+00	43	\N	43	\N	\N	0	\N	\N
+92	2018-03-15 18:23:42.849766+00	43	\N	43	\N	\N	0	\N	\N
+93	2018-03-15 18:23:53.182309+00	43	\N	43	\N	\N	0	\N	\N
+94	2018-03-15 18:24:08.119533+00	43	\N	43	\N	\N	0	\N	\N
+95	2018-03-15 18:24:20.893402+00	43	\N	43	\N	\N	0	\N	\N
+96	2018-03-15 18:24:30.449553+00	43	\N	43	\N	\N	0	\N	\N
+97	2018-03-15 18:24:48.650789+00	43	\N	43	\N	\N	0	\N	\N
+98	2018-03-15 18:25:52.818933+00	43	\N	43	\N	\N	0	\N	\N
+99	2018-03-15 18:27:22.075265+00	43	\N	43	\N	\N	0	\N	\N
+100	2018-03-15 18:27:31.137628+00	43	\N	43	\N	\N	0	\N	\N
+101	2018-03-15 18:27:34.05858+00	43	\N	43	\N	\N	0	\N	\N
+102	2018-03-15 18:27:35.098042+00	43	\N	43	\N	\N	0	\N	\N
+103	2018-03-15 18:27:36.863938+00	43	\N	43	\N	\N	0	\N	\N
+104	2018-03-15 18:27:44.327055+00	43	\N	43	\N	\N	0	\N	\N
+105	2018-03-15 18:27:47.338533+00	43	\N	43	\N	\N	0	\N	\N
+106	2018-03-15 18:27:50.954148+00	43	\N	43	\N	\N	0	\N	\N
+107	2018-03-15 18:27:54.330223+00	43	\N	43	\N	\N	0	\N	\N
+108	2018-03-15 18:28:04.11018+00	43	\N	43	\N	\N	0	\N	\N
+109	2018-03-15 18:28:07.980957+00	43	\N	43	\N	\N	0	\N	\N
+110	2018-03-15 18:28:09.301863+00	43	\N	43	\N	\N	0	\N	\N
+111	2018-03-15 18:28:10.524295+00	43	\N	43	\N	\N	0	\N	\N
+112	2018-03-15 18:28:12.704359+00	43	\N	43	\N	\N	0	\N	\N
+113	2018-03-15 18:28:14.967406+00	43	\N	43	\N	\N	0	\N	\N
+114	2018-03-15 18:28:17.296695+00	43	\N	43	\N	\N	0	\N	\N
+115	2018-03-15 18:28:19.55644+00	43	\N	43	\N	\N	0	\N	\N
+116	2018-03-15 18:33:22.456325+00	43	\N	43	\N	\N	0	\N	\N
+117	2018-03-15 18:34:21.334624+00	43	\N	43	\N	\N	0	\N	\N
+118	2018-03-15 18:35:12.538822+00	43	\N	43	\N	\N	0	\N	\N
+119	2018-03-15 18:36:00.770895+00	43	\N	43	\N	\N	0	\N	\N
+120	2018-03-15 18:36:49.307398+00	43	\N	43	\N	\N	0	\N	\N
+121	2018-03-15 18:39:49.100827+00	43	\N	43	\N	\N	0	\N	\N
+122	2018-03-15 18:40:54.965061+00	43	\N	43	\N	\N	0	\N	\N
+123	2018-03-15 18:41:46.412116+00	43	\N	43	\N	\N	0	\N	\N
+124	2018-03-15 18:42:55.118412+00	43	\N	43	\N	\N	0	\N	\N
+125	2018-03-15 18:43:42.52683+00	43	\N	43	\N	\N	0	\N	\N
+126	2018-03-15 18:44:43.779954+00	43	\N	43	\N	\N	0	\N	\N
+127	2018-03-15 18:46:05.081789+00	43	\N	43	\N	\N	0	\N	\N
+128	2018-03-15 18:47:06.79931+00	43	\N	43	\N	\N	0	\N	\N
+129	2018-03-15 18:47:49.912357+00	43	\N	43	\N	\N	0	\N	\N
+130	2018-03-15 18:48:31.490473+00	43	\N	43	\N	\N	0	\N	\N
+131	2018-03-15 18:49:17.403215+00	43	\N	43	\N	\N	0	\N	\N
+132	2018-03-15 18:50:01.866697+00	43	\N	43	\N	\N	0	\N	\N
+133	2018-03-15 18:52:01.920667+00	43	\N	43	\N	\N	0	\N	\N
+17	2014-01-03 17:44:29.059282+00	43	\N	43	\N	\N	0	\N	\N
+18	2014-01-03 22:13:32.335503+00	43	\N	43	\N	\N	1	\N	\N
+29	2015-02-04 20:06:40.169408+00	43	\N	43	\N	\N	0	\N	\N
+30	2015-02-06 16:07:45.355755+00	43	\N	43	\N	\N	0	\N	\N
+31	2015-02-06 20:07:38.136354+00	43	\N	43	\N	\N	0	\N	\N
+1	2011-12-20 17:58:26.736933+00	43	\N	43	\N	\N	0	\N	\N
+2	2011-12-20 17:59:02.671505+00	43	\N	43	\N	\N	0	\N	\N
+3	2011-12-20 17:59:19.844545+00	43	\N	43	\N	\N	0	\N	\N
+4	2012-01-19 20:46:35.153106+00	43	\N	43	\N	\N	0	\N	\N
+5	2012-01-23 17:25:06.637079+00	43	\N	43	\N	\N	0	\N	\N
+6	2012-06-28 20:34:36.265863+00	43	\N	43	\N	\N	0	\N	\N
+7	2012-06-28 20:35:00.551065+00	43	\N	43	\N	\N	0	\N	\N
+134	2018-03-15 18:56:21.786723+00	43	\N	43	\N	\N	0	\N	\N
+135	2018-03-15 18:57:23.524967+00	43	\N	43	\N	\N	0	\N	\N
+136	2018-03-15 18:59:13.473233+00	43	\N	43	\N	\N	0	\N	\N
+137	2018-08-07 19:33:30.680892+00	43	\N	43	\N	\N	0	\N	\N
+138	2018-08-07 19:33:32.459585+00	43	\N	43	\N	\N	0	\N	\N
+139	2018-08-07 19:33:34.412633+00	43	\N	43	\N	\N	0	\N	\N
+140	2018-08-07 19:33:36.167087+00	43	\N	43	\N	\N	0	\N	\N
+141	2018-08-07 19:33:37.222176+00	43	\N	43	\N	\N	0	\N	\N
+142	2018-08-07 19:33:38.900354+00	43	\N	43	\N	\N	0	\N	\N
+143	2018-08-07 19:33:41.547063+00	43	\N	43	\N	\N	0	\N	\N
+144	2018-08-07 19:33:44.11407+00	43	\N	43	\N	\N	0	\N	\N
+145	2018-08-07 19:33:45.851851+00	43	\N	43	\N	\N	0	\N	\N
+146	2018-08-07 19:33:47.617691+00	43	\N	43	\N	\N	0	\N	\N
+147	2018-08-07 19:33:50.103259+00	43	\N	43	\N	\N	0	\N	\N
+148	2018-08-07 19:33:52.612056+00	43	\N	43	\N	\N	0	\N	\N
+149	2018-08-07 19:33:55.128981+00	43	\N	43	\N	\N	0	\N	\N
+150	2018-08-19 22:28:38.254282+00	43	\N	43	\N	\N	0	\N	\N
+172	2020-01-22 20:12:29.485024+00	43	\N	43	\N	\N	0	\N	\N
+173	2020-01-22 20:12:31.038054+00	43	\N	43	\N	\N	0	\N	\N
+174	2020-01-22 20:12:33.972515+00	43	\N	43	\N	\N	0	\N	\N
+175	2020-01-22 20:12:36.71407+00	43	\N	43	\N	\N	0	\N	\N
+176	2020-01-22 20:12:39.453074+00	43	\N	43	\N	\N	0	\N	\N
+177	2020-01-22 20:12:42.868603+00	43	\N	43	\N	\N	0	\N	\N
+178	2020-01-22 20:12:45.743603+00	43	\N	43	\N	\N	0	\N	\N
+179	2020-01-22 20:12:48.129976+00	43	\N	43	\N	\N	0	\N	\N
+180	2020-02-21 19:26:14.344237+00	43	\N	43	\N	\N	0	\N	\N
+181	2020-02-21 19:26:16.286043+00	43	\N	43	\N	\N	0	\N	\N
+182	2020-02-21 19:26:18.454662+00	43	\N	43	\N	\N	0	\N	\N
+183	2020-04-09 13:28:49.143965+00	43	\N	43	\N	\N	0	\N	\N
+184	2020-04-09 13:28:50.799902+00	43	\N	43	\N	\N	0	\N	\N
+185	2020-04-09 13:28:54.790587+00	43	\N	43	\N	\N	0	\N	\N
+186	2020-04-09 13:28:58.773546+00	43	\N	43	\N	\N	0	\N	\N
+187	2020-04-09 13:29:01.086215+00	43	\N	43	\N	\N	0	\N	\N
+188	2020-04-09 13:29:14.372195+00	43	\N	43	\N	\N	0	\N	\N
+189	2020-04-09 14:43:29.697094+00	43	\N	43	\N	\N	0	\N	\N
+190	2020-04-09 14:43:29.697094+00	43	2020-04-09 14:43:29.697094+00	43	Bulk load of accession information	189	0	\N	\N
+191	2020-06-27 16:30:33.970546+00	43	\N	43	\N	\N	0	\N	\N
+192	2020-06-27 16:31:08.146366+00	43	\N	43	\N	\N	0	\N	\N
+193	2020-06-27 16:31:34.328798+00	43	\N	43	\N	\N	0	\N	\N
+194	2020-06-27 16:32:05.049948+00	43	\N	43	\N	\N	0	\N	\N
+195	2020-06-27 16:32:20.437788+00	43	\N	43	\N	\N	0	\N	\N
+196	2020-06-27 16:32:38.081425+00	43	\N	43	\N	\N	0	\N	\N
+197	2020-06-27 16:33:02.002609+00	43	\N	43	\N	\N	0	\N	\N
+198	2020-07-16 19:28:30.985547+00	43	\N	43	\N	\N	0	\N	\N
+199	2020-07-16 19:28:34.216065+00	43	\N	43	\N	\N	0	\N	\N
+200	2020-07-16 19:28:35.498009+00	43	\N	43	\N	\N	0	\N	\N
+201	2020-07-30 17:46:20.213307+00	43	\N	43	\N	\N	0	\N	\N
+202	2020-07-30 17:46:33.932416+00	43	\N	43	\N	\N	0	\N	\N
+203	2020-08-21 02:48:39.117945+00	43	\N	43	\N	\N	0	\N	\N
+204	2020-08-21 02:48:40.500789+00	43	\N	43	\N	\N	0	\N	\N
+205	2020-08-21 02:48:42.018041+00	43	\N	43	\N	\N	0	\N	\N
+206	2020-09-04 21:06:50.649866+00	43	\N	43	\N	\N	0	\N	\N
+207	2020-09-04 21:07:35.065837+00	43	\N	43	\N	\N	0	\N	\N
+208	2020-09-14 15:41:40.496852+00	43	\N	43	\N	\N	0	\N	\N
+209	2020-09-17 22:21:38.715859+00	43	\N	43	\N	\N	0	\N	\N
+210	2020-09-17 22:22:05.958752+00	43	\N	43	\N	\N	0	\N	\N
+211	2020-09-23 17:35:58.809559+00	43	\N	43	\N	\N	0	\N	\N
+212	2020-10-03 22:04:01.315147+00	43	\N	43	\N	\N	0	\N	\N
+213	2020-10-30 02:06:28.159077+00	43	\N	43	\N	\N	0	\N	\N
+214	2020-10-30 02:09:20.737725+00	43	\N	43	\N	\N	0	\N	\N
+215	2020-10-30 02:09:39.410676+00	43	\N	43	\N	\N	0	\N	\N
+216	2022-02-20 22:29:52.724879+00	43	\N	43	\N	\N	0	\N	\N
+217	2022-02-20 22:29:53.568086+00	43	\N	43	\N	\N	0	\N	\N
+218	2022-02-20 22:29:54.792459+00	43	\N	43	\N	\N	0	\N	\N
+219	2022-02-20 22:29:55.619007+00	43	\N	43	\N	\N	0	\N	\N
+220	2022-02-20 22:29:56.148918+00	43	\N	43	\N	\N	0	\N	\N
+221	2022-02-20 22:29:57.729633+00	43	\N	43	\N	\N	0	\N	\N
+222	2022-02-20 22:29:58.54075+00	43	\N	43	\N	\N	0	\N	\N
+223	2022-02-20 22:29:59.318981+00	43	\N	43	\N	\N	0	\N	\N
+224	2022-02-20 22:30:00.131832+00	43	\N	43	\N	\N	0	\N	\N
+225	2022-02-20 22:30:00.958071+00	43	\N	43	\N	\N	0	\N	\N
+226	2022-02-20 22:30:01.833743+00	43	\N	43	\N	\N	0	\N	\N
+227	2022-02-20 22:30:02.672484+00	43	\N	43	\N	\N	0	\N	\N
+228	2022-02-20 22:30:03.244121+00	43	\N	43	\N	\N	0	\N	\N
+229	2022-02-20 22:30:03.982238+00	43	\N	43	\N	\N	0	\N	\N
+230	2022-02-20 22:30:04.49187+00	43	\N	43	\N	\N	0	\N	\N
+231	2022-02-20 22:30:05.216586+00	43	\N	43	\N	\N	0	\N	\N
+232	2022-02-20 22:30:05.996902+00	43	\N	43	\N	\N	0	\N	\N
+233	2022-02-20 22:30:06.781385+00	43	\N	43	\N	\N	0	\N	\N
+234	2022-02-20 22:30:07.580065+00	43	\N	43	\N	\N	0	\N	\N
+235	2022-02-20 22:30:08.114968+00	43	\N	43	\N	\N	0	\N	\N
+236	2022-02-20 22:30:08.884032+00	43	\N	43	\N	\N	0	\N	\N
+237	2022-02-20 22:30:09.431491+00	43	\N	43	\N	\N	0	\N	\N
+238	2022-02-20 22:30:09.918064+00	43	\N	43	\N	\N	0	\N	\N
+239	2022-02-20 22:30:10.942942+00	43	\N	43	\N	\N	0	\N	\N
+240	2022-02-20 22:30:11.721321+00	43	\N	43	\N	\N	0	\N	\N
+241	2022-02-20 22:30:12.585334+00	43	\N	43	\N	\N	0	\N	\N
+242	2022-02-20 22:30:13.364927+00	43	\N	43	\N	\N	0	\N	\N
+243	2022-02-20 22:30:14.166516+00	43	\N	43	\N	\N	0	\N	\N
+244	2022-02-20 22:30:14.945448+00	43	\N	43	\N	\N	0	\N	\N
+245	2022-02-20 22:30:16.136244+00	43	\N	43	\N	\N	0	\N	\N
+246	2022-02-20 22:30:16.655965+00	43	\N	43	\N	\N	0	\N	\N
+247	2022-02-20 22:30:17.393961+00	43	\N	43	\N	\N	0	\N	\N
+248	2022-02-20 22:30:17.899177+00	43	\N	43	\N	\N	0	\N	\N
+249	2022-02-20 22:30:18.356078+00	43	\N	43	\N	\N	0	\N	\N
+151	2018-08-19 22:28:41.219338+00	43	\N	43	\N	\N	0	\N	\N
+152	2018-10-17 19:34:10.537627+00	43	\N	43	\N	\N	0	\N	\N
+153	2018-10-17 19:34:11.840185+00	43	\N	43	\N	\N	0	\N	\N
+154	2018-10-17 19:34:13.089358+00	43	\N	43	\N	\N	0	\N	\N
+155	2018-10-17 19:34:15.04039+00	43	\N	43	\N	\N	0	\N	\N
+156	2018-10-17 19:34:17.251416+00	43	\N	43	\N	\N	0	\N	\N
+157	2018-10-17 19:34:19.268252+00	43	\N	43	\N	\N	0	\N	\N
+158	2019-04-03 19:07:52.723312+00	43	\N	43	\N	\N	0	\N	\N
+159	2019-04-03 19:07:53.774721+00	43	\N	43	\N	\N	0	\N	\N
+160	2019-04-03 19:07:55.444201+00	43	\N	43	\N	\N	0	\N	\N
+161	2019-04-03 19:07:57.201098+00	43	\N	43	\N	\N	0	\N	\N
+162	2019-04-03 19:07:58.878388+00	43	\N	43	\N	\N	0	\N	\N
+163	2019-06-05 21:33:52.895902+00	43	\N	43	\N	\N	0	\N	\N
+164	2019-06-05 21:33:54.076159+00	43	\N	43	\N	\N	0	\N	\N
+165	2019-08-06 16:35:16.339494+00	43	\N	43	\N	\N	0	\N	\N
+166	2019-08-06 16:35:17.89881+00	43	\N	43	\N	\N	0	\N	\N
+167	2019-08-06 16:35:19.280207+00	43	\N	43	\N	\N	0	\N	\N
+168	2019-08-06 16:35:21.282284+00	43	\N	43	\N	\N	0	\N	\N
+169	2019-08-06 16:35:22.148169+00	43	\N	43	\N	\N	0	\N	\N
+170	2019-08-07 22:56:34.894513+00	43	\N	43	\N	\N	0	\N	\N
+171	2020-01-22 20:12:16.928502+00	43	\N	43	\N	\N	0	\N	\N
+250	2022-02-20 22:30:18.898424+00	43	\N	43	\N	\N	0	\N	\N
+251	2022-02-20 22:30:19.658387+00	43	\N	43	\N	\N	0	\N	\N
+252	2022-02-20 22:30:20.448762+00	43	\N	43	\N	\N	0	\N	\N
+253	2022-02-20 22:30:21.24836+00	43	\N	43	\N	\N	0	\N	\N
+254	2022-02-20 22:30:22.494428+00	43	\N	43	\N	\N	0	\N	\N
+255	2022-02-20 22:30:23.849748+00	43	\N	43	\N	\N	0	\N	\N
+256	2022-02-20 22:30:25.111643+00	43	\N	43	\N	\N	0	\N	\N
+257	2022-02-20 22:30:25.934231+00	43	\N	43	\N	\N	0	\N	\N
+258	2022-02-20 22:30:27.147328+00	43	\N	43	\N	\N	0	\N	\N
+259	2022-02-20 22:30:28.434524+00	43	\N	43	\N	\N	0	\N	\N
+260	2022-02-20 22:30:29.730087+00	43	\N	43	\N	\N	0	\N	\N
+261	2022-02-20 22:30:30.247802+00	43	\N	43	\N	\N	0	\N	\N
+262	2023-11-27 20:03:23.037334+00	43	\N	\N	\N	\N	0	\N	\N
+263	2023-11-27 20:03:23.280106+00	43	\N	\N	\N	\N	0	\N	\N
+264	2023-11-27 20:03:25.528796+00	43	\N	\N	\N	\N	0	\N	\N
+265	2023-11-27 20:03:26.064043+00	43	\N	\N	\N	\N	0	\N	\N
+266	2023-11-27 20:03:26.310659+00	43	\N	\N	\N	\N	0	\N	\N
+267	2023-11-27 20:03:26.639512+00	43	\N	\N	\N	\N	0	\N	\N
+268	2023-11-27 20:03:26.987059+00	43	\N	\N	\N	\N	0	\N	\N
+269	2023-11-27 20:03:27.344859+00	43	\N	\N	\N	\N	0	\N	\N
+270	2023-11-27 20:03:27.717939+00	43	\N	\N	\N	\N	0	\N	\N
+271	2023-11-27 20:03:28.084225+00	43	\N	\N	\N	\N	0	\N	\N
+272	2023-11-27 20:03:28.660415+00	43	\N	\N	\N	\N	0	\N	\N
+273	2023-11-27 20:03:29.016723+00	43	\N	\N	\N	\N	0	\N	\N
+274	2023-11-27 20:03:29.380791+00	43	\N	\N	\N	\N	0	\N	\N
+275	2023-11-27 20:03:29.939076+00	43	\N	\N	\N	\N	0	\N	\N
+276	2023-11-27 20:03:30.376096+00	43	\N	\N	\N	\N	0	\N	\N
+277	2023-11-27 20:03:30.724593+00	43	\N	\N	\N	\N	0	\N	\N
+278	2023-11-27 20:03:30.961056+00	43	\N	\N	\N	\N	0	\N	\N
+279	2023-11-27 20:03:31.293072+00	43	\N	\N	\N	\N	0	\N	\N
+280	2023-11-27 20:03:31.659983+00	43	\N	\N	\N	\N	0	\N	\N
+281	2023-11-27 20:03:32.198153+00	43	\N	\N	\N	\N	0	\N	\N
+282	2023-11-27 20:03:32.824777+00	43	\N	\N	\N	\N	0	\N	\N
+283	2023-11-27 20:03:33.266396+00	43	\N	\N	\N	\N	0	\N	\N
+284	2023-11-27 20:03:33.625333+00	43	\N	\N	\N	\N	0	\N	\N
+285	2023-11-27 20:03:33.99317+00	43	\N	\N	\N	\N	0	\N	\N
+286	2023-11-27 20:03:34.34264+00	43	\N	\N	\N	\N	0	\N	\N
+287	2023-11-27 20:03:34.719983+00	43	\N	\N	\N	\N	0	\N	\N
+288	2023-11-27 20:03:35.078359+00	43	\N	\N	\N	\N	0	\N	\N
+289	2023-11-27 20:03:35.42112+00	43	\N	\N	\N	\N	0	\N	\N
+290	2023-11-27 20:03:35.763136+00	43	\N	\N	\N	\N	0	\N	\N
+291	2023-11-27 20:03:36.118337+00	43	\N	\N	\N	\N	0	\N	\N
+292	2023-11-27 20:03:36.501723+00	43	\N	\N	\N	\N	0	\N	\N
+293	2023-11-27 20:03:36.863227+00	43	\N	\N	\N	\N	0	\N	\N
+294	2023-11-27 20:03:37.20604+00	43	\N	\N	\N	\N	0	\N	\N
+295	2023-11-27 20:03:37.557307+00	43	\N	\N	\N	\N	0	\N	\N
+296	2023-11-27 20:03:38.100099+00	43	\N	\N	\N	\N	0	\N	\N
+297	2023-11-27 20:03:38.354032+00	43	\N	\N	\N	\N	0	\N	\N
+298	2023-11-27 20:03:38.695609+00	43	\N	\N	\N	\N	0	\N	\N
+299	2023-11-27 20:03:39.048646+00	43	\N	\N	\N	\N	0	\N	\N
 \.
 
 
@@ -29875,8 +30136,8 @@ COPY phenome.is_public (is_public_id, population_id, is_public, owner_id) FROM s
 --
 
 COPY phenome.locus (locus_id, locus_name, locus_symbol, original_symbol, gene_activity, locus_notes, obsolete, sp_person_id, create_date, modified_date, description, linkage_group, lg_arm, common_name_id, updated_by, locus, organism_id) FROM stdin;
-2	test	T1	\N	testblablabla	\N	f	41	2014-01-06 21:25:00.611864+00	2014-01-06 21:47:23.803621+00	\N	\N	\N	1	41	test	\N
-3	test2	test2	\N	test	\N	f	41	2014-01-06 22:08:44.539434+00	\N	\N	\N	\N	1	41	test2	\N
+2	test	T1	\N	testblablabla	\N	f	43	2014-01-06 21:25:00.611864+00	2014-01-06 21:47:23.803621+00	\N	\N	\N	1	43	test	\N
+3	test2	test2	\N	test	\N	f	43	2014-01-06 22:08:44.539434+00	\N	\N	\N	\N	1	43	test2	\N
 \.
 
 
@@ -29926,9 +30187,9 @@ COPY phenome.locus_dbxref_evidence_history (locus_dbxref_evidence_history_id, lo
 --
 
 COPY phenome.locus_history (locus_history_id, locus_id, locus_name, locus_symbol, original_symbol, gene_activity, locus_description, locus_notes, linkage_group, lg_arm, sp_person_id, updated_by, obsolete, create_date) FROM stdin;
-1	2	test	T1	\N	\N	\N	\N	\N	\N	41	41	f	2014-01-06 21:31:44.678775+00
-2	2	test	T1	\N	\N	\N	\N	\N	\N	41	41	f	2014-01-06 21:35:55.408797+00
-3	2	test	T1	\N	\N	\N	\N	\N	\N	41	41	f	2014-01-06 21:47:23.801806+00
+1	2	test	T1	\N	\N	\N	\N	\N	\N	43	43	f	2014-01-06 21:31:44.678775+00
+2	2	test	T1	\N	\N	\N	\N	\N	\N	43	43	f	2014-01-06 21:35:55.408797+00
+3	2	test	T1	\N	\N	\N	\N	\N	\N	43	43	f	2014-01-06 21:47:23.801806+00
 \.
 
 
@@ -29953,7 +30214,7 @@ COPY phenome.locus_marker (locus_marker_id, locus_id, marker_id, obsolete, sp_pe
 --
 
 COPY phenome.locus_owner (locus_owner_id, locus_id, sp_person_id, granted_by, obsolete, create_date, modified_date) FROM stdin;
-1	3	41	\N	f	2014-01-06 22:08:44.546768+00	\N
+1	3	43	43	f	2014-01-06 22:08:44.546768+00	\N
 \.
 
 
@@ -30110,6 +30371,14 @@ COPY phenome.stock_allele (stock_allele_id, stock_id, allele_id, metadata_id) FR
 
 
 --
+-- Data for Name: stock_file; Type: TABLE DATA; Schema: phenome; Owner: postgres
+--
+
+COPY phenome.stock_file (stock_file_id, stock_id, file_id) FROM stdin;
+\.
+
+
+--
 -- Data for Name: stock_image; Type: TABLE DATA; Schema: phenome; Owner: postgres
 --
 
@@ -30122,7 +30391,7 @@ COPY phenome.stock_image (stock_image_id, stock_id, image_id, metadata_id, displ
 --
 
 COPY phenome.stock_owner (stock_owner_id, stock_id, sp_person_id, metadata_id) FROM stdin;
-152785	41784	41	190
+152785	41784	43	190
 \.
 
 
@@ -30646,6 +30915,7 @@ COPY public.cv (cv_id, name, definition) FROM stdin;
 74	cxgn_rtb_cuts	\N
 75	sequence_metadata_types	\N
 76	sp_order_property	\N
+77	list_properties	\N
 \.
 
 
@@ -38275,6 +38545,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77229	59	tryptophan	An alpha-amino acid that is alanine bearing an indol-3-yl substituent at position 3.	210818	0	0
 77333	61	hours	Number of hours.	212494	0	0
 77334	61	cu mi	Cubic mile.	212495	0	0
+77584	36	grafted_accession	\N	212745	0	0
 77230	59	fumaric acid	A butenedioic acid in which the C=C double bond has E geometry. It is an intermediate metabolite in the citric acid cycle.	210830	0	0
 77231	59	D-fructose 6-phosphate	A ketohexose monophosphate that is D-fructose having a phospahte substituent at position 6. It is an important intermediate in the carbohydrate metabolism.	210856	0	0
 77232	59	ribulose 5-phosphate	A ribulose phosphate in which the phosphate group is attached at position 5.	210858	0	0
@@ -38607,7 +38878,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77580	46	current_count	\N	212741	0	0
 77582	37	female_plot_of	\N	212743	0	0
 77583	37	male_plot_of	\N	212744	0	0
-77584	36	grafted_accession	\N	212745	0	0
 77585	35	grafting_experiment	\N	212746	0	0
 77586	47	crossing_trial	\N	212747	0	0
 77587	47	grafting_trial	\N	212748	0	0
@@ -38654,7 +38924,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77627	51	number_of_seedlings_transplanted	\N	212786	0	0
 77628	47	Seed Multiplication	\N	212787	0	0
 77629	47	Screen House	\N	212788	0	0
-77630	45	genotyping_trials	\N	212789	0	0
 77631	52	field_trial_from_field_trial	\N	212790	0	0
 77632	52	genotyping_trial_from_field_trial	\N	212791	0	0
 77633	52	crossing_trial_from_field_trial	\N	212792	0	0
@@ -38711,6 +38980,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77684	66	observation_unit_polygon_blue_background_removed_threshold_imagery	\N	212843	0	0
 77685	66	observation_unit_polygon_green_background_removed_threshold_imagery	\N	212844	0	0
 78531	62	day 269		213690	0	0
+77916	66	calculate_phenotypes_orb_drone_imagery_vari	\N	213075	0	0
 77686	66	observation_unit_polygon_red_background_removed_threshold_imagery	\N	212845	0	0
 77687	66	observation_unit_polygon_red_edge_background_removed_threshold_imagery	\N	212846	0	0
 77688	66	observation_unit_polygon_nir_background_removed_threshold_imagery	\N	212847	0	0
@@ -38941,7 +39211,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77912	66	calculate_phenotypes_sift_drone_imagery_ndvi	\N	213071	0	0
 77913	66	calculate_phenotypes_sift_drone_imagery_ndre	\N	213072	0	0
 77914	66	calculate_phenotypes_orb_drone_imagery	\N	213073	0	0
-77916	66	calculate_phenotypes_orb_drone_imagery_vari	\N	213075	0	0
 77917	66	calculate_phenotypes_orb_drone_imagery_ndvi	\N	213076	0	0
 77918	66	calculate_phenotypes_orb_drone_imagery_ndre	\N	213077	0	0
 77919	66	calculate_phenotypes_surf_drone_imagery	\N	213078	0	0
@@ -39009,6 +39278,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 77981	66	calculate_fourier_transform_hpf20_nir_threshold_background_removed_stitched_drone_imagery_channel_1	\N	213140	0	0
 78093	38	drone_run_band_rotate_angle	\N	213252	0	0
 78532	62	day 295		213691	0	0
+78094	38	drone_run_band_cropped_polygon	\N	213253	0	0
 77982	66	calculate_fourier_transform_hpf30_nir_threshold_background_removed_stitched_drone_imagery_channel_1	\N	213141	0	0
 77983	66	calculate_fourier_transform_hpf40_nir_threshold_background_removed_stitched_drone_imagery_channel_1	\N	213142	0	0
 77984	66	calculate_fourier_transform_hpf20_mir_threshold_background_removed_stitched_drone_imagery_channel_1	\N	213143	0	0
@@ -39121,7 +39391,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78090	38	drone_run_project_type	\N	213249	0	0
 78091	38	drone_run_camera_type	\N	213250	0	0
 78092	38	drone_run_band_project_type	\N	213251	0	0
-78094	38	drone_run_band_cropped_polygon	\N	213253	0	0
 78095	38	drone_run_band_background_removed_tgi_threshold	\N	213254	0	0
 78096	38	drone_run_band_background_removed_vari_threshold	\N	213255	0	0
 78097	38	drone_run_band_background_removed_ndvi_threshold	\N	213256	0	0
@@ -39261,6 +39530,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78232	69	FIR (50000-1000000nm)	A single channel image capturing the far infrared spectrum between 50000 to 1000000 nm	213391	0	0
 78533	62	day 54		213692	0	0
 78534	62	day 347		213693	0	0
+78291	69	RGB Color Image Masked with VARI Vegetative Index Image		213450	0	0
 78233	69	Fourier Transform High Pass Filter 30 Red Image From RGB Color Denoised Thresholded VARI Vegetative Index Masked Image		213392	0	0
 78234	69	Thermal IR (9000-14000nm)	A single channel image capturing the thermal infrared spectrum between 9000 to 14000 nm	213393	0	0
 78235	69	ISOL	\N	213394	0	0
@@ -39319,7 +39589,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78288	69	Fourier Transform High Pass Filter 30 Red Image from Denoised RGB Color Image		213447	0	0
 78289	69	Fourier Transform High Pass Filter 20 NDRE Vegetative Index Image		213448	0	0
 78290	69	Fourier Transform High Pass Filter 40 NDRE Vegetative Index Image		213449	0	0
-78291	69	RGB Color Image Masked with VARI Vegetative Index Image		213450	0	0
 78292	69	Fourier Transform High Pass Filter 40 MIR Denoised Image		213451	0	0
 78293	69	Fourier Transform High Pass Filter 30 Black and White Denoised Image		213452	0	0
 78294	69	Red Image from Merged 3 Channels NRN Image Masked with NDVI Vegetative Index Image		213453	0	0
@@ -39380,6 +39649,8 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78349	69	Thresholded Red Denoised Original Image		213508	0	0
 78350	69	Blue (450-520nm)	A single channel image capturing the blue spectrum between 450 to 520 nm	213509	0	0
 78351	69	Fourier Transform High Pass Filter 40 Green Image From RGB Color Denoised Thresholded TGI Vegetative Index Masked Image		213510	0	0
+78535	62	after harvest		213694	0	0
+78536	62	day 179		213695	0	0
 78352	69	Fourier Transform High Pass Filter 30 Thresholded NDRE Vegetative Index Image		213511	0	0
 78353	69	Green Image From RGB Denoised Original Image		213512	0	0
 78354	69	Fourier Transform High Pass Filter 30 VARI Vegetative Index Image		213513	0	0
@@ -39558,8 +39829,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78526	62	day 196		213685	0	0
 78527	62	day 90		213686	0	0
 78528	62	day 189		213687	0	0
-78535	62	after harvest		213694	0	0
-78536	62	day 179		213695	0	0
 78537	62	day 180		213696	0	0
 78538	62	day 103		213697	0	0
 78539	62	day 257		213698	0	0
@@ -39910,6 +40179,7 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78884	71	cycle 1	First cycle (or ratoon one).	214043	0	0
 78885	71	cycle 3 tallest sucker	Third cycle (ratoon three-tallest sucker).	214044	0	0
 78886	71	cycle 5	Fifth cycle (or ratoon five).	214045	0	0
+79109	47	genotyping_project	\N	214268	0	0
 78887	71	cycle 1 main plant	First cycle (ratoon one-main plant).	214046	0	0
 78888	72	1st most distal hand rank	Record the most distal hand rand 	214047	0	0
 78889	72	leaf rank 25	Twenty fifth standing leaf, counting the rank by starting with youngest completly unrolled leaf as 1 and moving downwards.	214048	0	0
@@ -39967,8 +40237,6 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 78941	72	leaf rank 15	Fifteenth standing leaf, counting the rank by starting with youngest completly unrolled leaf as 1 and moving downwards.	214100	0	0
 78942	72	hand rank 03	Record the third rank hand 	214101	0	0
 78943	72	leaf rank 24	Twenty fourth standing leaf, counting the rank by starting with youngest completly unrolled leaf as 1 and moving downwards.	214102	0	0
-79105	47	Sensory Trial	\N	214264	0	0
-79107	46	facility_identifier	\N	214266	0	0
 78944	72	hand rank	Record the rank (order) of a hand in the bunch, starting with the hand at the proximal end (closest to the pseudostem) of the bunch as 1 and continuing to the hand at the most distal end (closest to the male bud).	214103	0	0
 78945	72	hand rank 12	Record the twelfth rank hand 	214104	0	0
 78946	72	hand rank 13	Record the thirteenth rank hand 	214105	0	0
@@ -40053,8 +40321,8 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 79025	70	Support vector machine (SVM) with linear kernel as implemented with the kernLab package in R	\N	214184	0	0
 79026	70	Multivariate linear mixed model genetic BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using AIREMLf90	\N	214185	0	0
 79027	70	Multivariate linear mixed model permanent environment BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using AIREMLf90	\N	214186	0	0
-79106	38	soil_data_json	\N	214265	0	0
 79028	70	Multivariate linear mixed model permanent environment BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on growing degree days computed using AIREMLf90	\N	214187	0	0
+79110	38	folder_for_genotyping_projects	\N	214269	0	0
 79029	70	Multivariate linear mixed model genetic BLUPs using genetic relationship matrix and temporal Legendre polynomial random regression on growing degree days computed using AIREMLf90	\N	214188	0	0
 79030	67	airemlf90_grm_random_regression_dap_blups	\N	214189	0	0
 79031	67	airemlf90_grm_random_regression_gdd_blups	\N	214190	0	0
@@ -40084,12 +40352,12 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 79055	70	Adjusted means from BLUEs using LMER R	\N	214214	0	0
 79056	70	Multivariate linear mixed model residual using genetic relationship matrix and temporal Legendre polynomial random regression on growing degree days computed using AIREMLf90	\N	214215	0	0
 79057	70	Multivariate linear mixed model residual using genetic relationship matrix and temporal Legendre polynomial random regression on days after planting computed using AIREMLf90	\N	214216	0	0
-79058	67	high_dimensional_phenotype_nirs_protocol	\N	214217	0	0
-79059	67	high_dimensional_phenotype_transcriptomics_protocol	\N	214218	0	0
-79060	67	high_dimensional_phenotype_metabolomics_protocol	\N	214219	0	0
-79061	56	high_dimensional_phenotype_protocol_properties	\N	214220	0	0
-79062	35	sampling_layout	\N	214221	0	0
-79063	52	sampling_trial_from_field_trial	\N	214222	0	0
+79058	52	sampling_trial_from_field_trial	\N	214217	0	0
+79059	67	high_dimensional_phenotype_nirs_protocol	\N	214218	0	0
+79060	67	high_dimensional_phenotype_transcriptomics_protocol	\N	214219	0	0
+79061	67	high_dimensional_phenotype_metabolomics_protocol	\N	214220	0	0
+79062	56	high_dimensional_phenotype_protocol_properties	\N	214221	0	0
+79063	35	sampling_layout	\N	214222	0	0
 79064	38	sampling_facility	\N	214223	0	0
 79065	38	sampling_trial_sample_type	\N	214224	0	0
 79066	46	released_variety_name	\N	214225	0	0
@@ -40113,8 +40381,8 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 79084	76	order_batch_json	\N	214243	0	0
 79085	76	order_progress_json	\N	214244	0	0
 79086	56	analysis_model_properties_multi_trial	\N	214245	0	0
-79087	67	drone_imagery_analytics_env_simulation_protocol	\N	214246	0	0
-79088	35	analytics_protocol_experiment	\N	214247	0	0
+79087	35	analytics_protocol_experiment	\N	214246	0	0
+79088	67	drone_imagery_analytics_env_simulation_protocol	\N	214247	0	0
 79089	56	analytics_protocol_properties	\N	214248	0	0
 79090	56	analytics_protocol_result_summary	\N	214249	0	0
 79091	38	drone_run_opendronemap_process_running	\N	214250	0	0
@@ -40122,30 +40390,53 @@ COPY public.cvterm (cvterm_id, cv_id, name, definition, dbxref_id, is_obsolete, 
 79093	38	drone_run_camera_rig_description	\N	214252	0	0
 79094	38	drone_run_geoparam_coordinates	\N	214253	0	0
 79095	38	drone_run_geoparam_coordinates_type	\N	214254	0	0
-79096	42	pcr_marker_genotyping	\N	214255	0	0
-79097	67	pcr_marker_protocol	\N	214256	0	0
-79098	56	pcr_marker_details	\N	214257	0	0
+79096	56	pcr_marker_details	\N	214255	0	0
+79097	42	pcr_marker_genotyping	\N	214256	0	0
+79098	67	pcr_marker_protocol	\N	214257	0	0
 79099	46	seedlot_maintenance_json	\N	214258	0	0
 79100	65	phenotype_additional_info	\N	214259	0	0
 79101	38	project_entry_number_map	\N	214260	0	0
 79102	46	family_type	\N	214261	0	0
 79103	38	file_metadata_json	\N	214262	0	0
 79104	38	trial_status_json	\N	214263	0	0
+79105	47	Sensory Trial	\N	214264	0	0
+79106	38	soil_data_json	\N	214265	0	0
+79107	46	facility_identifier	\N	214266	0	0
 79108	52	genotyping_project_and_plate_relationship	\N	214267	0	0
-79109	47	genotyping_project	\N	214268	0	0
-79110	38	target_numbers_json	\N	214269	0	0
-79111	46	SelectionMarker	\N	214270	0	0
-79112	46	CloningOrganism	\N	214271	0	0
-79113	46	CassetteName	\N	214272	0	0
-79114	46	InherentMarker	\N	214273	0	0
-79115	46	Strain	\N	214274	0	0
-79116	46	Backbone	\N	214275	0	0
-79117	46	Gene	\N	214276	0	0
-79118	46	Promotors	\N	214277	0	0
-79119	46	Terminators	\N	214278	0	0
-79120	46	VectorType	\N	214279	0	0
-79121	45	list_additional_info	\N	214280	0	0
-79122	65	phenotype_external_references	\N	214281	0	0
+79111	38	genotyping_project_type	\N	214270	0	0
+79112	38	target_numbers_json	\N	214271	0	0
+79113	46	SelectionMarker	\N	214272	0	0
+79114	46	CloningOrganism	\N	214273	0	0
+79115	46	CassetteName	\N	214274	0	0
+79116	46	InherentMarker	\N	214275	0	0
+79117	46	Strain	\N	214276	0	0
+79118	46	Backbone	\N	214277	0	0
+79119	46	Gene	\N	214278	0	0
+79120	46	Promotors	\N	214279	0	0
+79121	46	Terminators	\N	214280	0	0
+79122	46	VectorType	\N	214281	0	0
+79123	45	list_additional_info	\N	214282	0	0
+79124	65	phenotype_external_references	\N	214283	0	0
+79125	42	vcf_phg_genotyping	\N	214284	0	0
+79126	42	phg genotyping	\N	214285	0	0
+79127	46	PlantAntibioticResistantMarker	\N	214286	0	0
+79128	46	BacterialResistantMarker	\N	214287	0	0
+79129	38	project_transplanting_date	\N	214288	0	0
+79130	48	trait_method_name	\N	214289	0	0
+79131	48	trait_method_description	\N	214290	0	0
+79132	48	trait_method_class	\N	214291	0	0
+79133	48	trait_method_formula	\N	214292	0	0
+79134	48	trait_decimal_places	\N	214293	0	0
+79135	48	trait_categories_label	\N	214294	0	0
+79136	48	trait_categories_value	\N	214295	0	0
+79137	48	cvterm_additional_info	\N	214296	0	0
+79138	48	trait_entity	\N	214297	0	0
+79139	48	trait_attribute	\N	214298	0	0
+79140	65	phenotype_stderr	\N	214299	0	0
+77630	45	genotyping_plates	\N	212789	0	0
+79141	45	crossing_experiments	\N	214300	0	0
+79142	45	genotyping_projects	\N	214301	0	0
+79143	77	list_additional_info	\N	214302	0	0
 \.
 
 
@@ -131178,12 +131469,12 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 214214	308	0000036		\N
 214215	308	0000027		\N
 214216	308	0000026		\N
-214217	2	autocreated:high_dimensional_phenotype_nirs_protocol		\N
-214218	2	autocreated:high_dimensional_phenotype_transcriptomics_protocol		\N
-214219	2	autocreated:high_dimensional_phenotype_metabolomics_protocol		\N
-214220	2	autocreated:high_dimensional_phenotype_protocol_properties		\N
-214221	2	autocreated:sampling_layout		\N
-214222	2	autocreated:sampling_trial_from_field_trial		\N
+214217	2	autocreated:sampling_trial_from_field_trial		\N
+214218	2	autocreated:high_dimensional_phenotype_nirs_protocol		\N
+214219	2	autocreated:high_dimensional_phenotype_transcriptomics_protocol		\N
+214220	2	autocreated:high_dimensional_phenotype_metabolomics_protocol		\N
+214221	2	autocreated:high_dimensional_phenotype_protocol_properties		\N
+214222	2	autocreated:sampling_layout		\N
 214223	2	autocreated:sampling_facility		\N
 214224	2	autocreated:sampling_trial_sample_type		\N
 214225	2	autocreated:released_variety_name		\N
@@ -131207,8 +131498,8 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 214243	2	autocreated:order_batch_json		\N
 214244	2	autocreated:order_progress_json		\N
 214245	2	autocreated:analysis_model_properties_multi_trial		\N
-214246	2	autocreated:drone_imagery_analytics_env_simulation_protocol		\N
-214247	2	autocreated:analytics_protocol_experiment		\N
+214246	2	autocreated:analytics_protocol_experiment		\N
+214247	2	autocreated:drone_imagery_analytics_env_simulation_protocol		\N
 214248	2	autocreated:analytics_protocol_properties		\N
 214249	2	autocreated:analytics_protocol_result_summary		\N
 214250	2	autocreated:drone_run_opendronemap_process_running		\N
@@ -131216,9 +131507,9 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 214252	2	autocreated:drone_run_camera_rig_description		\N
 214253	2	autocreated:drone_run_geoparam_coordinates		\N
 214254	2	autocreated:drone_run_geoparam_coordinates_type		\N
-214255	2	autocreated:pcr_marker_genotyping		\N
-214256	2	autocreated:pcr_marker_protocol		\N
-214257	2	autocreated:pcr_marker_details		\N
+214255	2	autocreated:pcr_marker_details		\N
+214256	2	autocreated:pcr_marker_genotyping		\N
+214257	2	autocreated:pcr_marker_protocol		\N
 214258	2	autocreated:seedlot_maintenance_json		\N
 214259	2	autocreated:phenotype_additional_info		\N
 214260	2	autocreated:project_entry_number_map		\N
@@ -131230,19 +131521,40 @@ COPY public.dbxref (dbxref_id, db_id, accession, version, description) FROM stdi
 214266	2	autocreated:facility_identifier		\N
 214267	2	autocreated:genotyping_project_and_plate_relationship		\N
 214268	2	autocreated:genotyping_project		\N
-214269	2	autocreated:target_numbers_json		\N
-214270	2	autocreated:SelectionMarker		\N
-214271	2	autocreated:CloningOrganism		\N
-214272	2	autocreated:CassetteName		\N
-214273	2	autocreated:InherentMarker		\N
-214274	2	autocreated:Strain		\N
-214275	2	autocreated:Backbone		\N
-214276	2	autocreated:Gene		\N
-214277	2	autocreated:Promotors		\N
-214278	2	autocreated:Terminators		\N
-214279	2	autocreated:VectorType		\N
-214280	2	autocreated:list_additional_info		\N
-214281	2	autocreated:phenotype_external_references		\N
+214269	2	autocreated:folder_for_genotyping_projects		\N
+214270	2	autocreated:genotyping_project_type		\N
+214271	2	autocreated:target_numbers_json		\N
+214272	2	autocreated:SelectionMarker		\N
+214273	2	autocreated:CloningOrganism		\N
+214274	2	autocreated:CassetteName		\N
+214275	2	autocreated:InherentMarker		\N
+214276	2	autocreated:Strain		\N
+214277	2	autocreated:Backbone		\N
+214278	2	autocreated:Gene		\N
+214279	2	autocreated:Promotors		\N
+214280	2	autocreated:Terminators		\N
+214281	2	autocreated:VectorType		\N
+214282	2	autocreated:list_additional_info		\N
+214283	2	autocreated:phenotype_external_references		\N
+214284	2	autocreated:vcf_phg_genotyping		\N
+214285	2	autocreated:phg genotyping		\N
+214286	2	autocreated:PlantAntibioticResistantMarker		\N
+214287	2	autocreated:BacterialResistantMarker		\N
+214288	2	autocreated:project_transplanting_date		\N
+214289	2	autocreated:trait_method_name		\N
+214290	2	autocreated:trait_method_description		\N
+214291	2	autocreated:trait_method_class		\N
+214292	2	autocreated:trait_method_formula		\N
+214293	2	autocreated:trait_decimal_places		\N
+214294	2	autocreated:trait_categories_label		\N
+214295	2	autocreated:trait_categories_value		\N
+214296	2	autocreated:cvterm_additional_info		\N
+214297	2	autocreated:trait_entity		\N
+214298	2	autocreated:trait_attribute		\N
+214299	2	autocreated:phenotype_stderr		\N
+214300	2	autocreated:crossing_experiments		\N
+214301	2	autocreated:genotyping_projects		\N
+214302	273	autocreated:list_additional_info		\N
 \.
 
 
@@ -131671,6 +131983,14 @@ COPY public.nd_geolocation (nd_geolocation_id, description, latitude, longitude,
 
 
 --
+-- Data for Name: nd_geolocation_dbxref; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.nd_geolocation_dbxref (nd_geolocation_dbxref_id, nd_geolocation_id, dbxref_id, is_current) FROM stdin;
+\.
+
+
+--
 -- Data for Name: nd_geolocationprop; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -131690,7 +132010,7 @@ COPY public.nd_geolocationprop (nd_geolocationprop_id, nd_geolocation_id, type_i
 --
 
 COPY public.nd_protocol (nd_protocol_id, name, type_id, create_date, description) FROM stdin;
-2	NIRS Protocol	79058	2023-03-16 23:54:16.693608	Default NIRS protocol
+2	NIRS Protocol	79059	2022-02-20 22:29:54.829706	Default NIRS protocol
 \.
 
 
@@ -131707,7 +132027,7 @@ COPY public.nd_protocol_reagent (nd_protocol_reagent_id, nd_protocol_id, reagent
 --
 
 COPY public.nd_protocolprop (nd_protocolprop_id, nd_protocol_id, type_id, value, rank) FROM stdin;
-1	2	79061	{"device_type": "SCIO"}	0
+1	2	79062	{"device_type": "SCIO"}	0
 \.
 
 
@@ -241305,6 +241625,14 @@ COPY public.project_contact (project_contact_id, project_id, contact_id) FROM st
 
 
 --
+-- Data for Name: project_dbxref; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.project_dbxref (project_dbxref_id, project_id, dbxref_id, is_current) FROM stdin;
+\.
+
+
+--
 -- Data for Name: project_pub; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -243694,15 +244022,16 @@ COPY sgn_people.forum_topic (forum_topic_id, person_id, topic_name, parent_topic
 -- Data for Name: list; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
 --
 
-COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, type_id, is_public, "timestamp", modify_timestamp) FROM stdin;
-3	f	\N	test_stocks	\N	41	76451	f	\N	\N
-5	f	\N	accessions_for_solgs_tests	\N	41	76451	f	\N	\N
-6	f	\N	accessions_for_trial2	\N	41	76451	f	\N	\N
-7	f	\N	selection_acc	\N	41	\N	f	\N	\N
-809	f	\N	janedoe_1_public	\N	41	\N	t	\N	\N
-811	f	\N	janedoe_1_private	\N	41	\N	f	\N	\N
-12	f	\N	desynonymize_test_list	\N	41	76451	f	\N	\N
-13	f	\N	traits	\N	41	76455	f	\N	\N
+COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, type_id, is_public, create_date, modified_date) FROM stdin;
+14	f	\N	test_accession_list	Adds the first accession to database	43	76451	f	2023-11-27 20:03:35.771926	\N
+\.
+
+
+--
+-- Data for Name: list_dbxref; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
+--
+
+COPY sgn_people.list_dbxref (list_dbxref_id, list_id, dbxref_id, is_current) FROM stdin;
 \.
 
 
@@ -243711,732 +244040,15 @@ COPY sgn_people.list (list_id, is_hotlist, sent_by, name, description, owner, ty
 --
 
 COPY sgn_people.list_item (list_item_id, content, list_id) FROM stdin;
-11	test_accession4	3
-12	test_accession5	3
-16	test_accession1	3
-17	test_accession2	3
-18	test_accession3	3
-24	UG120001	5
-25	UG120002	5
-26	UG120003	5
-27	UG120004	5
-28	UG120005	5
-29	UG120006	5
-30	UG120007	5
-31	UG120008	5
-32	UG120009	5
-33	UG120010	5
-34	UG120011	5
-35	UG120012	5
-36	UG120013	5
-37	UG120014	5
-38	UG120015	5
-39	UG120016	5
-40	UG120017	5
-41	UG120018	5
-42	UG120019	5
-43	UG120020	5
-44	UG120021	5
-45	UG120022	5
-46	UG120023	5
-47	UG120024	5
-48	UG120025	5
-49	UG120026	5
-50	UG120027	5
-51	UG120028	5
-52	UG120029	5
-53	UG120030	5
-54	UG120031	5
-55	UG120032	5
-56	UG120033	5
-57	UG120034	5
-58	UG120035	5
-59	UG120036	5
-60	UG120037	5
-61	UG120038	5
-62	UG120039	5
-63	UG120040	5
-64	UG120042	5
-65	UG120043	5
-66	UG120044	5
-67	UG120046	5
-68	UG120048	5
-69	UG120049	5
-70	UG120051	5
-71	UG120053	5
-72	UG120054	5
-73	UG120055	5
-74	UG120057	5
-75	UG120058	5
-76	UG120059	5
-77	UG120060	5
-78	UG120061	5
-79	UG120062	5
-80	UG120063	5
-81	UG120064	5
-82	UG120065	5
-83	UG120066	5
-84	UG120067	5
-85	UG120069	5
-86	UG120070	5
-87	UG120071	5
-88	UG120072	5
-89	UG120073	5
-90	UG120074	5
-91	UG120076	5
-92	UG120077	5
-93	UG120078	5
-94	UG120079	5
-95	UG120080	5
-96	UG120081	5
-97	UG120082	5
-98	UG120084	5
-99	UG120085	5
-100	UG120086	5
-101	UG120087	5
-102	UG120088	5
-103	UG120089	5
-104	UG120090	5
-105	UG120091	5
-106	UG120092	5
-107	UG120093	5
-108	UG120095	5
-109	UG120096	5
-110	UG120097	5
-111	UG120098	5
-112	UG120099	5
-113	UG120100	5
-114	UG120101	5
-115	UG120102	5
-116	UG120103	5
-117	UG120105	5
-118	UG120106	5
-119	UG120107	5
-120	UG120108	5
-121	UG120109	5
-122	UG120111	5
-123	UG120113	5
-124	UG120115	5
-125	UG120116	5
-126	UG120117	5
-127	UG120120	5
-128	UG120121	5
-129	UG120122	5
-130	UG120124	5
-131	UG120126	5
-132	UG120127	5
-133	UG120128	5
-134	UG120132	5
-135	UG120133	5
-136	UG120134	5
-137	UG120135	5
-138	UG120137	5
-139	UG120138	5
-140	UG120139	5
-141	UG120141	5
-142	UG120143	5
-143	UG120144	5
-144	UG120145	5
-145	UG120146	5
-146	UG120148	5
-147	UG120149	5
-148	UG120150	5
-149	UG120151	5
-150	UG120152	5
-151	UG120153	5
-152	UG120154	5
-153	UG120156	5
-154	UG120157	5
-155	UG120158	5
-156	UG120160	5
-157	UG120161	5
-158	UG120162	5
-159	UG120163	5
-160	UG120164	5
-161	UG120165	5
-162	UG120166	5
-163	UG120167	5
-164	UG120169	5
-165	UG120170	5
-166	UG120171	5
-167	UG120172	5
-168	UG120173	5
-169	UG120174	5
-170	UG120175	5
-171	UG120176	5
-172	UG120177	5
-173	UG120178	5
-174	UG120179	5
-175	UG120181	5
-176	UG120182	5
-177	UG120183	5
-178	UG120184	5
-179	UG120185	5
-180	UG120186	5
-181	UG120187	5
-182	UG120188	5
-183	UG120189	5
-184	UG120190	5
-185	UG120191	5
-186	UG120192	5
-187	UG120193	5
-188	UG120194	5
-189	UG120195	5
-190	UG120196	5
-191	UG120197	5
-192	UG120198	5
-193	UG120199	5
-194	UG120201	5
-195	UG120202	5
-196	UG120205	5
-197	UG120206	5
-198	UG120207	5
-199	UG120208	5
-200	UG120210	5
-201	UG120211	5
-202	UG120213	5
-203	UG120215	5
-204	UG120216	5
-205	UG120218	5
-206	UG120219	5
-207	UG120220	5
-208	UG120221	5
-209	UG120222	5
-210	UG120223	5
-211	UG120224	5
-212	UG120225	5
-213	UG120226	5
-214	UG120227	5
-215	UG120228	5
-216	UG120229	5
-217	UG120230	5
-218	UG120231	5
-219	UG120232	5
-220	UG120234	5
-221	UG120235	5
-222	UG120238	5
-223	UG120239	5
-224	UG120240	5
-225	UG120242	5
-226	UG120243	5
-227	UG120244	5
-228	UG120245	5
-229	UG120246	5
-230	UG120247	5
-231	UG120248	5
-232	UG120250	5
-233	UG120251	5
-234	UG120253	5
-235	UG120254	5
-236	UG120255	5
-237	UG120256	5
-238	UG120257	5
-239	UG120258	5
-240	UG120260	5
-241	UG120261	5
-242	UG120262	5
-243	UG120264	5
-244	UG120265	5
-245	UG120266	5
-246	UG120267	5
-247	UG120268	5
-248	UG120269	5
-249	UG120270	5
-250	UG120272	5
-251	UG120273	5
-252	UG120274	5
-253	UG120276	5
-254	UG120277	5
-255	UG120278	5
-256	UG120279	5
-257	UG120280	5
-258	UG120283	5
-259	UG120284	5
-260	UG120286	5
-261	UG120287	5
-262	UG120288	5
-263	UG120289	5
-264	UG120290	5
-265	UG120291	5
-266	UG120292	5
-267	UG120293	5
-268	UG120296	5
-269	UG120297	5
-270	UG120298	5
-271	UG120299	5
-272	UG120300	5
-273	UG120301	5
-274	UG120303	5
-275	UG120305	5
-276	UG120306	5
-277	UG120307	5
-278	UG130001	5
-279	UG130002	5
-280	UG130003	5
-281	UG130004	5
-282	UG130005	5
-283	UG130006	5
-284	UG130007	5
-285	UG130008	5
-286	UG130009	5
-287	UG130010	5
-288	UG130011	5
-289	UG130012	5
-290	UG130013	5
-291	UG130017	5
-292	UG130018	5
-293	UG130019	5
-294	UG130020	5
-295	UG130021	5
-296	UG130022	5
-297	UG130023	5
-298	UG130024	5
-299	UG130025	5
-300	UG130026	5
-301	UG130028	5
-302	UG130029	5
-303	UG130030	5
-304	UG130031	5
-305	UG130032	5
-306	UG130033	5
-307	UG130034	5
-308	UG130035	5
-309	UG130036	5
-310	UG130037	5
-311	UG130038	5
-312	UG130040	5
-313	UG130042	5
-314	UG130043	5
-315	UG130044	5
-316	UG130045	5
-317	UG130046	5
-318	UG130047	5
-319	UG130049	5
-320	UG130050	5
-321	UG130051	5
-322	UG130052	5
-323	UG130056	5
-324	UG130057	5
-325	UG130058	5
-326	UG130059	5
-327	UG130060	5
-328	UG130061	5
-329	UG130062	5
-330	UG130063	5
-331	UG130065	5
-332	UG130066	5
-333	UG130067	5
-334	UG130068	5
-335	UG130069	5
-336	UG130070	5
-337	UG130071	5
-338	UG130073	5
-339	UG130074	5
-340	UG130076	5
-341	UG130077	5
-342	UG130078	5
-343	UG130080	5
-344	UG130081	5
-345	UG130082	5
-346	UG130083	5
-347	UG130085	5
-348	UG130086	5
-349	UG130087	5
-350	UG130088	5
-351	UG130089	5
-352	UG130090	5
-353	UG130091	5
-354	UG130092	5
-355	UG130093	5
-356	UG130094	5
-357	UG130095	5
-358	UG130096	5
-359	UG130097	5
-360	UG130098	5
-361	UG130099	5
-362	UG130100	5
-363	UG130101	5
-364	UG130102	5
-365	UG130103	5
-366	UG130104	5
-367	UG130105	5
-368	UG130106	5
-369	UG130107	5
-370	UG130108	5
-371	UG130109	5
-372	UG130110	5
-373	UG130111	5
-374	UG130113	5
-375	UG130114	5
-376	UG130116	5
-377	UG130117	5
-378	UG130118	5
-379	UG130119	5
-380	UG130120	5
-381	UG130121	5
-382	UG130122	5
-383	UG130123	5
-384	UG130124	5
-385	UG130125	5
-386	UG130126	5
-387	UG130128	5
-388	UG130131	5
-389	UG130133	5
-390	UG130135	5
-391	UG130136	5
-392	UG130137	5
-393	UG130139	5
-394	UG130140	5
-395	UG130143	5
-396	UG130144	5
-397	UG130145	5
-398	UG120001	6
-399	UG120002	6
-400	UG120003	6
-401	UG120004	6
-402	UG120005	6
-403	UG120006	6
-404	UG120007	6
-405	UG120008	6
-406	UG120009	6
-407	UG120010	6
-408	UG120011	6
-409	UG120012	6
-410	UG120013	6
-411	UG120014	6
-412	UG120015	6
-413	UG120016	6
-414	UG120017	6
-415	UG120018	6
-416	UG120019	6
-417	UG120020	6
-418	UG120021	6
-419	UG120022	6
-420	UG120023	6
-421	UG120024	6
-422	UG120025	6
-423	UG120026	6
-424	UG120027	6
-425	UG120028	6
-426	UG120029	6
-427	UG120030	6
-428	UG120031	6
-429	UG120032	6
-430	UG120033	6
-431	UG120034	6
-432	UG120035	6
-433	UG120036	6
-434	UG120037	6
-435	UG120038	6
-436	UG120039	6
-437	UG120040	6
-438	UG120041	6
-439	UG120042	6
-440	UG120043	6
-441	UG120044	6
-442	UG120045	6
-443	UG120046	6
-444	UG120047	6
-445	UG120048	6
-446	UG120049	6
-447	UG120050	6
-448	UG120051	6
-449	UG120052	6
-450	UG120053	6
-451	UG120054	6
-452	UG120055	6
-453	UG120056	6
-454	UG120057	6
-455	UG120058	6
-456	UG120059	6
-457	UG120060	6
-458	UG120061	6
-459	UG120062	6
-460	UG120063	6
-461	UG120064	6
-462	UG120065	6
-463	UG120066	6
-464	UG120067	6
-465	UG120068	6
-466	UG120069	6
-467	UG120070	6
-468	UG120071	6
-469	UG120072	6
-470	UG120073	6
-471	UG120074	6
-472	UG120075	6
-473	UG120076	6
-474	UG120077	6
-475	UG120078	6
-476	UG120079	6
-477	UG120080	6
-478	UG120081	6
-479	UG120082	6
-480	UG120083	6
-481	UG120084	6
-482	UG120085	6
-483	UG120086	6
-484	UG120087	6
-485	UG120088	6
-486	UG120089	6
-487	UG120090	6
-488	UG120091	6
-489	UG120092	6
-490	UG120093	6
-491	UG120094	6
-492	UG120095	6
-493	UG120096	6
-494	UG120097	6
-495	UG120098	6
-496	UG120099	6
-497	UG120100	6
-498	UG120101	6
-499	UG120102	6
-500	UG120103	6
-501	UG120104	6
-502	UG120105	6
-503	UG120106	6
-504	UG120107	6
-505	UG120108	6
-506	UG120109	6
-507	UG120110	6
-508	UG120111	6
-509	UG120112	6
-510	UG120113	6
-511	UG120114	6
-512	UG120115	6
-513	UG120116	6
-514	UG120117	6
-515	UG120118	6
-516	UG120119	6
-517	UG120120	6
-518	UG120121	6
-519	UG120122	6
-520	UG120123	6
-521	UG120124	6
-522	UG120125	6
-523	UG120126	6
-524	UG120127	6
-525	UG120128	6
-526	UG120129	6
-527	UG120130	6
-528	UG120131	6
-529	UG120132	6
-530	UG120133	6
-531	UG120134	6
-532	UG120135	6
-533	UG120136	6
-534	UG120137	6
-535	UG120138	6
-536	UG120139	6
-537	UG120140	6
-538	UG120141	6
-539	UG120142	6
-540	UG120143	6
-541	UG120144	6
-542	UG120145	6
-543	UG120146	6
-544	UG120147	6
-545	UG120148	6
-546	UG120149	6
-547	UG120150	6
-548	UG120151	6
-549	UG120152	6
-550	UG120153	6
-551	UG120154	6
-552	UG120155	6
-553	UG120156	6
-554	UG120157	6
-555	UG120158	6
-556	UG120159	6
-557	UG120160	6
-558	UG120161	6
-559	UG120162	6
-560	UG120163	6
-561	UG120164	6
-562	UG120165	6
-563	UG120166	6
-564	UG120167	6
-565	UG120168	6
-566	UG120169	6
-567	UG120170	6
-568	UG120171	6
-569	UG120172	6
-570	UG120173	6
-571	UG120174	6
-572	UG120175	6
-573	UG120176	6
-574	UG120177	6
-575	UG120178	6
-576	UG120179	6
-577	UG120180	6
-578	UG120181	6
-579	UG120182	6
-580	UG120183	6
-581	UG120184	6
-582	UG120185	6
-583	UG120186	6
-584	UG120187	6
-585	UG120188	6
-586	UG120189	6
-587	UG120190	6
-588	UG120191	6
-589	UG120192	6
-590	UG120193	6
-591	UG120194	6
-592	UG120195	6
-593	UG120196	6
-594	UG120197	6
-595	UG120198	6
-596	UG120199	6
-597	UG120200	6
-598	UG120201	6
-599	UG120202	6
-600	UG120203	6
-601	UG120204	6
-602	UG120205	6
-603	UG120206	6
-604	UG120207	6
-605	UG120208	6
-606	UG120209	6
-607	UG120210	6
-608	UG120211	6
-609	UG120212	6
-610	UG120213	6
-611	UG120214	6
-612	UG120215	6
-613	UG120216	6
-614	UG120217	6
-615	UG120218	6
-616	UG120219	6
-617	UG120220	6
-618	UG120221	6
-619	UG120222	6
-620	UG120223	6
-621	UG120224	6
-622	UG120225	6
-623	UG120226	6
-624	UG120227	6
-625	UG120228	6
-626	UG120229	6
-627	UG120230	6
-628	UG120231	6
-629	UG120232	6
-630	UG120233	6
-631	UG120234	6
-632	UG120235	6
-633	UG120236	6
-634	UG120237	6
-635	UG120238	6
-636	UG120239	6
-637	UG120240	6
-638	UG120241	6
-639	UG120242	6
-640	UG120243	6
-641	UG120244	6
-642	UG120245	6
-643	UG120246	6
-644	UG120247	6
-645	UG120248	6
-646	UG120249	6
-647	UG120250	6
-648	UG120251	6
-649	UG120252	6
-650	UG120253	6
-651	UG120254	6
-652	UG120255	6
-653	UG120256	6
-654	UG120257	6
-655	UG120258	6
-656	UG120259	6
-657	UG120260	6
-658	UG120261	6
-659	UG120262	6
-660	UG120263	6
-661	UG120264	6
-662	UG120265	6
-663	UG120266	6
-664	UG120267	6
-665	UG120268	6
-666	UG120269	6
-667	UG120270	6
-668	UG120271	6
-669	UG120272	6
-670	UG120273	6
-671	UG120274	6
-672	UG120275	6
-673	UG120276	6
-674	UG120277	6
-675	UG120278	6
-676	UG120279	6
-677	UG120280	6
-678	UG120281	6
-679	UG120282	6
-680	UG120283	6
-681	UG120284	6
-682	UG120285	6
-683	UG120286	6
-684	UG120287	6
-685	UG120288	6
-686	UG120289	6
-687	UG120290	6
-688	UG120291	6
-689	UG120292	6
-690	UG120293	6
-691	UG120294	6
-692	UG120295	6
-693	UG120296	6
-694	UG120297	6
-695	UG120298	6
-696	UG120299	6
-697	UG120300	6
-698	UG120301	6
-699	UG120303	6
-700	UG120304	6
-701	UG120305	6
-702	UG120306	6
-703	UG120307	6
-704	UG120308	6
-705	XG120113	7
-706	XG120073	7
-707	XG120123	7
-708	XG120131	7
-709	XG120261	7
-710	XG120068	7
-711	XG120251	7
-712	XG120198	7
-713	XG120021	7
-714	XG120221	7
-715	XG120273	7
-716	XG120015	7
-717	XG120030	7
-718	XG120171	7
-719	XG120287	7
-720	XG120155	7
-721	XG120061	7
-722	XG120104	7
-723	XG120071	7
-724	XG120083	7
-802	item1	809
-803	item2	809
-806	item11	811
-807	item12	811
-1430	new_test_crossP005	12
-1431	new_test_crossP009	12
-1432	test_accession1	12
-1433	test_accession2	12
-1434	test_accession2_synonym1	12
-1435	test_accession3_synonym1	12
-1436	CO_334:0000008	13
-1437	CO_334:0000009	13
-1438	CO_334:0000010	13
-1439	CO_334:0000011	13
-1440	CO_334:0000012	13
-1441	CO_334:0000013	13
-1442	CO_334:0000014	13
-1443	CO_334:0000015	13
-1444	CO_334:0000016	13
-1445	CO_334:0000017	13
+1446	test_accession	14
+\.
+
+
+--
+-- Data for Name: listprop; Type: TABLE DATA; Schema: sgn_people; Owner: postgres
+--
+
+COPY sgn_people.listprop (listprop_id, list_id, type_id, value, rank) FROM stdin;
 \.
 
 
@@ -244533,7 +244145,7 @@ COPY sgn_people.sp_papers (sp_paper_id, person_id, title, author_list, journal, 
 --
 
 COPY sgn_people.sp_person (sp_person_id, censor, salutation, last_name, first_name, organization, address, country, phone_number, fax, contact_email, webpage, research_keywords, user_format, research_interests, formatted_interests, contact_update, research_update, sp_login_id, username, private_email, pending_email, password, confirm_code, disabled, user_type, cookie_string, last_access_time, user_prefs, developer_settings) FROM stdin;
-41	0	\N	admin	admin	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	admin	\N	\N	$2a$06$qgEw8U6C05g6zWv7djWDyekjZRlD6VOEsSsogI4YRvNYoKHBdTSjC	\N	\N	user	yxuijzwyblqemqxvfmeklhvumzpvonlxqhcxmsttjpiqwsgzhllknaewreyytzsibiacnyq	2020-08-21 02:50:52.101952	\N	\N
+43	0	\N	admin	admin	BTI	\N	\N	\N	\N	\N	\N	\N	auto	\N	\N	\N	2020-04-09	\N	admin	\N	admintest@admin.test	$2a$06$7ktfwu1jfuVbVOpAoM/IyuI.NWp1eyglukY1thDJNldayA3RUjWna	3WZZIlbaM1d29TnJ	\N	user	\N	2020-04-09 10:43:13.62851	\N	\N
 \.
 
 
@@ -244550,9 +244162,9 @@ COPY sgn_people.sp_person_organisms (sp_person_organisms_id, sp_person_id, organ
 --
 
 COPY sgn_people.sp_person_roles (sp_person_role_id, sp_person_id, sp_role_id) FROM stdin;
-72	41	1
-75	41	6
-79	41	7
+76	43	4
+77	43	1
+78	43	7
 \.
 
 
@@ -244609,7 +244221,7 @@ COPY sgn_people.sp_roles (sp_role_id, name) FROM stdin;
 --
 
 COPY sgn_people.sp_token (sp_token_id, cookie_string, last_access_time, source_ip_address, sp_person_id) FROM stdin;
-1	yylrebthmsdgbiwvguatberxcbfmmksxxlumquxxbmzdffdfyddzesopehlhapltdrsgjdf	2023-03-16 23:55:56.065168	\N	41
+2	gnsrlrdluxptabisvabunssxkabxyyfnaizujovzqmgixjmfkjmjqrwuhvuztsjjaoxsatw	2022-02-20 22:53:04.639101	\N	43
 \.
 
 
@@ -245407,7 +245019,7 @@ SELECT pg_catalog.setval('metadata.md_dbiref_dbiref_id_seq', 1, false);
 -- Name: md_dbversion_dbversion_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: postgres
 --
 
-SELECT pg_catalog.setval('metadata.md_dbversion_dbversion_id_seq', 263, true);
+SELECT pg_catalog.setval('metadata.md_dbversion_dbversion_id_seq', 286, true);
 
 
 --
@@ -245463,7 +245075,7 @@ SELECT pg_catalog.setval('metadata.md_json_json_id_seq', 1, false);
 -- Name: md_metadata_metadata_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: postgres
 --
 
-SELECT pg_catalog.setval('metadata.md_metadata_metadata_id_seq', 276, true);
+SELECT pg_catalog.setval('metadata.md_metadata_metadata_id_seq', 299, true);
 
 
 --
@@ -245880,6 +245492,13 @@ SELECT pg_catalog.setval('phenome.stock_allele_stock_allele_id_seq', 1, false);
 
 
 --
+-- Name: stock_file_stock_file_id_seq; Type: SEQUENCE SET; Schema: phenome; Owner: postgres
+--
+
+SELECT pg_catalog.setval('phenome.stock_file_stock_file_id_seq', 1, false);
+
+
+--
 -- Name: stock_image_stock_image_id_seq; Type: SEQUENCE SET; Schema: phenome; Owner: postgres
 --
 
@@ -246170,7 +245789,7 @@ SELECT pg_catalog.setval('public.contact_relationship_contact_relationship_id_se
 -- Name: cv_cv_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cv_cv_id_seq', 76, true);
+SELECT pg_catalog.setval('public.cv_cv_id_seq', 77, true);
 
 
 --
@@ -246184,7 +245803,7 @@ SELECT pg_catalog.setval('public.cvprop_cvprop_id_seq', 6, true);
 -- Name: cvterm_cvterm_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cvterm_cvterm_id_seq', 79122, true);
+SELECT pg_catalog.setval('public.cvterm_cvterm_id_seq', 79143, true);
 
 
 --
@@ -246261,7 +245880,7 @@ SELECT pg_catalog.setval('public.db_db_id_seq', 312, true);
 -- Name: dbxref_dbxref_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.dbxref_dbxref_id_seq', 214281, true);
+SELECT pg_catalog.setval('public.dbxref_dbxref_id_seq', 214302, true);
 
 
 --
@@ -246615,6 +246234,13 @@ SELECT pg_catalog.setval('public.nd_experimentprop_nd_experimentprop_id_seq', 70
 
 
 --
+-- Name: nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.nd_geolocation_dbxref_nd_geolocation_dbxref_id_seq', 1, false);
+
+
+--
 -- Name: nd_geolocation_nd_geolocation_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
@@ -246815,6 +246441,13 @@ SELECT pg_catalog.setval('public.phylotree_pub_phylotree_pub_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('public.project_contact_project_contact_id_seq', 1, false);
+
+
+--
+-- Name: project_dbxref_project_dbxref_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.project_dbxref_project_dbxref_id_seq', 1, false);
 
 
 --
@@ -247847,6 +247480,13 @@ SELECT pg_catalog.setval('sgn_people.forum_topic_forum_topic_id_seq', 4, true);
 
 
 --
+-- Name: list_dbxref_list_dbxref_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
+--
+
+SELECT pg_catalog.setval('sgn_people.list_dbxref_list_dbxref_id_seq', 1, false);
+
+
+--
 -- Name: list_item_list_item_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
@@ -247858,6 +247498,13 @@ SELECT pg_catalog.setval('sgn_people.list_item_list_item_id_seq', 724, true);
 --
 
 SELECT pg_catalog.setval('sgn_people.list_list_id_seq', 14, true);
+
+
+--
+-- Name: listprop_listprop_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
+--
+
+SELECT pg_catalog.setval('sgn_people.listprop_listprop_id_seq', 1, false);
 
 
 --
@@ -247941,14 +247588,14 @@ SELECT pg_catalog.setval('sgn_people.sp_person_organisms_sp_person_organisms_id_
 -- Name: sp_person_roles_sp_person_role_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
-SELECT pg_catalog.setval('sgn_people.sp_person_roles_sp_person_role_id_seq', 79, true);
+SELECT pg_catalog.setval('sgn_people.sp_person_roles_sp_person_role_id_seq', 82, true);
 
 
 --
 -- Name: sp_person_sp_person_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
-SELECT pg_catalog.setval('sgn_people.sp_person_sp_person_id_seq', 43, true);
+SELECT pg_catalog.setval('sgn_people.sp_person_sp_person_id_seq', 44, true);
 
 
 --
@@ -247990,7 +247637,7 @@ SELECT pg_catalog.setval('sgn_people.sp_roles_sp_role_id_seq', 8, true);
 -- Name: sp_token_sp_token_id_seq; Type: SEQUENCE SET; Schema: sgn_people; Owner: postgres
 --
 
-SELECT pg_catalog.setval('sgn_people.sp_token_sp_token_id_seq', 1, true);
+SELECT pg_catalog.setval('sgn_people.sp_token_sp_token_id_seq', 2, true);
 
 
 --
@@ -249664,6 +249311,14 @@ ALTER TABLE ONLY phenome.stock_allele
 
 
 --
+-- Name: stock_file stock_file_pkey; Type: CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.stock_file
+    ADD CONSTRAINT stock_file_pkey PRIMARY KEY (stock_file_id);
+
+
+--
 -- Name: stock_image stock_image_pkey; Type: CONSTRAINT; Schema: phenome; Owner: postgres
 --
 
@@ -250888,6 +250543,14 @@ ALTER TABLE ONLY public.nd_experimentprop
 
 
 --
+-- Name: nd_geolocation_dbxref nd_geolocation_dbxref_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.nd_geolocation_dbxref
+    ADD CONSTRAINT nd_geolocation_dbxref_pkey PRIMARY KEY (nd_geolocation_dbxref_id);
+
+
+--
 -- Name: nd_geolocation nd_geolocation_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -251317,6 +250980,22 @@ ALTER TABLE ONLY public.project_contact
 
 ALTER TABLE ONLY public.project_contact
     ADD CONSTRAINT project_contact_pkey PRIMARY KEY (project_contact_id);
+
+
+--
+-- Name: project_dbxref project_dbxref_c1; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref
+    ADD CONSTRAINT project_dbxref_c1 UNIQUE (project_id, dbxref_id);
+
+
+--
+-- Name: project_dbxref project_dbxref_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref
+    ADD CONSTRAINT project_dbxref_pkey PRIMARY KEY (project_dbxref_id);
 
 
 --
@@ -252976,6 +252655,30 @@ ALTER TABLE ONLY sgn_people.forum_topic
 
 
 --
+-- Name: list_dbxref list_dbxref_c1; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref
+    ADD CONSTRAINT list_dbxref_c1 UNIQUE (list_id, dbxref_id);
+
+
+--
+-- Name: list_dbxref list_dbxref_pkey; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref
+    ADD CONSTRAINT list_dbxref_pkey PRIMARY KEY (list_dbxref_id);
+
+
+--
+-- Name: list list_id_unique; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list
+    ADD CONSTRAINT list_id_unique UNIQUE (list_id);
+
+
+--
 -- Name: list_item list_item_pkey; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
 --
 
@@ -252989,6 +252692,14 @@ ALTER TABLE ONLY sgn_people.list_item
 
 ALTER TABLE ONLY sgn_people.list
     ADD CONSTRAINT list_pkey PRIMARY KEY (list_id);
+
+
+--
+-- Name: listprop listprop_pkey; Type: CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.listprop
+    ADD CONSTRAINT listprop_pkey PRIMARY KEY (listprop_id);
 
 
 --
@@ -255549,6 +255260,20 @@ CREATE INDEX project_contact_idx2 ON public.project_contact USING btree (contact
 
 
 --
+-- Name: project_dbxref_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX project_dbxref_idx1 ON public.project_dbxref USING btree (project_id);
+
+
+--
+-- Name: project_dbxref_idx2; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX project_dbxref_idx2 ON public.project_dbxref USING btree (dbxref_id);
+
+
+--
 -- Name: project_idx1; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -256708,6 +256433,20 @@ CREATE INDEX bac_status_idx ON sgn_people.bac_status USING btree (bac_id, status
 --
 
 CREATE INDEX country_idx ON sgn_people.sp_person USING btree (country);
+
+
+--
+-- Name: list_dbxref_idx1; Type: INDEX; Schema: sgn_people; Owner: postgres
+--
+
+CREATE INDEX list_dbxref_idx1 ON sgn_people.list_dbxref USING btree (list_id);
+
+
+--
+-- Name: list_dbxref_idx2; Type: INDEX; Schema: sgn_people; Owner: postgres
+--
+
+CREATE INDEX list_dbxref_idx2 ON sgn_people.list_dbxref USING btree (dbxref_id);
 
 
 --
@@ -260033,15 +259772,7 @@ ALTER TABLE ONLY phenome.registry
 --
 
 ALTER TABLE ONLY phenome.stock_allele
-    ADD CONSTRAINT stock_allele_allele_id_fkey FOREIGN KEY (allele_id) REFERENCES phenome.allele(allele_id);
-
-
---
--- Name: stock_allele stock_allele_metadata_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
---
-
-ALTER TABLE ONLY phenome.stock_allele
-    ADD CONSTRAINT stock_allele_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id);
+    ADD CONSTRAINT stock_allele_allele_id_fkey FOREIGN KEY (allele_id) REFERENCES phenome.allele(allele_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260049,7 +259780,23 @@ ALTER TABLE ONLY phenome.stock_allele
 --
 
 ALTER TABLE ONLY phenome.stock_allele
-    ADD CONSTRAINT stock_allele_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id);
+    ADD CONSTRAINT stock_allele_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: stock_file stock_file_file_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.stock_file
+    ADD CONSTRAINT stock_file_file_id_fkey FOREIGN KEY (file_id) REFERENCES metadata.md_files(file_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: stock_file stock_file_stock_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.stock_file
+    ADD CONSTRAINT stock_file_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES public.stock(stock_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -260065,6 +259812,14 @@ ALTER TABLE ONLY phenome.stock_image
 --
 
 ALTER TABLE ONLY phenome.stock_image
+    ADD CONSTRAINT stock_image_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: stock_allele stock_image_metadata_id_fkey; Type: FK CONSTRAINT; Schema: phenome; Owner: postgres
+--
+
+ALTER TABLE ONLY phenome.stock_allele
     ADD CONSTRAINT stock_image_metadata_id_fkey FOREIGN KEY (metadata_id) REFERENCES metadata.md_metadata(metadata_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
@@ -260933,6 +260688,22 @@ ALTER TABLE ONLY public.featureprop
 
 
 --
+-- Name: project_dbxref fkey_dbxref_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref
+    ADD CONSTRAINT fkey_dbxref_id FOREIGN KEY (dbxref_id) REFERENCES public.dbxref(dbxref_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: project_dbxref fkey_project_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.project_dbxref
+    ADD CONSTRAINT fkey_project_id FOREIGN KEY (project_id) REFERENCES public.project(project_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
 -- Name: fpc_band fpc_band_fpc_fingerprint_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -261226,6 +260997,22 @@ ALTER TABLE ONLY public.nd_experimentprop
 
 ALTER TABLE ONLY public.nd_experimentprop
     ADD CONSTRAINT nd_experimentprop_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: nd_geolocation_dbxref nd_geolocation_dbxref_dbxref_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.nd_geolocation_dbxref
+    ADD CONSTRAINT nd_geolocation_dbxref_dbxref_id_fkey FOREIGN KEY (dbxref_id) REFERENCES public.dbxref(dbxref_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: nd_geolocation_dbxref nd_geolocation_dbxref_nd_geolocation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.nd_geolocation_dbxref
+    ADD CONSTRAINT nd_geolocation_dbxref_nd_geolocation_id_fkey FOREIGN KEY (nd_geolocation_id) REFERENCES public.nd_geolocation(nd_geolocation_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -263549,6 +263336,22 @@ ALTER TABLE ONLY sgn_people.forum_post
 
 
 --
+-- Name: list_dbxref list_dbxref_dbxref_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref
+    ADD CONSTRAINT list_dbxref_dbxref_id_fkey FOREIGN KEY (dbxref_id) REFERENCES public.dbxref(dbxref_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: list_dbxref list_dbxref_list_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.list_dbxref
+    ADD CONSTRAINT list_dbxref_list_id_fkey FOREIGN KEY (list_id) REFERENCES sgn_people.list(list_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
 -- Name: list_item list_item_list_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
 --
 
@@ -263570,6 +263373,22 @@ ALTER TABLE ONLY sgn_people.list
 
 ALTER TABLE ONLY sgn_people.list
     ADD CONSTRAINT list_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id);
+
+
+--
+-- Name: listprop listprop_list_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.listprop
+    ADD CONSTRAINT listprop_list_id_fkey FOREIGN KEY (list_id) REFERENCES sgn_people.list(list_id);
+
+
+--
+-- Name: listprop listprop_type_id_fkey; Type: FK CONSTRAINT; Schema: sgn_people; Owner: postgres
+--
+
+ALTER TABLE ONLY sgn_people.listprop
+    ADD CONSTRAINT listprop_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.cvterm(cvterm_id);
 
 
 --
@@ -266087,6 +265906,20 @@ GRANT SELECT,USAGE ON SEQUENCE phenome.stock_allele_stock_allele_id_seq TO web_u
 
 
 --
+-- Name: TABLE stock_file; Type: ACL; Schema: phenome; Owner: postgres
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE phenome.stock_file TO web_usr;
+
+
+--
+-- Name: SEQUENCE stock_file_stock_file_id_seq; Type: ACL; Schema: phenome; Owner: postgres
+--
+
+GRANT USAGE ON SEQUENCE phenome.stock_file_stock_file_id_seq TO web_usr;
+
+
+--
 -- Name: TABLE stock_image; Type: ACL; Schema: phenome; Owner: postgres
 --
 
@@ -268094,6 +267927,20 @@ GRANT ALL ON TABLE public.project_contact TO web_usr;
 --
 
 GRANT SELECT,USAGE ON SEQUENCE public.project_contact_project_contact_id_seq TO web_usr;
+
+
+--
+-- Name: TABLE project_dbxref; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.project_dbxref TO web_usr;
+
+
+--
+-- Name: SEQUENCE project_dbxref_project_dbxref_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.project_dbxref_project_dbxref_id_seq TO web_usr;
 
 
 --
@@ -270170,6 +270017,20 @@ GRANT ALL ON SEQUENCE sgn_people.list_item_list_item_id_seq TO web_usr;
 --
 
 GRANT ALL ON SEQUENCE sgn_people.list_list_id_seq TO web_usr;
+
+
+--
+-- Name: TABLE listprop; Type: ACL; Schema: sgn_people; Owner: postgres
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sgn_people.listprop TO web_usr;
+
+
+--
+-- Name: SEQUENCE listprop_listprop_id_seq; Type: ACL; Schema: sgn_people; Owner: postgres
+--
+
+GRANT USAGE ON SEQUENCE sgn_people.listprop_listprop_id_seq TO web_usr;
 
 
 --
